@@ -26,7 +26,6 @@ export const DebugPanel = () => {
   return (
     <div style={panelStyle}>
       <h3>🐛 Debug Panel</h3>
-      
       <div style={sectionStyle}>
         <h4>📍 Тайл</h4>
         <p><strong>ID:</strong> {tile.templateId}</p>
@@ -40,7 +39,9 @@ export const DebugPanel = () => {
         {tile.features.map((feature, idx) => {
           const featureKey = `${x},${y}:${feature.id}`;
           const owners = regionManager.getFeatureOwners(featureKey);
-          const metadata = regionManager.getMetadata(featureKey);
+          // 🌟 Получаем метаданные через корневой ключ
+          const rootKey = regionManager.find(featureKey);
+          const metadata = rootKey ? regionManager.getMetadata(rootKey) : undefined;
           const regionKeys = metadata ? Array.from(metadata.featureKeys) : [];
 
           return (
@@ -48,22 +49,52 @@ export const DebugPanel = () => {
               <strong>#{idx + 1} {feature.id}</strong>
               <p>Тип: {feature.type}</p>
               <p>Направления: {feature.directions.join(', ')}</p>
-              <p>Владельцы: {owners.length > 0 ? owners.map(id => {
+              <p>Владельцы (локально): {owners.length > 0 ? owners.map(id => {
                 const player = players.find(p => p.id === id);
                 return `${player?.name} (${player?.color})`;
               }).join(', ') : 'Нет'}</p>
-              <p>Размер региона: {metadata?.segments || 0} тайл(ов)</p>
-              <p>Щит: {metadata?.hasShield ? 'Да' : 'Нет'}</p>
-              <details>
-                <summary style={{ cursor: 'pointer', marginTop: '5px', color: '#aaa' }}>
-                  Ключи региона ({regionKeys.length})
-                </summary>
-                <ul style={{ fontSize: '11px', marginTop: '5px', paddingLeft: '15px', color: '#ccc' }}>
-                  {regionKeys.map((key, kidx) => (
-                    <li key={kidx}>{key}</li>
-                  ))}
-                </ul>
-              </details>
+              {metadata && (
+                <>
+                  <p>Размер региона: {metadata.segments} тайл(ов)</p>
+                  <p>Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
+                  <p style={{ color: metadata.isComplete ? '#4CAF50' : '#FF9800' }}>
+                    Статус завершения: {metadata.isComplete ? 'ЗАВЕРШЁН' : 'НЕ ЗАВЕРШЁН'}
+                  </p>
+                  {metadata.isComplete && (
+                    <p>Очки: {metadata.points}</p>
+                  )}
+                  {/* --- ОТОБРАЖЕНИЕ ВЛАДЕЛЬЦЕВ ВСЕГО РЕГИОНА И ИХ МИПЛОВ --- */}
+                    <div>
+                    <p>Владельцы региона и миплы:</p>
+                    {/* --- ДОБАВЛЕНА ПРОВЕРКА if (metadata) --- */}
+                    {metadata && metadata.meepleCounts.size > 0 ? (
+                      <ul style={{ margin: '2px 0', paddingLeft: '15px' }}>
+                        {Array.from(metadata.meepleCounts.entries()).map(([playerId, count]) => {
+                          const player = players.find(p => p.id === playerId);
+                          return (
+                            <li key={playerId} style={{ fontSize: '11px' }}>
+                              {player?.name} ({player?.color}): {count} мипл(ов)
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p style={{ margin: '2px 0', fontSize: '11px' }}>Нет миплов</p>
+                    )}
+                  </div>
+                  {/* ---------------------------------------- */}
+                  <details>
+                    <summary style={{ cursor: 'pointer', marginTop: '5px', color: '#aaa' }}>
+                      Ключи региона ({regionKeys.length})
+                    </summary>
+                    <ul style={{ fontSize: '11px', marginTop: '5px', paddingLeft: '15px', color: '#ccc' }}>
+                      {regionKeys.map((key, kidx) => (
+                        <li key={kidx}>{key}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </>
+              )}
             </div>
           );
         })}
@@ -75,6 +106,8 @@ export const DebugPanel = () => {
     </div>
   );
 };
+
+// ... (стили без изменений)
 
 const panelStyle: React.CSSProperties = {
   position: 'fixed',

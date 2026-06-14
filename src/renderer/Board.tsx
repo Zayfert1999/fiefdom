@@ -21,6 +21,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
   const showRegions = useGameStore(s => s.showRegions);
   const regionManager = useGameStore(s => s.regionManager);
   const players = useGameStore(s => s.players);
+
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
 
@@ -96,16 +97,51 @@ export const Board = ({ onGridClick }: BoardProps) => {
     onGridClick(gridX, gridY);
   };
 
+  // 🐛 Обработчик дебаг-клика (Ctrl + клик)
   const handleDebugClick = (e: React.MouseEvent, x: number, y: number) => {
-    e.stopPropagation();
-    setDebugSelectedTile({ x, y });
+    // Проверяем, был ли нажат Control или Command (Mac)
+    if (e.ctrlKey || e.metaKey) {
+        e.stopPropagation(); // Останавливаем всплытие, чтобы не сработал handleSvgClick
+        setDebugSelectedTile({ x, y });
+        console.log(`🐛 [Board] Вызван дебаг для тайла (${x}, ${y})`);
+    }
+    // Если клик был без Ctrl/Command, ничего не делаем.
+    // Контекстное меню больше не вызывается.
+  };
+
+  // 🐛 Обработчик клика на уровне SVG (для дебага по Ctrl/Cmd + левый клик)
+  const handleSvgMainClick = (e: React.MouseEvent<SVGSVGElement>) => {
+     // Проверяем, был ли нажат Control или Command (Mac)
+     if (e.ctrlKey || e.metaKey) {
+        e.stopPropagation(); // Останавливаем всплытие, чтобы не сработал handleSvgClick
+        // Определяем координаты клика в системе координат доски (аналогично handleSvgClick)
+        const svg = e.currentTarget;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+
+        const svgPoint = svg.createSVGPoint();
+        svgPoint.x = e.clientX;
+        svgPoint.y = e.clientY;
+
+        const pointInViewBox = svgPoint.matrixTransform(ctm.inverse());
+        const gridX = Math.floor(pointInViewBox.x / TILE_SIZE);
+        const gridY = Math.floor(pointInViewBox.y / TILE_SIZE);
+
+        setDebugSelectedTile({ x: gridX, y: gridY });
+        console.log(`🐛 [Board] Вызван дебаг для тайла (${gridX}, ${gridY}) по клику на SVG.`);
+     } else {
+        // Если не Ctrl/Cmd, передаём клик на обработку размещения тайла
+        handleSvgClick(e);
+     }
   };
 
   return (
     <svg
       viewBox={viewBox} // 🌟 Используем вычисляемый viewBox
-      onClick={handleSvgClick}
-      onContextMenu={(e) => e.preventDefault()}
+      // 🐛 УБРАНО: onClick={handleSvgClick}, onContextMenu={handleContextMenu}
+      // 🐛 ДОБАВЛЕНО: onClick={handleSvgMainClick} для обработки Ctrl/Cmd + клик
+      onClick={handleSvgMainClick}
+      // 🐛 УБРАНО: onContextMenu
       style={{ width: '100%', height: '100vh', background: '#1a1a1a', display: 'block', cursor: 'crosshair' }}
     >
       <defs>
@@ -132,7 +168,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
         const key = `${t.x},${t.y}`;
         const isLastTile = key === lastTileKey;
         const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
-        
+
         // 🌟 Собираем массив подсветок ДЛЯ КАЖДОЙ ФИЧИ ОТДЕЛЬНО
         const featureHighlights: FeatureHighlight[] = [];
 
@@ -140,11 +176,11 @@ export const Board = ({ onGridClick }: BoardProps) => {
           for (const feature of t.features) {
             const featureKey = `${t.x},${t.y}:${feature.id}`;
             const owners = regionManager.getFeatureOwners(featureKey);
-            
+
             if (owners.length > 0) {
               const firstOwner = players.find(p => p.id === owners[0]);
               const color = firstOwner?.color || '#ffffff';
-              
+
               featureHighlights.push({
                 featureId: feature.id,
                 color,
@@ -161,15 +197,18 @@ export const Board = ({ onGridClick }: BoardProps) => {
         const availableFeaturesForMeeple = featuresForRendering.filter(feature => {
           const featureKey = `${t.x},${t.y}:${feature.id}`;
           const owners = regionManager.getFeatureOwners(featureKey);
+          // Разрешаем ставить мипла только если в регионе 0 владельцев
           return owners.length === 0;
         });
 
         return (
-          <g 
-            key={key} 
+          <g
+            key={key}
             transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE})`}
-            onContextMenu={(e) => handleDebugClick(e, t.x, t.y)}
+            // 🐛 УБРАНО: onContextMenu={(e) => handleDebugClick(e, t.x, t.y)}
+            // 🐛 ДОБАВЛЕНО: onClick={(e) => { if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y); }}
             onClick={(e) => {
+              // Левый клик с Ctrl/Cmd вызывает дебаг
               if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y);
             }}
             style={{ cursor: 'pointer' }}
@@ -177,24 +216,24 @@ export const Board = ({ onGridClick }: BoardProps) => {
             {isDebugSelected && (
               <rect x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} fill="transparent" stroke="#ffff00" strokeWidth={4} pointerEvents="none" />
             )}
-            
+
             <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
               {/* 🌟 Передаём изолированный массив подсветок */}
-              <Tile 
-                id={t.templateId as any} 
-                size={TILE_SIZE} 
+              <Tile
+                id={t.templateId as any}
+                size={TILE_SIZE}
                 meeple={t.meeple}
                 featureHighlights={featureHighlights}
               />
 
               {phase === 'placeMeeple' && isLastTile && !t.meeple && currentPlayer && availableFeaturesForMeeple.length > 0 && (
-                <MeepleSelection 
+                <MeepleSelection
                   features={availableFeaturesForMeeple}
-                  playerColor={currentPlayer.color} 
+                  playerColor={currentPlayer.color}
                   onPlace={(fid, x, y) => {
                     console.log(`🖱️ [Board] Выбор спота: фича ${fid}, координаты (${x}, ${y})`);
                     useGameStore.getState().placeMeeple(fid, x, y);
-                  }} 
+                  }}
                 />
               )}
             </g>

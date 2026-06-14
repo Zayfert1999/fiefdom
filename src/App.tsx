@@ -11,7 +11,7 @@ export default function App() {
     placeTile, endTurn, initGame,
     showRegions, toggleRegions
   } = useGameStore();
-  
+
   const [previewRotation, setPreviewRotation] = useState<0 | 90 | 180 | 270>(0);
 
   useEffect(() => {
@@ -51,8 +51,8 @@ export default function App() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
-      
-      {/* 🖼️ Верхняя панель (HUD) — теперь без кнопки пропуска */}
+
+      {/* 🖼️ Верхняя панель (HUD) */}
       <div style={{
         padding: '12px 20px',
         background: '#222',
@@ -64,13 +64,11 @@ export default function App() {
         flexWrap: 'wrap'
       }}>
         <span>👤 Ход: <strong>{currentPlayer?.name || '---'}</strong></span>
-        <span style={{ color: '#888', fontSize: '0.85em' }}>📦 Колода: {deck.length}</span>
-        <span style={{ color: '#888', fontSize: '0.85em' }}>🔶 Миплы: {currentPlayer?.meepleCount ?? 0}</span>
-
-        <button 
-          onClick={toggleRegions} 
-          style={{ 
-            ...btnStyle, 
+        {/* 🌟 Информация о колоде перемещена в панель действий */}
+        <button
+          onClick={toggleRegions}
+          style={{
+            ...btnStyle,
             background: showRegions ? '#5cb85c' : '#555',
             marginLeft: 'auto'
           }}
@@ -79,10 +77,51 @@ export default function App() {
         </button>
       </div>
 
+      {/* 📊 ПАНЕЛЬ ИГРОКОВ (Левый верхний угол, под хедером) */}
+      {players.length > 0 && (
+        <div style={{
+          position: 'absolute', // Абсолютное позиционирование относительно body/html
+          top: '70px', // Отступ от верха, чтобы не перекрывалось с верхним хедером
+          left: '20px',
+          background: 'rgba(30, 30, 30, 0.95)',
+          border: '2px solid #4a90e2',
+          borderRadius: '16px',
+          padding: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
+          zIndex: 999, // Ниже, чем DebugPanel (обычно z-index 1000), но выше, чем всё остальное
+          backdropFilter: 'blur(8px)',
+          minWidth: '150px',
+        }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#fff', textAlign: 'center' }}>Игроки</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {players.map((player, index) => (
+              <div
+                key={player.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '6px 10px',
+                  background: currentTurn === index ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)', // Подсветка текущего игрока
+                  borderRadius: '6px',
+                  border: currentTurn === index ? '1px solid #4a90e2' : '1px solid transparent', // Бордер для текущего игрока
+                }}
+              >
+                <span style={{ color: '#fff', fontSize: '13px', fontWeight: '500' }}>{player.name}</span>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <span style={{ color: '#888', fontSize: '12px' }}>🏆 {player.score}</span>
+                  <span style={{ color: '#888', fontSize: '12px' }}>🔶 {player.meepleCount}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 🗺️ Игровое поле */}
       <Board onGridClick={handleBoardClick} />
 
-      {/* 🤲 ПАНЕЛЬ ДЕЙСТВИЙ (Правый нижний угол) — теперь с кнопкой пропуска */}
+      /* 🤲 ПАНЕЛЬ ДЕЙСТВИЙ (Правый нижний угол) — теперь с информацией о колоде и превью тайла */
       {showPreviewPanel && (
         <div style={{
           position: 'fixed',
@@ -101,17 +140,18 @@ export default function App() {
           backdropFilter: 'blur(8px)',
           minWidth: '140px'
         }}>
+          {/* 🌟 Информация о колоде перемещена сюда */}
+          <div style={{ alignSelf: 'flex-start' }}>
+            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px' }}>📦 Колода: {deck.length}</span>
+          </div>
+
           {/* 🎴 Превью тайла (только в фазе placeTile) */}
           {phase === 'placeTile' && drawnTile && (
             <>
-              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                🤲 Тайл в руке
-              </span>
-              
-              <div 
+              <div
                 onClick={handleRotate}
                 title="Нажмите, чтобы повернуть"
-                style={{ 
+                style={{
                   cursor: 'pointer',
                   border: '1px solid #555',
                   borderRadius: '8px',
@@ -136,7 +176,7 @@ export default function App() {
                 </svg>
               </div>
               <div style={{ color: '#888', fontSize: '11px', textAlign: 'center' }}>
-                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле
+                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле<br />
               </div>
             </>
           )}
@@ -147,11 +187,11 @@ export default function App() {
               <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px', textAlign: 'center' }}>
                 🎯 Поставить мипла?
               </span>
-              <button 
-                onClick={handleSkipMeeple} 
-                style={{ 
-                  ...btnStyle, 
-                  width: '100%', 
+              <button
+                onClick={handleSkipMeeple}
+                style={{
+                  ...btnStyle,
+                  width: '100%',
                   background: '#2ecc71',
                   display: 'flex',
                   alignItems: 'center',
@@ -162,11 +202,14 @@ export default function App() {
               >
                 ⏭️ Пропустить мипла
               </button>
+              <div style={{ color: '#888', fontSize: '11px', textAlign: 'center' }}>
+                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле,<br />
+              </div>
             </>
           )}
         </div>
       )}
-      
+
       {/* 🐛 Рендерим дебаг-панель поверх всего */}
       <DebugPanel />
     </div>

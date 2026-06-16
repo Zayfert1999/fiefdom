@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g id="b" data-name="field">
+    <path id="c" data-name="field_new" d="M0,0v100h42v-25h16v25h42V0H0ZM74,74H26v-22l14-6v-11l10-9,10,9v11l14,6v22Z" fill="#6c0"/>
+    <path id="d" data-name="field_new" d="M0,0v100h42v-25h16v25h42V0H0ZM74,74H26v-22l14-6v-11l10-9,10,9v11l14,6v22Z" fill="#6c0"/>
+  </g>
+  <g id="e" data-name="road">
+    <rect id="f" data-name="road_s" x="42" y="75" width="16" height="25" fill="#e6e6e6"/>
+    <rect id="g" data-name="road_s" x="42" y="75" width="16" height="25" fill="#e6e6e6"/>
+  </g>
+  <g id="h" data-name="roadBorder">
+    <line x1="42.5" y1="100" x2="42.5" y2="75" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="57.5" y1="100" x2="57.5" y2="75" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
+  </g>
+  <g id="l" data-name="monastery">
+    <g id="m" data-name="monastery">
+      <polygon points="74 52 74 74 26 74 26 52 40 46 40 35 50 26 60 35 60 46 74 52" fill="#dcbe96" stroke="#c30" stroke-miterlimit="10" stroke-width="2"/>
+      <line x1="35" y1="60.29" x2="35" y2="73.71" fill="none" stroke="#c30" stroke-miterlimit="10" stroke-width="2"/>
+      <line x1="65" y1="60.29" x2="65" y2="73.71" fill="none" stroke="#c30" stroke-miterlimit="10" stroke-width="2"/>
+      <line x1="50" y1="36.35" x2="50" y2="44.35" fill="none" stroke="#c30" stroke-miterlimit="10" stroke-width="2"/>
+      <path d="M55,74v-15c0-2.76-2.24-5-5-5h0c-2.76,0-5,2.24-5,5v15" fill="none" stroke="#c30" stroke-miterlimit="10" stroke-width="2"/>
+    </g>
+  </g>
+
+
+
+<g id="highlights" class="highlights-layer" style="pointer-events: none;">
+  <path d="M0,0v100h42v-25h16v25h42V0H0ZM74,74H26v-22l14-6v-11l10-9,10,9v11l14,6v22Z" fill="var(--player-color, white)" class="highlight" data-feature="field_new" stroke="none" opacity="0"/>
+  <rect x="42" y="75" width="16" height="25" fill="var(--player-color, white)" class="highlight" data-feature="road_s" stroke="none" opacity="0"/>
+</g>
+</svg>

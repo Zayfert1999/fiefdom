@@ -1,21 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-  <g id="field">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g id="a" data-name="field">
     <g>
-    <rect id="field_w" y="0" width="42" height="100" fill="#6c0"/>
-    <rect id="field_e" x="58" y="0" width="42" height="100" fill="#6c0"/>
+      <rect id="b" data-name="field_w" y="0" width="42" height="100" fill="#6c0"/>
+      <rect id="c" data-name="field_e" x="58" y="0" width="42" height="100" fill="#6c0"/>
+    </g>
+    <g>
+      <rect id="d" data-name="field_w" y="0" width="42" height="100" fill="#6c0"/>
+      <rect id="e" data-name="field_e" x="58" y="0" width="42" height="100" fill="#6c0"/>
+    </g>
   </g>
-</g>
-<g id="road">
-  <rect id="road_ns" x="42" width="16" height="100" fill="#e6e6e6"/>
-</g>
-<g id="roadBorder">
-  <line x1="57.5" y1="100" x2="57.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
-  <line x1="42.5" y1="100" x2="42.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
-</g>
+  <g id="f" data-name="road">
+    <rect id="g" data-name="road_ns" x="42" width="16" height="100" fill="#e6e6e6"/>
+    <rect id="h" data-name="road_ns" x="42" width="16" height="100" fill="#e6e6e6"/>
+  </g>
+  <g id="i" data-name="roadBorder">
+    <line x1="57.5" y1="100" x2="57.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="42.5" y1="100" x2="42.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
+  </g>
+
+
+
 <g id="highlights" class="highlights-layer" style="pointer-events: none;">
-  <rect y="0" width="42" height="100" fill="var(--player-color, white)" opacity="0" data-feature="field_w" class="highlight"/>
-  <rect x="58" y="0" width="42" height="100" fill="var(--player-color, white)" opacity="0" data-feature="field_e" class="highlight"/>
-  <rect x="42" width="16" height="100" fill="var(--player-color, white)" opacity="0" data-feature="road_ns" class="highlight"/>
+  <rect y="0" width="42" height="100" fill="var(--player-color, white)" class="highlight" data-feature="field_w" stroke="none" opacity="0"/>
+  <rect x="58" y="0" width="42" height="100" fill="var(--player-color, white)" class="highlight" data-feature="field_e" stroke="none" opacity="0"/>
+  <rect x="42" width="16" height="100" fill="var(--player-color, white)" class="highlight" data-feature="road_ns" stroke="none" opacity="0"/>
 </g>
 </svg>

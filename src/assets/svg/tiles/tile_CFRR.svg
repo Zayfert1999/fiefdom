@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g id="c" data-name="field">
+    <g>
+      <path id="d" data-name="field_e-nw" d="M0,0v42s34,0,34,0c13.23,0,24,10.77,24,24v34s42,0,42,0V0c-10.44,7.37-21.36,14.58-33.81,17.8C41.34,24.64,19.72,14.62,0,0Z" fill="#6c0"/>
+      <path id="e" data-name="field_sw" d="M34,58H0s0,42,0,42h42s0-34,0-34c0-4.41-3.59-8-8-8Z" fill="#6c0"/>
+    </g>
+    <g>
+      <path id="f" data-name="field_e-nw" d="M0,0v42s34,0,34,0c13.23,0,24,10.77,24,24v34s42,0,42,0V0c-10.44,7.37-21.36,14.58-33.81,17.8C41.34,24.64,19.72,14.62,0,0Z" fill="#6c0"/>
+      <path id="g" data-name="field_sw" d="M34,58H0s0,42,0,42h42s0-34,0-34c0-4.41-3.59-8-8-8Z" fill="#6c0"/>
+    </g>
+  </g>
+  <g id="h" data-name="road">
+    <path id="i" data-name="road_sw" d="M42,100h16s0-34,0-34c0-13.23-10.77-24-24-24H0s0,16,0,16h34c4.41,0,8,3.59,8,8v34Z" fill="#e6e6e6"/>
+    <path id="j" data-name="road_sw" d="M42,100h16s0-34,0-34c0-13.23-10.77-24-24-24H0s0,16,0,16h34c4.41,0,8,3.59,8,8v34Z" fill="#e6e6e6"/>
+  </g>
+  <g id="k" data-name="roadBorder">
+    <path d="M0,57.5h34c4.69,0,8.5,3.81,8.5,8.5v34" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <path d="M57.5,100v-34c0-12.96-10.54-23.5-23.5-23.5H0" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+  </g>
+  <g id="l" data-name="city">
+    <path id="m" data-name="city_n" d="M100,0c-19.72,14.62-41.34,24.64-66.19,17.8C21.36,14.58,10.44,7.37,0,0h100Z" fill="#960"/>
+    <path id="n" data-name="city_n" d="M100,0c-19.72,14.62-41.34,24.64-66.19,17.8C21.36,14.58,10.44,7.37,0,0h100Z" fill="#960"/>
+  </g>
+  <g id="o" data-name="cityBorder">
+    <path d="M0,0c10.44,7.37,21.36,14.58,33.81,17.8,24.85,6.84,46.46-3.18,66.19-17.8" fill="none" stroke="#d1bc8d" stroke-miterlimit="10" stroke-width="2"/>
+  </g>
+
+
+
+<g id="highlights" class="highlights-layer" style="pointer-events: none;">
+  <path d="M0,0v42s34,0,34,0c13.23,0,24,10.77,24,24v34s42,0,42,0V0c-10.44,7.37-21.36,14.58-33.81,17.8C41.34,24.64,19.72,14.62,0,0Z" fill="var(--player-color, white)" class="highlight" data-feature="field_e-nw" stroke="none" opacity="0"/>
+  <path d="M34,58H0s0,42,0,42h42s0-34,0-34c0-4.41-3.59-8-8-8Z" fill="var(--player-color, white)" class="highlight" data-feature="field_sw" stroke="none" opacity="0"/>
+  <path d="M42,100h16s0-34,0-34c0-13.23-10.77-24-24-24H0s0,16,0,16h34c4.41,0,8,3.59,8,8v34Z" fill="var(--player-color, white)" class="highlight" data-feature="road_sw" stroke="none" opacity="0"/>
+  <path d="M100,0c-19.72,14.62-41.34,24.64-66.19,17.8C21.36,14.58,10.44,7.37,0,0h100Z" fill="var(--player-color, white)" class="highlight" data-feature="city_n" stroke="none" opacity="0"/>
+</g>
+</svg>

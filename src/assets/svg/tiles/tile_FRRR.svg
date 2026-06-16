@@ -1,36 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="_Слой_2" data-name="Слой 2" xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-  <g id="field">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g id="b" data-name="field">
     <g>
-    <path id="field_n" d="M100,0v42h-31.67c-3.08-7.07-10.13-12-18.33-12s-15.25,4.93-18.33,12H0V0h100Z" fill="#6c0"/>
-    <path id="field_sw" d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="#6c0"/>
-    <path id="field_se" d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="#6c0"/>
+      <path id="c" data-name="field_n" d="M100,0v42h-31.67c-3.08-7.07-10.13-12-18.33-12s-15.25,4.93-18.33,12H0V0h100Z" fill="#6c0"/>
+      <path id="d" data-name="field_sw" d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="#6c0"/>
+      <path id="e" data-name="field_se" d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="#6c0"/>
+    </g>
+    <g>
+      <path id="f" data-name="field_n" d="M100,0v42h-31.67c-3.08-7.07-10.13-12-18.33-12s-15.25,4.93-18.33,12H0V0h100Z" fill="#6c0"/>
+      <path id="g" data-name="field_sw" d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="#6c0"/>
+      <path id="h" data-name="field_se" d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="#6c0"/>
+    </g>
   </g>
-</g>
-<g id="road">
-  <g>
-  <path id="road_s" d="M58,68.33v31.67h-16v-31.67c.16.08.33.15.5.21,2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46c.17-.06.34-.13.5-.21Z" fill="#e6e6e6"/>
-  <path id="road_w" d="M31.46,57.5c.06.17.13.34.21.5H0v-16h31.67c-.08.16-.15.33-.21.5-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5Z" fill="#e6e6e6"/>
-  <path id="road_e" d="M100,42v16h-31.67c.08-.16.15-.33.21-.5.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5c-.06-.17-.13-.34-.21-.5h31.67Z" fill="#e6e6e6"/>
-</g>
-</g>
-<g id="roadBorder">
-<line x1="100" y1="42.5" x2="67" y2="42.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
-<line x1="100" y1="57.5" x2="67" y2="57.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
-<line x1="33" y1="42.5" y2="42.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
-<line x1="33" y1="57.5" y2="57.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
-<line x1="57.5" y1="100" x2="57.5" y2="67" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
-<line x1="42.5" y1="100" x2="42.5" y2="67" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
-</g>
-<g id="village">
-<circle cx="50" cy="50" r="20" fill="#cc0"/>
-</g>
+  <g id="i" data-name="road">
+    <g>
+      <path id="j" data-name="road_s" d="M58,68.33v31.67h-16v-31.67c.16.08.33.15.5.21,2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46c.17-.06.34-.13.5-.21Z" fill="#e6e6e6"/>
+      <path id="k" data-name="road_w" d="M31.46,57.5c.06.17.13.34.21.5H0v-16h31.67c-.08.16-.15.33-.21.5-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5Z" fill="#e6e6e6"/>
+      <path id="l" data-name="road_e" d="M100,42v16h-31.67c.08-.16.15-.33.21-.5.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5c-.06-.17-.13-.34-.21-.5h31.67Z" fill="#e6e6e6"/>
+    </g>
+    <g>
+      <path id="m" data-name="road_s" d="M58,68.33v31.67h-16v-31.67c.16.08.33.15.5.21,2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46c.17-.06.34-.13.5-.21Z" fill="#e6e6e6"/>
+      <path id="n" data-name="road_w" d="M31.46,57.5c.06.17.13.34.21.5H0v-16h31.67c-.08.16-.15.33-.21.5-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5Z" fill="#e6e6e6"/>
+      <path id="o" data-name="road_e" d="M100,42v16h-31.67c.08-.16.15-.33.21-.5.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5c-.06-.17-.13-.34-.21-.5h31.67Z" fill="#e6e6e6"/>
+    </g>
+  </g>
+  <g id="p" data-name="roadBorder">
+    <line x1="100" y1="42.5" x2="67" y2="42.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="100" y1="57.5" x2="67" y2="57.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="33" y1="42.5" y2="42.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="33" y1="57.5" y2="57.5" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="57.5" y1="100" x2="57.5" y2="67" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+    <line x1="42.5" y1="100" x2="42.5" y2="67" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
+  </g>
+  <g id="r" data-name="village">
+    <circle cx="50" cy="50" r="20" fill="#cc0"/>
+  </g>
+
+
+
 <g id="highlights" class="highlights-layer" style="pointer-events: none;">
-<path d="M100,0v42h-31.67c-3.08-7.07-10.13-12-18.33-12s-15.25,4.93-18.33,12H0V0h100Z" fill="var(--player-color, white)" opacity="0" data-feature="field_n" class="highlight"/>
-<path d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="var(--player-color, white)" opacity="0" data-feature="field_sw" class="highlight"/>
-<path d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="var(--player-color, white)" opacity="0" data-feature="field_se" class="highlight"/>
-<path d="M58,68.33v31.67h-16v-31.67c.16.08.33.15.5.21,2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46c.17-.06.34-.13.5-.21Z" fill="var(--player-color, white)" opacity="0" data-feature="road_s" class="highlight"/>
-<path d="M31.46,57.5c.06.17.13.34.21.5H0v-16h31.67c-.08.16-.15.33-.21.5-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5Z" fill="var(--player-color, white)" opacity="0" data-feature="road_w" class="highlight"/>
-<path d="M100,42v16h-31.67c.08-.16.15-.33.21-.5.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5c-.06-.17-.13-.34-.21-.5h31.67Z" fill="var(--player-color, white)" opacity="0" data-feature="road_e" class="highlight"/>
+  <path d="M100,0v42h-31.67c-3.08-7.07-10.13-12-18.33-12s-15.25,4.93-18.33,12H0V0h100Z" fill="var(--player-color, white)" class="highlight" data-feature="field_n" stroke="none" opacity="0"/>
+  <path d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="var(--player-color, white)" class="highlight" data-feature="field_sw" stroke="none" opacity="0"/>
+  <path d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="var(--player-color, white)" class="highlight" data-feature="field_se" stroke="none" opacity="0"/>
+  <path d="M58,68.33v31.67h-16v-31.67c.16.08.33.15.5.21,2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46c.17-.06.34-.13.5-.21Z" fill="var(--player-color, white)" class="highlight" data-feature="road_s" stroke="none" opacity="0"/>
+  <path d="M31.46,57.5c.06.17.13.34.21.5H0v-16h31.67c-.08.16-.15.33-.21.5-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5Z" fill="var(--player-color, white)" class="highlight" data-feature="road_w" stroke="none" opacity="0"/>
+  <path d="M100,42v16h-31.67c.08-.16.15-.33.21-.5.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5c-.06-.17-.13-.34-.21-.5h31.67Z" fill="var(--player-color, white)" class="highlight" data-feature="road_e" stroke="none" opacity="0"/>
 </g>
 </svg>

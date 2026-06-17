@@ -91,15 +91,15 @@ export default function App() {
       {/* 📊 ПАНЕЛЬ ИГРОКОВ (Левый верхний угол, под хедером) */}
       {players.length > 0 && (
         <div style={{
-          position: 'absolute', // Абсолютное позиционирование относительно body/html
-          top: '70px', // Отступ от верха, чтобы не перекрывалось с верхним хедером
+          position: 'absolute',
+          top: '70px',
           left: '20px',
           background: 'rgba(30, 30, 30, 0.95)',
           border: '2px solid #4a90e2',
           borderRadius: '16px',
           padding: '12px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
-          zIndex: 999, // Ниже, чем DebugPanel (обычно z-index 1000), но выше, чем всё остальное
+          zIndex: 999,
           backdropFilter: 'blur(8px)',
           minWidth: '150px',
         }}>
@@ -110,18 +110,36 @@ export default function App() {
                 key={player.id}
                 style={{
                   display: 'flex',
+                  alignItems: 'stretch',
+                  background: currentTurn === index ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  border: currentTurn === index ? '1px solid #4a90e2' : '1px solid transparent',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* 🌟 Цветная полоска слева */}
+                <div 
+                  style={{ 
+                    width: '8px', 
+                    backgroundColor: player.color,
+                    flexShrink: 0
+                  }} 
+                />
+                
+                {/* Основная информация о игроке */}
+                <div style={{ 
+                  display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '6px 10px',
-                  background: currentTurn === index ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)', // Подсветка текущего игрока
-                  borderRadius: '6px',
-                  border: currentTurn === index ? '1px solid #4a90e2' : '1px solid transparent', // Бордер для текущего игрока
-                }}
-              >
-                <span style={{ color: '#fff', fontSize: '13px', fontWeight: '500' }}>{player.name}</span>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ color: '#888', fontSize: '12px' }}>🏆 {player.score}</span>
-                  <span style={{ color: '#888', fontSize: '12px' }}>🔶 {player.meepleCount}</span>
+                  flex: 1,
+                  gap: '12px' // 🌟 Добавлен отступ между именем и статистикой
+                }}>
+                  <span style={{ color: '#fff', fontSize: '16px', fontWeight: '500' }}>{player.name}</span>
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    <span style={{ color: '#888', fontSize: '14px' }}>🏆 {player.score}</span>
+                    <span style={{ color: '#888', fontSize: '14px' }}>🔶 {player.meepleCount}</span>
+                  </div>
                 </div>
               </div>
             ))}

@@ -8,7 +8,8 @@ export const Meeple = memo(({ color, size = 32 }: { color: string; size?: number
       height={size} 
       style={{ 
         filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.5))', // Тень для объема
-        transition: 'transform 0.2s' 
+        transition: 'transform 0.2s',
+        overflow: 'visible' 
       }} 
       // В большинстве плагинов SVGR цвет передается через fill или color prop
       // Если твой SVG использует fill="currentColor", то:

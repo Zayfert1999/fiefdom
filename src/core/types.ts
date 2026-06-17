@@ -39,6 +39,8 @@ export interface PlacedMeeple {
   color: string;
   x: number;
   y: number;
+  isCompleting?: boolean; // Помечен для удаления (анимация)
+  points?: number;        // Очки, полученные за регион
 }
 
 export interface PlacedTile {

@@ -132,3 +132,72 @@
   display: block;
   cursor: crosshair;
 }
+
+/* ============================================
+   ✨ АНИМАЦИЯ ЗАВЕРШЕНИЯ РЕГИОНА
+   ============================================ */
+/* Обёртка мипла во время анимации исчезновения */
+.meeple-completing {
+  animation: meeple-fade-out 5s ease-out forwards;
+  /* 🌟 Убираем transform-box: fill-box — он учитывает все дочерние элементы */
+  /* 🌟 Указываем центр масштабирования в локальных координатах (0, 0) */
+  transform-origin: 0 0;
+}
+
+@keyframes meeple-fade-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(255, 215, 0, 0));
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.9));
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.3);
+    filter: drop-shadow(0 0 0px rgba(255, 215, 0, 0));
+  }
+}
+
+/* Контейнер для всплывающего текста "+N" */
+.points-popup {
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+
+/* Стиль текста "+N" */
+.points-text {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  fill: #ffd700;
+  stroke: #ffffff;
+  stroke-width: 0.8;
+  paint-order: stroke fill;
+  animation: points-float-up 5s ease-out forwards;
+  /* 🌟 Центр масштабирования — центр текста */
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes points-float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(0px) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.2);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-25px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.8);
+  }
+}

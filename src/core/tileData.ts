@@ -58,9 +58,9 @@ export const TILE_DEFINITIONS: Tile[] = [
   },
   { id: 'tile_CFRR', quantity: 3, features: [ 
     {id: 'city_n', type: 'city', directions: ['N'], spots: [{ x: 50, y: 10 }]},
-    {id: 'road_sw', type: 'road', directions: ['S', 'C', 'W'], spots: [{ x: 55, y: 55 }]},
+    {id: 'road_sw', type: 'road', directions: ['S', 'C', 'W'], spots: [{ x: 45, y: 55 }]},
     {id: 'field_e-nw', type: 'field', directions: ['NE(E)', 'E', 'SE', 'NW(W)'], spots: [{ x: 80, y: 50 }]},
-    {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 80, y: 80 }]}
+    {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 20, y: 80 }]}
     ]
   },
   { id: 'tile_CRFR', quantity: 4, features: [

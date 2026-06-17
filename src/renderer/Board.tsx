@@ -227,13 +227,13 @@ export const Board = ({ onGridClick }: BoardProps) => {
             onClick={(e) => {
               if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y);
             }}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', overflow: 'visible' }}
           >
             {isDebugSelected && (
               <rect className="debug-selected" x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} />
             )}
 
-            <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
+            <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
               {/* 🌟 Передаём rotation и meepleFeatureType в Tile */}
               <Tile
                 id={t.templateId as any}
@@ -245,7 +245,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
               />
 
               {phase === 'placeMeeple' && isLastTile && !t.meeple && currentPlayer && availableFeaturesForMeeple.length > 0 && (
-                <g style={{ '--player-color': currentPlayer.color } as React.CSSProperties}>
+                <g style={{ '--player-color': currentPlayer.color, overflow: 'visible' } as React.CSSProperties}>
                   {/* 🌟 Передаём rotation в MeepleSelection */}
                   <MeepleSelection
                     features={availableFeaturesForMeeple}

@@ -308,20 +308,52 @@ export const useGameStore = create<GameStore>((set, get) => ({
                       }
                   }
 
-                  // --- УДАЛЕНИЕ МИПЛОВ С ТАЙЛОВ (визуально) ---
-                  // Найдём все тайлы, входящие в регион, и удалим с них миплов
-                  for(const regionFeatureKey of meta.featureKeys) {
-                      const [tileCoord] = regionFeatureKey.split(':');
-                      const tileKey = tileCoord;
-                      const tileWithMeeple = newBoard.get(tileKey);
-                      if (tileWithMeeple && tileWithMeeple.meeple) {
-                          // Проверим, принадлежит ли мипл одному из участников региона (всех, кто поставил мипла)
-                          // или, для простоты, удалим, если регион завершён и мипл на нём есть
-                          // В реальности, мипл удаляется, если его игрок - один из "победителей" или "участников"
-                          // Учитывая, что мы возвращаем ВСЕ миплы, участвовавшие в регионе, удаляем все
-                          newBoard.set(tileKey, { ...tileWithMeeple, meeple: undefined });
-                          console.log(`🧹 [Store] Мипл удалён с тайла ${tileKey} (регион завершён).`);
+                  // 🌟 ШАГ 1: Помечаем миплов как "завершающихся" (анимация +N и растворение)
+                  // НЕ удаляем их сразу — пусть CSS отыграет анимацию
+                  const completingTileKeys: string[] = [];
+                  for (const regionFeatureKey of meta.featureKeys) {
+                    const [tileCoord, featureId] = regionFeatureKey.split(':'); // 🌟 Извлекаем featureId
+                    const tileKey = tileCoord;
+                    const tileWithMeeple = newBoard.get(tileKey);
+                    
+                    if (tileWithMeeple && tileWithMeeple.meeple) {
+                      // 🌟 ПРОВЕРКА: мипл должен стоять именно на этой фиче, а не на другой фиче того же тайла
+                      if (tileWithMeeple.meeple.featureId === featureId) {
+                        // Помечаем мипла для анимации
+                        newBoard.set(tileKey, {
+                          ...tileWithMeeple,
+                          meeple: {
+                            ...tileWithMeeple.meeple,
+                            isCompleting: true,
+                            points: points
+                          }
+                        });
+                        completingTileKeys.push(tileKey);
+                        console.log(`✨ [Store] Мипл на тайле ${tileKey} (фича ${featureId}) помечен для анимации завершения (+${points} очков)`);
                       }
+                    }
+                  }
+
+                  // 🌟 ШАГ 2: Откладываем реальное удаление миплов на время анимации (1500мс)
+                  if (completingTileKeys.length > 0) {
+                    setTimeout(() => {
+                      const currentState = get();
+                      const currentBoard = new Map(currentState.board);
+                      let changed = false;
+                      
+                      for (const tileKey of completingTileKeys) {
+                        const tile = currentBoard.get(tileKey);
+                        if (tile && tile.meeple && tile.meeple.isCompleting) {
+                          currentBoard.set(tileKey, { ...tile, meeple: undefined });
+                          changed = true;
+                          console.log(`🧹 [Store] Мипл удалён с тайла ${tileKey} (анимация завершена)`);
+                        }
+                      }
+                      
+                      if (changed) {
+                        set({ board: currentBoard });
+                      }
+                    }, 5000); // Длительность анимации
                   }
                 }
               }

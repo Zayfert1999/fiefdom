@@ -66,22 +66,39 @@ export const Tile = memo(({
   };
 
   return (
-    <g ref={containerRef}>
+    <g ref={containerRef} style={{ overflow: 'visible' }}>
       <Component
         width={size}
         height={size}
-        style={{ display: 'block' }}
+        style={{ display: 'block', overflow: 'hidden' }}
         preserveAspectRatio="xMidYMid meet"
       />
 
       {meeple && (
         <g transform={`translate(${meeple.x}, ${meeple.y})`}>
-          {/* 🌟 Поворот относительно центра мипла (0, 0) после translate */}
-          <g transform={`rotate(${getMeepleRotation()}, 0, 0)`}>
-            <g transform="translate(-15, -15)">
-              <Meeple color={meeple.color} size={30} />
+          {/* 🌟 Анимация завершения применяется ТОЛЬКО к миплу */}
+          <g className={meeple.isCompleting ? 'meeple-completing' : ''} style={{ overflow: 'visible' }}>
+            <g transform={`rotate(${getMeepleRotation()}, 0, 0)`}>
+              <g transform="translate(-15, -15)">
+                <Meeple color={meeple.color} size={30} />
+              </g>
             </g>
           </g>
+
+          {/* 🌟 Текст "+N" анимируется НЕЗАВИСИМО от мипла */}
+          {meeple.isCompleting && meeple.points !== undefined && (
+            <g className="points-popup" transform={`rotate(${-rotation}, 0, 0)`} style={{ overflow: 'visible' }}>
+              <text
+                x="0"
+                y="-20"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="points-text"
+              >
+                +{meeple.points}
+              </text>
+            </g>
+          )}
         </g>
       )}
     </g>

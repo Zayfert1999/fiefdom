@@ -1,7 +1,7 @@
 // core/tileUtils.ts
 import type { Direction, FeatureType, Tile, TileFeature } from './types';
 
-const COMPASS_ORDER: Direction[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const COMPASS_ORDER: Direction[] = ['N','NE(N)', 'NE', 'NE(E)', 'E', 'SE(E)', 'SE', 'SE(S)', 'S', 'SW(S)', 'SW', 'SW(W)', 'W', 'NW(W)', 'NW', 'NW(N)'];
 
 export const NEIGHBOR_OFFSETS = [
   { dx: 0, dy: -1, mySide: 'N' as Direction, theirSide: 'S' as Direction, matchKey: 'N-S' },
@@ -19,12 +19,21 @@ export const getTileSides = (tile: Tile): [FeatureType, FeatureType, FeatureType
   return sides as [FeatureType, FeatureType, FeatureType, FeatureType];
 };
 
-/** Поворот компасной точки */
+/** Поворот компасной точки (включая подточки) */
 export const rotateCompass = (point: Direction, rotation: 0 | 90 | 180 | 270): Direction => {
   if (point === 'C') return 'C';
+  
   const idx = COMPASS_ORDER.indexOf(point);
-  const shift = rotation / 45;
-  return COMPASS_ORDER[(idx + shift) % 8];
+  if (idx === -1) {
+    console.warn(`⚠️ [rotateCompass] Неизвестное направление: ${point}`);
+    return point;
+  }
+  
+  // 🌟 Сдвиг: 90° = 4 позиции, 180° = 8, 270° = 12
+  const shift = (rotation / 90) * 4;
+  
+  // 🌟 Модуль 16 (размер массива)
+  return COMPASS_ORDER[(idx + shift) % 16];
 };
 
 /** Поворот точки (x,y) вокруг центра (50,50) */
@@ -56,28 +65,76 @@ export const rotateFeatures = (
 
 /**
  * Карта точного соответствия точек на стыкуемых границах.
- * Гарантирует, что левое поле соединится только с левым, а правое с правым.
+ * Поддерживает обычные углы (NE, NW, SE, SW) и подточки (NE(E), NW(W) и т.д.).
+ * 
+ * Подточки соединяются:
+ * - С обычными углами соседа
+ * - С подточками соседа (если они указывают на ту же сторону)
  */
 export const BOUNDARY_MATCHES: Record<string, { my: Direction; their: Direction }[]> = {
   'S-N': [ // Моя нижняя граница (S) стыкуется с его верхней (N)
+    // Обычные углы
     { my: 'SW', their: 'NW' },
     { my: 'S', their: 'N' },
-    { my: 'SE', their: 'NE' }
+    { my: 'SE', their: 'NE' },
+    // Подточки моей стороны S
+    { my: 'SW(S)', their: 'NW' },
+    { my: 'SW(S)', their: 'NW(N)' },
+    { my: 'SE(S)', their: 'NE' },
+    { my: 'SE(S)', their: 'NE(N)' },
+    // Подточки его стороны N
+    { my: 'SW', their: 'NW(N)' },
+    { my: 'SW(S)', their: 'NW(N)' },
+    { my: 'SE', their: 'NE(N)' },
+    { my: 'SE(S)', their: 'NE(N)' },
   ],
   'N-S': [ // Моя верхняя (N) с его нижней (S)
+    // Обычные углы
     { my: 'NW', their: 'SW' },
     { my: 'N', their: 'S' },
-    { my: 'NE', their: 'SE' }
+    { my: 'NE', their: 'SE' },
+    // Подточки моей стороны N
+    { my: 'NW(N)', their: 'SW' },
+    { my: 'NW(N)', their: 'SW(S)' },
+    { my: 'NE(N)', their: 'SE' },
+    { my: 'NE(N)', their: 'SE(S)' },
+    // Подточки его стороны S
+    { my: 'NW', their: 'SW(S)' },
+    { my: 'NW(N)', their: 'SW(S)' },
+    { my: 'NE', their: 'SE(S)' },
+    { my: 'NE(N)', their: 'SE(S)' },
   ],
   'W-E': [ // Моя левая (W) с его правой (E)
+    // Обычные углы
     { my: 'NW', their: 'NE' },
     { my: 'W', their: 'E' },
-    { my: 'SW', their: 'SE' }
+    { my: 'SW', their: 'SE' },
+    // Подточки моей стороны W
+    { my: 'NW(W)', their: 'NE' },
+    { my: 'NW(W)', their: 'NE(E)' },
+    { my: 'SW(W)', their: 'SE' },
+    { my: 'SW(W)', their: 'SE(E)' },
+    // Подточки его стороны E
+    { my: 'NW', their: 'NE(E)' },
+    { my: 'NW(W)', their: 'NE(E)' },
+    { my: 'SW', their: 'SE(E)' },
+    { my: 'SW(W)', their: 'SE(E)' },
   ],
   'E-W': [ // Моя правая (E) с его левой (W)
+    // Обычные углы
     { my: 'NE', their: 'NW' },
     { my: 'E', their: 'W' },
-    { my: 'SE', their: 'SW' }
+    { my: 'SE', their: 'SW' },
+    // Подточки моей стороны E
+    { my: 'NE(E)', their: 'NW' },
+    { my: 'NE(E)', their: 'NW(W)' },
+    { my: 'SE(E)', their: 'SW' },
+    { my: 'SE(E)', their: 'SW(W)' },
+    // Подточки его стороны W
+    { my: 'NE', their: 'NW(W)' },
+    { my: 'NE(E)', their: 'NW(W)' },
+    { my: 'SE', their: 'SW(W)' },
+    { my: 'SE(E)', their: 'SW(W)' },
   ]
 };
 

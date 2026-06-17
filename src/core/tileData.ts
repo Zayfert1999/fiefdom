@@ -28,15 +28,15 @@ export const TILE_DEFINITIONS: Tile[] = [
   { id: 'tile_CCRC -S', quantity: 2, features: [
     {id: 'city_new', type: 'city', hasShield: true, directions: ['N', 'E', 'W'], spots: [{ x: 50, y: 40 }]},
     {id: 'road_s', type: 'road', directions: ['S'], spots: [{ x: 50, y: 90 }]},
-    {id: 'field_se', type: 'field', directions: ['SE'], spots: [{ x: 75, y: 90 }]},
-    {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 25, y: 90 }]}
+    {id: 'field_se', type: 'field', directions: ['SE(S)'], spots: [{ x: 75, y: 90 }]},
+    {id: 'field_sw', type: 'field', directions: ['SW(S)'], spots: [{ x: 25, y: 90 }]}
     ] 
   },
   { id: 'tile_CCRC', quantity: 1, features: [
     {id: 'city_new', type: 'city', directions: ['N', 'E', 'W'], spots: [{ x: 50, y: 40 }]},
     {id: 'road_s', type: 'road', directions: ['S'], spots: [{ x: 50, y: 90 }]},
-    {id: 'field_se', type: 'field', directions: ['SE'], spots: [{ x: 75, y: 90 }]},
-    {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 25, y: 90 }]}
+    {id: 'field_se', type: 'field', directions: ['SE(S)'], spots: [{ x: 75, y: 90 }]},
+    {id: 'field_sw', type: 'field', directions: ['SW(S)'], spots: [{ x: 25, y: 90 }]}
     ] 
   },
   { id: 'tile_CFCF', quantity: 3, features: [
@@ -58,28 +58,28 @@ export const TILE_DEFINITIONS: Tile[] = [
   },
   { id: 'tile_CFRR', quantity: 3, features: [ 
     {id: 'city_n', type: 'city', directions: ['N'], spots: [{ x: 50, y: 10 }]},
-    {id: 'road_sw', type: 'road', directions: ['S', 'C', 'W'], spots: [{ x: 45, y: 45 }]},
-    {id: 'field_e-nw', type: 'field', directions: ['NE', 'E', 'SE', 'NW'], spots: [{ x: 80, y: 50 }]},
-    {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 20, y: 20 }]}
+    {id: 'road_sw', type: 'road', directions: ['S', 'C', 'W'], spots: [{ x: 55, y: 55 }]},
+    {id: 'field_e-nw', type: 'field', directions: ['NE(E)', 'E', 'SE', 'NW(W)'], spots: [{ x: 80, y: 50 }]},
+    {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 80, y: 80 }]}
     ]
   },
   { id: 'tile_CRFR', quantity: 4, features: [
     {id: 'city_n', type: 'city', directions: ['N'], spots: [{ x: 50, y: 10 }]},
-    {id: 'field_ne-nw', type: 'field', directions: ['NE', 'NW'], spots: [{ x: 90, y: 25 }]},
+    {id: 'field_ne-nw', type: 'field', directions: ['NE(E)', 'NW(W)'], spots: [{ x: 90, y: 25 }]},
     {id: 'road_ew', type: 'road', directions: ['E', 'C', 'W'], spots: [{ x: 50, y: 50 }]},
     {id: 'field_s', type: 'field', directions: ['SE', 'S', 'SW'], spots: [{ x: 50, y: 80 }]}
     ]
   },
   { id: 'tile_CRRC -S', quantity: 2, features: [
     {id: 'city_nw', type: 'city', hasShield: true, directions: ['N', 'W'], spots: [{ x: 25, y: 25 }]},
-    {id: 'field_ne-sw', type: 'field', directions: ['NE', 'SW'], spots: [{ x: 90, y: 30 }]},
+    {id: 'field_ne-sw', type: 'field', directions: ['NE(E)', 'SW(S)'], spots: [{ x: 90, y: 30 }]},
     {id: 'road_se', type: 'road', directions: ['S', 'C', 'E'], spots: [{ x: 65, y: 65 }]},
     {id: 'field_se', type: 'field', directions: ['SE'], spots: [{ x: 85, y: 85 }]}
     ] 
   },
   { id: 'tile_CRRC', quantity: 3, features: [
     {id: 'city_nw', type: 'city', directions: ['N', 'W'], spots: [{ x: 25, y: 25 }]},
-    {id: 'field_ne-sw', type: 'field', directions: ['NE', 'SW'], spots: [{ x: 90, y: 30 }]},
+    {id: 'field_ne-sw', type: 'field', directions: ['NE(E)', 'SW(S)'], spots: [{ x: 90, y: 30 }]},
     {id: 'road_se', type: 'road', directions: ['S', 'C', 'E'], spots: [{ x: 65, y: 65 }]},
     {id: 'field_se', type: 'field', directions: ['SE'], spots: [{ x: 85, y: 85 }]}
     ] 
@@ -87,13 +87,13 @@ export const TILE_DEFINITIONS: Tile[] = [
   { id: 'tile_CRRF', quantity: 3, features: [ 
     {id: 'city_n', type: 'city', directions: ['N'], spots: [{ x: 50, y: 10 }]},
     {id: 'road_se', type: 'road', directions: ['S', 'C', 'E'], spots: [{ x: 55, y: 55 }]},
-    {id: 'field_ne-w', type: 'field', directions: ['NE', 'SW', 'W', 'NW' ], spots: [{ x: 20, y: 50 }]},
+    {id: 'field_ne-w', type: 'field', directions: ['NE(E)', 'SW', 'W', 'NW(W)' ], spots: [{ x: 20, y: 50 }]},
     {id: 'field_se', type: 'field', directions: ['SE'], spots: [{ x: 80, y: 80 }]}
     ]
   },
   { id: 'tile_CRRR', quantity: 3, features: [
     {id: 'city_n', type: 'city', directions: ['N'], spots: [{ x: 50, y: 10 }]},
-    {id: 'field_ne-nw', type: 'field', directions: ['NE', 'NW'], spots: [{ x: 90, y: 25 }]},
+    {id: 'field_ne-nw', type: 'field', directions: ['NE(E)', 'NW(W)'], spots: [{ x: 90, y: 25 }]},
     {id: 'road_e', type: 'road', directions: ['E'], spots: [{ x: 85, y: 50 }]},
     {id: 'field_sw', type: 'field', directions: ['SW'], spots: [{ x: 20, y: 80 }]},
     {id: 'road_s', type: 'road', directions: ['S'], spots: [{ x: 50, y: 85 }]},

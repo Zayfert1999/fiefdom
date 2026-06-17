@@ -1,4 +1,8 @@
-export type Direction = 'N' | 'E' | 'S' | 'W' | 'C' | 'NW' | 'NE' | 'SE' | 'SW';
+export type Direction = 
+  | 'N' | 'E' | 'S' | 'W' | 'C' 
+  | 'NW' | 'NE' | 'SE' | 'SW'
+  | 'NE(E)' | 'NE(N)' | 'NW(N)' | 'NW(W)'
+  | 'SE(S)' | 'SE(E)' | 'SW(S)' | 'SW(W)';
 export type FeatureType = 'road' | 'city' | 'monastery' | 'field';
 
 export interface MeepleSpot {

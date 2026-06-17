@@ -132,7 +132,7 @@ export default function App() {
       {/* 🗺️ Игровое поле */}
       <Board onGridClick={handleBoardClick} />
 
-      /* 🤲 ПАНЕЛЬ ДЕЙСТВИЙ (Правый нижний угол) — теперь с информацией о колоде и превью тайла */
+      {/* 🤲 ПАНЕЛЬ ДЕЙСТВИЙ (Правый нижний угол) — теперь с информацией о колоде и превью тайла */}
       {showPreviewPanel && (
         <div style={{
           position: 'fixed',

@@ -117,11 +117,8 @@ export const Board = ({ onGridClick }: BoardProps) => {
   return (
     <svg
       viewBox={viewBox} // 🌟 Используем вычисляемый viewBox
-      // 🐛 УБРАНО: onClick={handleSvgClick}, onContextMenu={handleContextMenu}
-      // 🐛 ДОБАВЛЕНО: onClick={handleSvgMainClick} для обработки Ctrl/Cmd + клик
       onClick={handleSvgMainClick}
-      // 🐛 УБРАНО: onContextMenu
-      style={{ width: '100%', height: '100vh', background: '#1a1a1a', display: 'block', cursor: 'crosshair' }}
+      className= "board-svg"
     >
       <defs>
         <pattern id="grid" width={TILE_SIZE} height={TILE_SIZE} patternUnits="userSpaceOnUse">
@@ -135,12 +132,52 @@ export const Board = ({ onGridClick }: BoardProps) => {
 
       {/* Фон (рисуется чуть больше viewBox, чтобы не было пустых углов при скролле) */}
       <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#grid)" pointerEvents="none" />
-      <line x1="-10000" y1="0" x2="10000" y2="0" stroke="#444" strokeWidth="2" pointerEvents="none" />
-      <line x1="0" y1="-10000" x2="0" y2="10000" stroke="#444" strokeWidth="2" pointerEvents="none" />
-
+      <line x1="-10000" y1="0" x2="10000" y2="0" className="axis-line" pointerEvents="none" />
+      <line x1="0" y1="-10000" x2="0" y2="10000" className="axis-line" pointerEvents="none" />
+      
+      /* 🌟 ВАЛИДНЫЕ КЛЕТКИ С КРЕСТИКОМ "+" В ЦЕНТРЕ */
       {Array.from(validCells).map(key => {
         const [x, y] = key.split(',').map(Number);
-        return <rect key={key} x={x * TILE_SIZE} y={y * TILE_SIZE} width={TILE_SIZE} height={TILE_SIZE} fill="rgba(50, 205, 50, 0.3)" stroke="#32cd32" strokeWidth="2" pointerEvents="none" />;
+        const px = x * TILE_SIZE;
+        const py = y * TILE_SIZE;
+        const cx = px + TILE_SIZE / 2;
+        const cy = py + TILE_SIZE / 2;
+        const plusSize = 15;
+
+        return (
+          <g 
+            key={key} 
+            className="valid-cell-container"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGridClick(x, y);
+            }}
+          >
+            <rect
+              className="valid-cell"
+              x={px}
+              y={py}
+              width={TILE_SIZE}
+              height={TILE_SIZE}
+            />
+            {/* Горизонтальная линия "+" */}
+            <line
+              className="valid-cell-plus"
+              x1={cx - plusSize}
+              y1={cy}
+              x2={cx + plusSize}
+              y2={cy}
+            />
+            {/* Вертикальная линия "+" */}
+            <line
+              className="valid-cell-plus"
+              x1={cx}
+              y1={cy - plusSize}
+              x2={cx}
+              y2={cy + plusSize}
+            />
+          </g>
+        );
       })}
 
       {Array.from(board.values()).map((t) => {
@@ -206,14 +243,15 @@ export const Board = ({ onGridClick }: BoardProps) => {
               />
 
               {phase === 'placeMeeple' && isLastTile && !t.meeple && currentPlayer && availableFeaturesForMeeple.length > 0 && (
-                <MeepleSelection
-                  features={availableFeaturesForMeeple}
-                  playerColor={currentPlayer.color}
-                  onPlace={(fid, x, y) => {
-                    console.log(`🖱️ [Board] Выбор спота: фича ${fid}, координаты (${x}, ${y})`);
-                    useGameStore.getState().placeMeeple(fid, x, y);
-                  }}
-                />
+                <g style={{ '--player-color': currentPlayer.color } as React.CSSProperties}>
+                  <MeepleSelection
+                    features={availableFeaturesForMeeple}
+                    onPlace={(fid, x, y) => {
+                      console.log(`🖱️ [Board] Выбор спота: фича ${fid}, координаты (${x}, ${y})`);
+                      useGameStore.getState().placeMeeple(fid, x, y);
+                    }}
+                  />
+                </g>
               )}
             </g>
           </g>

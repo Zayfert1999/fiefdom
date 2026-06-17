@@ -1,0 +1,134 @@
+/* ============================================
+   🎨 ПОДСВЕТКА РЕГИОНОВ
+   ============================================ */
+
+/* Слой подсветки (внутри SVG тайла) */
+.highlights-layer .highlight {
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  pointer-events: none;
+}
+
+/* Активная подсветка — полупрозрачная заливка цветом игрока */
+.highlights-layer .highlight.active {
+  opacity: 0.5;
+  fill: var(--player-color, white);
+  stroke: none;
+}
+
+/* Спорная подсветка — диагональная штриховка */
+.highlights-layer .highlight.contested {
+  opacity: 0.4;
+  fill: url(#contested-pattern);
+}
+
+/* ============================================
+   🔶 ПОДСВЕТКА СПОТОВ ДЛЯ МИПЛОВ
+   ============================================ */
+
+.meeple-spot {
+  opacity: 0,8;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform-origin: 8px 8px;
+  transform-box: fill-box;
+}
+
+/* 🌟 Базовое состояние — полупрозрачный белый */
+.meeple-spot * {
+  fill: rgba(255, 255, 255, 0.8);
+  stroke: white;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+/* 🌟 При наведении — окрашивается в цвет игрока */
+.meeple-spot:hover {
+  opacity: 1;
+  transform: scale(1.3);
+  filter: drop-shadow(0 0 8px var(--player-color, white));
+}
+
+.meeple-spot:hover * {
+  fill: var(--player-color, white);
+  stroke: var(--player-color, white);
+  stroke-width: 2;
+}
+
+/* ============================================
+   ✅ ПОДСВЕТКА ВАЛИДНЫХ КЛЕТОК
+   ============================================ */
+
+/* Контейнер валидной клетки */
+.valid-cell-container {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Фон клетки */
+.valid-cell {
+  fill: rgba(255, 255, 255, 0.15);
+  stroke: white;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+/* Крестик "+" в центре валидной клетки */
+.valid-cell-plus {
+  stroke: white;
+  stroke-width: 3;
+  stroke-linecap: round;
+  pointer-events: none;
+  opacity: 0.9;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* 🌟 HOVER-ЭФФЕКТЫ */
+.valid-cell-container:hover .valid-cell {
+  fill: rgba(255, 255, 255, 0.3);
+  stroke: white;
+  stroke-width: 3;
+}
+
+.valid-cell-container:hover .valid-cell-plus {
+  stroke-width: 4;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+  transform: scale(1.2);
+}
+
+/* ============================================
+   🐛 ДЕБАГ-ВЫДЕЛЕНИЕ ТАЙЛА
+   ============================================ */
+
+.debug-selected {
+  fill: transparent;
+  stroke: #ffff00;
+  stroke-width: 4;
+  pointer-events: none;
+}
+
+/* ============================================
+   🎯 СЕТКА И ФОН
+   ============================================ */
+
+.grid-line {
+  stroke: #2a2a2a;
+  stroke-width: 1;
+}
+
+.axis-line {
+  stroke: #444;
+  stroke-width: 2;
+}
+
+.board-svg {
+  width: 100%;
+  height: 100vh;
+  background: #1a1a1a;
+  display: block;
+  cursor: crosshair;
+}

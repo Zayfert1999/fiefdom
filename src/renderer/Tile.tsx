@@ -30,28 +30,27 @@ export const Tile = memo(({
     return null;
   }
 
-  // 🌟 Прямое применение стилей к каждой фиче через DOM API
+  // 🌟 Применяем CSS-классы к подсветкам через DOM API
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     // 1. Сбрасываем все существующие подсветки
     container.querySelectorAll('.highlight').forEach(el => {
-      (el as SVGElement).style.fill = '';
-      (el as SVGElement).style.opacity = '0';
+      el.classList.remove('active', 'contested');
     });
 
-    // 2. Применяем цвет/паттерн к каждой активной фиче
+    // 2. Применяем классы к каждой активной фиче
     for (const highlight of featureHighlights) {
       const targets = container.querySelectorAll(`.highlight[data-feature="${highlight.featureId}"]`);
       targets.forEach(el => {
-        const svgEl = el as SVGElement;
         if (highlight.isContested) {
-          svgEl.style.fill = 'url(#contested-pattern)'; // Полосатая заливка
+          el.classList.add('contested');
         } else {
-          svgEl.style.fill = highlight.color; // Сплошной цвет владельца
+          el.classList.add('active');
         }
-        svgEl.style.opacity = '0.65';
+        // 🌟 Устанавливаем CSS-переменную для цвета
+        (el as SVGElement).style.setProperty('--player-color', highlight.color);
       });
     }
   }, [featureHighlights]);

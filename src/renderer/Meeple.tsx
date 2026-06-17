@@ -12,7 +12,7 @@ export const Meeple = memo(({ color, size = 32 }: { color: string; size?: number
       }} 
       // В большинстве плагинов SVGR цвет передается через fill или color prop
       // Если твой SVG использует fill="currentColor", то:
-      className="fill-current" 
+      //className="fill-current" 
       color={color} 
     />
   );

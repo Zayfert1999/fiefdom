@@ -2,11 +2,11 @@
 import { create } from 'zustand';
 import type { Player, PlacedTile, PlacedMeeple, Tile } from '@/core/types';
 import { TILE_DEFINITIONS } from '@/core/tileData';
-import { rotateFeatures, getTileSides, isValidPlacement, BOUNDARY_MATCHES, NEIGHBOR_OFFSETS } from '@/core/tileUtils';
+import { rotateFeatures, getTileSides, isValidPlacement, getValidPlacementCells, BOUNDARY_MATCHES, NEIGHBOR_OFFSETS } from '@/core/tileUtils';
 import { RegionManager, type FeatureKey } from '@/core/regionManager';
 import { checkRoadCompleteness } from '@/core/scoring';
 
-export type GamePhase = 'draw' | 'placeTile' | 'placeMeeple' | 'endTurn'; // 🌟 Добавлена фаза 'endTurn'
+export type GamePhase = 'startTurn' | 'placeTile' | 'placeMeeple' | 'endTurn' | 'gameOver';
 
 export interface GameStore {
   deck: Tile[];
@@ -18,7 +18,7 @@ export interface GameStore {
   regionManager: RegionManager;
   showRegions: boolean;
   debugSelectedTile: { x: number; y: number } | null;
-
+  
   initGame: (players: Omit<Player, 'score' | 'meepleCount'>[]) => void;
   drawTile: () => void;
   placeTile: (x: number, y: number, rotation: 0 | 90 | 180 | 270) => boolean;
@@ -47,7 +47,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   players: [],
   currentTurn: 0,
   drawnTile: null,
-  phase: 'placeTile', // 🌟 Игра начинается сразу с фазы размещения
+  phase: 'startTurn',
   regionManager: new RegionManager(),
   showRegions: true,
   debugSelectedTile: null,
@@ -72,29 +72,72 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    // 🌟 АВТОВЫДАЧА ПЕРВОГО ТАЙЛА
-    const firstTile = fullDeck.pop() || null;
-    console.log(`🎴 [Store] Автоматически выдан первый тайл: ${firstTile?.id || 'Колода пуста!'}`);
+    console.log(`🎴 [Store] Стартовый тайл установлен. Игра начинается. Фаза: startTurn`);
 
     set({
       players: newPlayers.map(p => ({ ...p, score: 0, meepleCount: 8 })),
       deck: fullDeck,
       board: gameBoard,
       currentTurn: 0,
-      drawnTile: firstTile,
-      phase: firstTile ? 'placeTile' : 'draw',
+      drawnTile: null,
+      phase: 'startTurn',
       regionManager: rm,
       showRegions: true,
       debugSelectedTile: null,
     });
   },
 
+  // 🌟 Теперь это функция автоматической выдачи тайла
   drawTile: () => {
     const state = get();
-    if (state.deck.length === 0) return console.warn('⚠️ [Store] Колода пуста!');
-    if (state.phase !== 'draw') return console.warn('⚠️ [Store] Неверная фаза');
-    const tile = state.deck.pop()!;
-    set({ drawnTile: tile, phase: 'placeTile' });
+    if (state.phase !== 'startTurn') {
+      console.warn('⚠️ [Store] Неверная фаза для взятия тайла');
+      return;
+    }
+
+    // 🌟 Защита от повторного вызова
+    if (state.drawnTile !== null) {
+      console.warn('⚠️ [Store] Тайл уже выдан, повторный вызов игнорируется');
+      return;
+    }
+
+    const newDeck = [...state.deck];
+    let drawnTile: Tile | null = null;
+    let attempts = 0;
+    const maxAttempts = newDeck.length; // Защита от бесконечного цикла
+
+    // 🌟 Цикл: пока колода не пуста, берём тайл и проверяем
+    while (newDeck.length > 0 && attempts< maxAttempts) {
+      attempts++;
+      const candidate = newDeck.pop()!;
+      const validCells = getValidPlacementCells(candidate, state.board);
+
+      if (validCells.size > 0) {
+        // ✅ Тайл можно поставить — оставляем его
+        drawnTile = candidate;
+        console.log(`🎴 [Store] Выдан тайл ${candidate.id} (валидных клеток: ${validCells.size})`);
+        break;
+      }
+          // 🌟 Если колода пуста после pop — замешивать нечего, сразу выходим
+      if (newDeck.length === 0) {
+        console.log(`🏁 [Store] Последний тайл ${candidate.id} нельзя поставить. Игра окончена.`);
+        break;
+      }
+
+      // ❌ Тайл нельзя поставить — замешиваем обратно в случайное место
+      const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
+      newDeck.splice(insertIndex, 0, candidate);
+      console.log(`🔄 [Store] Тайл ${candidate.id} нельзя поставить. Замешан обратно в колоду.`);
+    }
+
+    if (!drawnTile) {
+      // 🏁 Колода пуста или все тайлы нельзя поставить — конец игры
+      console.log('🏁 [Store] Нечего ставить! Переход к фазе gameover.');
+      set({ deck: newDeck, phase: 'gameOver' });
+      return;
+    }
+
+    set({ deck: newDeck, drawnTile, phase: 'placeTile' });
   },
 
   placeTile: (x, y, rotation) => {
@@ -203,7 +246,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // 🌟 ВАЖНО: Автоматически вызываем endTurn после обновления состояния
     // Это гарантирует, что processEndTurn выполнится сразу после placeMeeple
-    get().endTurn(); // 🌟 Вызов endTurn
+    get().processEndTurn(); // 🌟 Вызов endTurn
   },
 
   endTurn: () => { // 🌟 Теперь просто вызывает processEndTurn
@@ -291,17 +334,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     // ------------------------------
 
-    // --- АВТОВЫДАЧА ТАЙЛА СЛЕДУЮЩЕМУ ИГРОКУ ---
-    const nextTile = state.deck.length > 0 ? state.deck.pop() : null;
-    if (nextTile) console.log(`🎴 [Store] Следующий игрок автоматически берет тайл: ${nextTile.id}`);
-    else console.warn('⚠️ [Store] Колода пуста! Игра завершается.');
-
+    // 🌟 НОВАЯ ЛОГИКА: Определяем следующую фазу
     console.log(`🔄 [Store] Ход переходит к: ${state.players[nextTurn]?.name}`);
-    set({
-      currentTurn: nextTurn,
-      drawnTile: nextTile,
-      phase: nextTile ? 'placeTile' : 'draw' // Если колода пуста, фаза становится 'draw' (можно изменить на конец игры)
-    });
+
+    if (state.deck.length === 0) {
+      console.log('🏁 [Store] Колода пуста! Переход к фазе gameover.');
+      set({
+        currentTurn: nextTurn,
+        drawnTile: null,
+        phase: 'gameOver'
+      });
+    } else {
+      // 🌟 Переходим в фазу 'draw' — UI автоматически вызовет drawTile
+      set({
+        currentTurn: nextTurn,
+        drawnTile: null,
+        phase: 'startTurn'
+      });
+    }
   },
 
   toggleRegions: () => {

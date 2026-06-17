@@ -177,3 +177,35 @@ export const isValidPlacement = (
   
   return hasAdjacent;
 };
+
+/**
+ * Возвращает множество ключей клеток "x,y", куда можно поставить данный тайл
+ * хотя бы в одном из 4 поворотов.
+ * Используется и в UI (для подсветки), и в логике автопропуска тайла.
+ */
+export const getValidPlacementCells = (
+  drawnTile: Tile,
+  board: Map<string, any>
+): Set<string> => {
+  const validSet = new Set<string>();
+  const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+
+  for (const existing of board.values()) {
+    for (const { dx, dy } of directions) {
+      const nx = existing.x + dx;
+      const ny = existing.y + dy;
+      const cellKey = `${nx},${ny}`;
+      if (board.has(cellKey)) continue;
+
+      for (const rot of [0, 90, 180, 270] as const) {
+        const rotatedFeatures = rotateFeatures(drawnTile.features, rot);
+        if (isValidPlacement(board, nx, ny, rotatedFeatures)) {
+          validSet.add(cellKey);
+          break; // Достаточно одного валидного поворота для этой клетки
+        }
+      }
+    }
+  }
+
+  return validSet;
+};

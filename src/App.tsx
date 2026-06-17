@@ -8,7 +8,7 @@ import { DebugPanel } from '@/renderer/DebugPanel';
 export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
-    placeTile, endTurn, initGame,
+    placeTile, endTurn, initGame, drawTile, // 🌟 Добавили drawTile
     showRegions, toggleRegions
   } = useGameStore();
 
@@ -23,6 +23,17 @@ export default function App() {
       ]);
     }
   }, [players.length, initGame]);
+ 
+    // 🌟 АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
+  useEffect(() => {
+    if (phase === 'startTurn' && !drawnTile) { // 🌟 Добавлена проверка drawnTile === null
+      console.log('🎴 [App] Фаза startTurn → автоматическая выдача тайла');
+      const timer = setTimeout(() => {
+        drawTile();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, drawnTile, drawTile]); // 🌟 Добавлена зависимость drawnTile
 
   const handleRotate = () => {
     const next = ((previewRotation + 90) % 360) as 0 | 90 | 180 | 270;

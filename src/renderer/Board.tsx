@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile, type FeatureHighlight } from './Tile';
-import { rotateFeatures, isValidPlacement } from '@/core/tileUtils';
+import { getValidPlacementCells } from '@/core/tileUtils';
 import { MeepleSelection } from './MeepleSelection';
 import { TILE_DEFINITIONS } from '@/core/tileData';
 
@@ -51,28 +51,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
   // 🟢 Расчёт валидных клеток (логика без изменений)
   const validCells = useMemo(() => {
     if (!drawnTile || phase !== 'placeTile') return new Set<string>();
-    const validSet = new Set<string>();
-    const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
-
-    for (const existing of board.values()) {
-      for (const { dx, dy } of directions) {
-        const nx = existing.x + dx;
-        const ny = existing.y + dy;
-        const cellKey = `${nx},${ny}`;
-        if (board.has(cellKey)) continue;
-
-        let isPlaceable = false;
-        for (const rot of [0, 90, 180, 270] as const) {
-          const rotatedFeatures = rotateFeatures(drawnTile.features, rot);
-          if (isValidPlacement(board, nx, ny, rotatedFeatures)) {
-            isPlaceable = true;
-            break;
-          }
-        }
-        if (isPlaceable) validSet.add(cellKey);
-      }
-    }
-    return validSet;
+    return getValidPlacementCells(drawnTile, board);
   }, [drawnTile, board, phase]);
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {

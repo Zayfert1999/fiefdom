@@ -185,7 +185,6 @@ export const Board = ({ onGridClick }: BoardProps) => {
         const isLastTile = key === lastTileKey;
         const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
 
-        // 🌟 Собираем массив подсветок ДЛЯ КАЖДОЙ ФИЧИ ОТДЕЛЬНО
         const featureHighlights: FeatureHighlight[] = [];
 
         if (showRegions) {
@@ -200,7 +199,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
               featureHighlights.push({
                 featureId: feature.id,
                 color,
-                isContested: owners.length > 1 // Если >1 владельца → спорная
+                isContested: owners.length > 1
               });
             }
           }
@@ -209,43 +208,48 @@ export const Board = ({ onGridClick }: BoardProps) => {
         const baseTileDef = TILE_DEFINITIONS.find(def => def.id === t.templateId);
         const featuresForRendering = baseTileDef ? baseTileDef.features : t.features;
 
-        // 🌟 Фильтруем фичи, оставляя только те, чей регион СВОБОДЕН
         const availableFeaturesForMeeple = featuresForRendering.filter(feature => {
           const featureKey = `${t.x},${t.y}:${feature.id}`;
           const owners = regionManager.getFeatureOwners(featureKey);
-          // Разрешаем ставить мипла только если в регионе 0 владельцев
           return owners.length === 0;
         });
+
+        // 🌟 Определяем тип фичи, на которой стоит мипл
+        const meepleFeature = t.meeple 
+          ? t.features.find(f => f.id === t.meeple!.featureId)
+          : null;
+        const meepleFeatureType = meepleFeature?.type;
 
         return (
           <g
             key={key}
             transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE})`}
-            // 🐛 УБРАНО: onContextMenu={(e) => handleDebugClick(e, t.x, t.y)}
-            // 🐛 ДОБАВЛЕНО: onClick={(e) => { if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y); }}
             onClick={(e) => {
-              // Левый клик с Ctrl/Cmd вызывает дебаг
               if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y);
             }}
             style={{ cursor: 'pointer' }}
           >
             {isDebugSelected && (
-              <rect x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} fill="transparent" stroke="#ffff00" strokeWidth={4} pointerEvents="none" />
+              <rect className="debug-selected" x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} />
             )}
 
             <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
-              {/* 🌟 Передаём изолированный массив подсветок */}
+              {/* 🌟 Передаём rotation и meepleFeatureType в Tile */}
               <Tile
                 id={t.templateId as any}
                 size={TILE_SIZE}
                 meeple={t.meeple}
+                meepleFeatureType={meepleFeatureType}
+                rotation={t.rotation}
                 featureHighlights={featureHighlights}
               />
 
               {phase === 'placeMeeple' && isLastTile && !t.meeple && currentPlayer && availableFeaturesForMeeple.length > 0 && (
                 <g style={{ '--player-color': currentPlayer.color } as React.CSSProperties}>
+                  {/* 🌟 Передаём rotation в MeepleSelection */}
                   <MeepleSelection
                     features={availableFeaturesForMeeple}
+                    rotation={t.rotation}
                     onPlace={(fid, x, y) => {
                       console.log(`🖱️ [Board] Выбор спота: фича ${fid}, координаты (${x}, ${y})`);
                       useGameStore.getState().placeMeeple(fid, x, y);

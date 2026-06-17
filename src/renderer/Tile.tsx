@@ -2,24 +2,27 @@
 import { memo, useEffect, useRef } from 'react';
 import { TileRegistry, type TileId } from '@/assets/svg/tiles/registry';
 import { Meeple } from './Meeple';
-import type { PlacedMeeple } from '@/core/types';
+import type { PlacedMeeple, FeatureType } from '@/core/types';
 
-// 🌟 Структура данных для подсветки одной конкретной фичи
 export interface FeatureHighlight {
   featureId: string;
   color: string;
-  isContested: boolean; // true если в регионе >1 владельца
+  isContested: boolean;
 }
 
 export const Tile = memo(({
   id,
   size = 100,
   meeple,
-  featureHighlights = [] // 🌟 Массив подсветок для каждой фичи
+  meepleFeatureType, // 🌟 Тип фичи, на которой стоит мипл
+  rotation = 0,      // 🌟 Поворот тайла
+  featureHighlights = []
 }: {
   id: TileId;
   size?: number;
   meeple?: PlacedMeeple;
+  meepleFeatureType?: FeatureType; // 🌟 Новый проп
+  rotation?: 0 | 90 | 180 | 270;   // 🌟 Новый проп
   featureHighlights?: FeatureHighlight[];
 }) => {
   const Component = TileRegistry[id];
@@ -30,17 +33,14 @@ export const Tile = memo(({
     return null;
   }
 
-  // 🌟 Применяем CSS-классы к подсветкам через DOM API
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Сбрасываем все существующие подсветки
     container.querySelectorAll('.highlight').forEach(el => {
       el.classList.remove('active', 'contested');
     });
 
-    // 2. Применяем классы к каждой активной фиче
     for (const highlight of featureHighlights) {
       const targets = container.querySelectorAll(`.highlight[data-feature="${highlight.featureId}"]`);
       targets.forEach(el => {
@@ -49,15 +49,24 @@ export const Tile = memo(({
         } else {
           el.classList.add('active');
         }
-        // 🌟 Устанавливаем CSS-переменную для цвета
         (el as SVGElement).style.setProperty('--player-color', highlight.color);
       });
     }
   }, [featureHighlights]);
 
+  // 🌟 Вычисляем поворот мипла
+  const getMeepleRotation = (): number => {
+    if (!meeple) return 0;
+    
+    let compensation = -rotation;
+    if (meepleFeatureType === 'field') {
+      compensation += 90;
+    }
+    return compensation;
+  };
+
   return (
     <g ref={containerRef}>
-      {/* Базовая графика тайла */}
       <Component
         width={size}
         height={size}
@@ -65,11 +74,13 @@ export const Tile = memo(({
         preserveAspectRatio="xMidYMid meet"
       />
 
-      {/* Мипл */}
       {meeple && (
         <g transform={`translate(${meeple.x}, ${meeple.y})`}>
-          <g transform="translate(-15, -15)">
-            <Meeple color={meeple.color} size={30} />
+          {/* 🌟 Поворот относительно центра мипла (0, 0) после translate */}
+          <g transform={`rotate(${getMeepleRotation()}, 0, 0)`}>
+            <g transform="translate(-15, -15)">
+              <Meeple color={meeple.color} size={30} />
+            </g>
           </g>
         </g>
       )}

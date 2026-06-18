@@ -2,24 +2,20 @@
    🎨 ПОДСВЕТКА РЕГИОНОВ
    ============================================ */
 
-/* Слой подсветки (внутри SVG тайла) */
-.highlights-layer .highlight {
-  opacity: 0;
-  transition: opacity 0.3s ease-in-out;
+/* 🌟 Контейнер подсветки */
+.region-overlay {
   pointer-events: none;
 }
 
-/* Активная подсветка — полупрозрачная заливка цветом игрока */
-.highlights-layer .highlight.active {
-  opacity: 0.5;
-  fill: var(--player-color, white);
-  stroke: none;
+/* 🌟 Прямоугольник с паттерном — базовое состояние (невидим) */
+.region-fill {
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
 }
 
-/* Спорная подсветка — диагональная штриховка */
-.highlights-layer .highlight.contested {
-  opacity: 0.4;
-  fill: url(#contested-pattern);
+/* 🌟 Активное состояние — плавно появляется */
+.region-overlay.active .region-fill {
+  opacity: 0.7;
 }
 
 /* ============================================

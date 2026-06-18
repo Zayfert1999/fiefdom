@@ -1,10 +1,11 @@
 // renderer/Board.tsx
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { Tile, type FeatureHighlight } from './Tile';
+import { Tile } from './Tile';
 import { getValidPlacementCells } from '@/core/tileUtils';
-import { MeepleSelection } from './MeepleSelection';
-import { TILE_DEFINITIONS } from '@/core/tileData';
+import { RegionOverlay } from './RegionOverlay';
+import { MeepleSelectionLayer } from './MeepleSelectionLayer';
+import { MeepleLayer } from './MeepleLayer';
 
 const TILE_SIZE = 100;
 
@@ -16,19 +17,14 @@ export const Board = ({ onGridClick }: BoardProps) => {
   const board = useGameStore(s => s.board);
   const drawnTile = useGameStore(s => s.drawnTile);
   const phase = useGameStore(s => s.phase);
-  const currentPlayer = useGameStore(s => s.players[s.currentTurn]);
-  const lastTileKey = Array.from(board.keys()).pop();
-  const showRegions = useGameStore(s => s.showRegions);
   const regionManager = useGameStore(s => s.regionManager);
   const players = useGameStore(s => s.players);
-
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
 
-  // 🌟 ДИНАМИЧЕСКИЙ VIEWBOX: автоматически подстраивается под границы доски
+  // 🌟 ДИНАМИЧЕСКИЙ VIEWBOX
   const viewBox = useMemo(() => {
-    if (board.size === 0) return '-150 -150 300 300'; // Дефолт для пустой доски
-
+    if (board.size === 0) return '-150 -150 300 300';
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
@@ -39,7 +35,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
       if (tile.y > maxY) maxY = tile.y;
     }
 
-    const padding = 2; // Отступ в 2 тайла по краям
+    const padding = 2;
     const x = (minX - padding) * TILE_SIZE;
     const y = (minY - padding) * TILE_SIZE;
     const width = (maxX - minX + 1 + padding * 2) * TILE_SIZE;
@@ -48,7 +44,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
     return `${x} ${y} ${width} ${height}`;
   }, [board]);
 
-  // 🟢 Расчёт валидных клеток (логика без изменений)
+  // 🟢 Расчёт валидных клеток
   const validCells = useMemo(() => {
     if (!drawnTile || phase !== 'placeTile') return new Set<string>();
     return getValidPlacementCells(drawnTile, board);
@@ -56,86 +52,139 @@ export const Board = ({ onGridClick }: BoardProps) => {
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
-    // 🎯 Получаем матрицу преобразования из координат viewBox в экранные координаты
     const ctm = svg.getScreenCTM();
     if (!ctm) return;
-
-    // Создаем точку в экранных координатах (клиентские координаты мыши)
     const svgPoint = svg.createSVGPoint();
     svgPoint.x = e.clientX;
     svgPoint.y = e.clientY;
-
-    // 🔄 Преобразуем в координаты viewBox с помощью ОБРАТНОЙ матрицы
     const pointInViewBox = svgPoint.matrixTransform(ctm.inverse());
-
-    // 🎲 Конвертируем в координаты сетки
     const gridX = Math.floor(pointInViewBox.x / TILE_SIZE);
     const gridY = Math.floor(pointInViewBox.y / TILE_SIZE);
-
-    // 🎯 Передаем координаты в обработчик
     onGridClick(gridX, gridY);
   };
 
-  // 🐛 Обработчик дебаг-клика (Ctrl + клик)
   const handleDebugClick = (e: React.MouseEvent, x: number, y: number) => {
-    // Проверяем, был ли нажат Control или Command (Mac)
     if (e.ctrlKey || e.metaKey) {
-        e.stopPropagation(); // Останавливаем всплытие, чтобы не сработал handleSvgClick
-        setDebugSelectedTile({ x, y });
-        console.log(`🐛 [Board] Вызван дебаг для тайла (${x}, ${y})`);
+      e.stopPropagation();
+      setDebugSelectedTile({ x, y });
+      console.log(`🐛 [Board] Вызван дебаг для тайла (${x}, ${y})`);
     }
-    // Если клик был без Ctrl/Command, ничего не делаем.
-    // Контекстное меню больше не вызывается.
   };
 
-  // 🐛 Обработчик клика на уровне SVG (для дебага по Ctrl/Cmd + левый клик)
   const handleSvgMainClick = (e: React.MouseEvent<SVGSVGElement>) => {
-     // Проверяем, был ли нажат Control или Command (Mac)
-     if (e.ctrlKey || e.metaKey) {
-        e.stopPropagation(); // Останавливаем всплытие, чтобы не сработал handleSvgClick
-        // Определяем координаты клика в системе координат доски (аналогично handleSvgClick)
-        const svg = e.currentTarget;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return;
-
-        const svgPoint = svg.createSVGPoint();
-        svgPoint.x = e.clientX;
-        svgPoint.y = e.clientY;
-
-        const pointInViewBox = svgPoint.matrixTransform(ctm.inverse());
-        const gridX = Math.floor(pointInViewBox.x / TILE_SIZE);
-        const gridY = Math.floor(pointInViewBox.y / TILE_SIZE);
-
-        setDebugSelectedTile({ x: gridX, y: gridY });
-        console.log(`🐛 [Board] Вызван дебаг для тайла (${gridX}, ${gridY}) по клику на SVG.`);
-     } else {
-        // Если не Ctrl/Cmd, передаём клик на обработку размещения тайла
-        handleSvgClick(e);
-     }
+    if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
+      const svg = e.currentTarget;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const svgPoint = svg.createSVGPoint();
+      svgPoint.x = e.clientX;
+      svgPoint.y = e.clientY;
+      const pointInViewBox = svgPoint.matrixTransform(ctm.inverse());
+      const gridX = Math.floor(pointInViewBox.x / TILE_SIZE);
+      const gridY = Math.floor(pointInViewBox.y / TILE_SIZE);
+      setDebugSelectedTile({ x: gridX, y: gridY });
+      console.log(`🐛 [Board] Вызван дебаг для тайла (${gridX}, ${gridY}) по клику на SVG.`);
+    } else {
+      handleSvgClick(e);
+    }
   };
+
+  // 🌟 Собираем уникальные комбинации цветов для глобальных паттернов
+  const uniqueColorCombinations = useMemo(() => {
+    const combinations = new Set<string>();
+
+    for (const tile of board.values()) {
+      for (const feature of tile.features) {
+        const featureKey = `${tile.x},${tile.y}:${feature.id}`;
+        const owners = regionManager.getFeatureOwners(featureKey);
+
+        if (owners.length > 0) {
+          const meta = regionManager.getMetadata(featureKey);
+          if (!meta) continue;
+
+          const maxCount = Math.max(...owners.map(id => meta.meepleCounts.get(id) || 0));
+          const dominantOwners = owners.filter(id => (meta.meepleCounts.get(id) || 0) === maxCount);
+
+          if (dominantOwners.length === 1) {
+            const player = players.find(p => p.id === dominantOwners[0]);
+            if (player) combinations.add(player.color);
+          } else {
+            const colors = dominantOwners
+              .map(id => players.find(p => p.id === id)?.color || '#ffffff')
+              .sort()
+              .join('|');
+            combinations.add(colors);
+          }
+        }
+      }
+    }
+
+    return Array.from(combinations);
+  }, [board, regionManager, players]);
 
   return (
     <svg
-      viewBox={viewBox} // 🌟 Используем вычисляемый viewBox
+      viewBox={viewBox}
       onClick={handleSvgMainClick}
-      className= "board-svg"
+      className="board-svg"
     >
       <defs>
         <pattern id="grid" width={TILE_SIZE} height={TILE_SIZE} patternUnits="userSpaceOnUse">
           <path d={`M ${TILE_SIZE} 0 L 0 0 0 ${TILE_SIZE}`} fill="none" stroke="#2a2a2a" strokeWidth="1" />
         </pattern>
-        {/* 🌟 Паттерн для спорных регионов */}
-        <pattern id="contested-pattern" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="10" stroke="#f59e0b" strokeWidth="6" />
-        </pattern>
+
+        {/* 🌟 ГЛОБАЛЬНЫЕ ПАТТЕРНЫ ДЛЯ ШТРИХОВКИ РЕГИОНОВ */}
+        {uniqueColorCombinations.map((combo) => {
+          const colors = combo.includes('|') ? combo.split('|') : [combo];
+          const segmentWidth = 5;
+          const patternWidth = segmentWidth * 2 * colors.length;
+          const patternId = `hatch-${combo.replace(/#/g, '').replace(/\|/g, '-')}`;
+
+          // 🌟 Константа скорости: 10px в секунду
+          // Чем шире паттерн, тем дольше анимация → визуально одинаковая скорость
+          const SPEED_PX_PER_SEC = 1;
+          const duration = patternWidth / SPEED_PX_PER_SEC;
+
+          return (
+            <pattern
+              key={patternId}
+              id={patternId}
+              patternUnits="userSpaceOnUse"
+              width={patternWidth}
+              height="10"
+              patternTransform="rotate(45)"
+            >
+              {colors.map((color, idx) => (
+                <rect
+                  key={idx}
+                  x={idx * segmentWidth * 2}
+                  y="0"
+                  width={segmentWidth}
+                  height="10"
+                  fill={color}
+                />
+              ))}
+              
+              {/* 🌟 АНИМАЦИЯ: длительность пропорциональна ширине паттерна */}
+              <animate
+                attributeName="x"
+                from="0"
+                to={patternWidth}
+                dur={`${duration}s`}
+                repeatCount="indefinite"
+              />
+            </pattern>
+          );
+        })}
       </defs>
 
-      {/* Фон (рисуется чуть больше viewBox, чтобы не было пустых углов при скролле) */}
+      {/* Фон */}
       <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#grid)" pointerEvents="none" />
       <line x1="-10000" y1="0" x2="10000" y2="0" className="axis-line" pointerEvents="none" />
       <line x1="0" y1="-10000" x2="0" y2="10000" className="axis-line" pointerEvents="none" />
-      
-      /* 🌟 ВАЛИДНЫЕ КЛЕТКИ С КРЕСТИКОМ "+" В ЦЕНТРЕ */
+
+      {/* 🌟 ВАЛИДНЫЕ КЛЕТКИ */}
       {Array.from(validCells).map(key => {
         const [x, y] = key.split(',').map(Number);
         const px = x * TILE_SIZE;
@@ -145,80 +194,25 @@ export const Board = ({ onGridClick }: BoardProps) => {
         const plusSize = 15;
 
         return (
-          <g 
-            key={key} 
+          <g
+            key={key}
             className="valid-cell-container"
             onClick={(e) => {
               e.stopPropagation();
               onGridClick(x, y);
             }}
           >
-            <rect
-              className="valid-cell"
-              x={px}
-              y={py}
-              width={TILE_SIZE}
-              height={TILE_SIZE}
-            />
-            {/* Горизонтальная линия "+" */}
-            <line
-              className="valid-cell-plus"
-              x1={cx - plusSize}
-              y1={cy}
-              x2={cx + plusSize}
-              y2={cy}
-            />
-            {/* Вертикальная линия "+" */}
-            <line
-              className="valid-cell-plus"
-              x1={cx}
-              y1={cy - plusSize}
-              x2={cx}
-              y2={cy + plusSize}
-            />
+            <rect className="valid-cell" x={px} y={py} width={TILE_SIZE} height={TILE_SIZE} />
+            <line className="valid-cell-plus" x1={cx - plusSize} y1={cy} x2={cx + plusSize} y2={cy} />
+            <line className="valid-cell-plus" x1={cx} y1={cy - plusSize} x2={cx} y2={cy + plusSize} />
           </g>
         );
       })}
 
+      {/* 🎨 СЛОЙ 1: ТАЙЛЫ (только графика) */}
       {Array.from(board.values()).map((t) => {
         const key = `${t.x},${t.y}`;
-        const isLastTile = key === lastTileKey;
         const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
-
-        const featureHighlights: FeatureHighlight[] = [];
-
-        if (showRegions) {
-          for (const feature of t.features) {
-            const featureKey = `${t.x},${t.y}:${feature.id}`;
-            const owners = regionManager.getFeatureOwners(featureKey);
-
-            if (owners.length > 0) {
-              const firstOwner = players.find(p => p.id === owners[0]);
-              const color = firstOwner?.color || '#ffffff';
-
-              featureHighlights.push({
-                featureId: feature.id,
-                color,
-                isContested: owners.length > 1
-              });
-            }
-          }
-        }
-
-        const baseTileDef = TILE_DEFINITIONS.find(def => def.id === t.templateId);
-        const featuresForRendering = baseTileDef ? baseTileDef.features : t.features;
-
-        const availableFeaturesForMeeple = featuresForRendering.filter(feature => {
-          const featureKey = `${t.x},${t.y}:${feature.id}`;
-          const owners = regionManager.getFeatureOwners(featureKey);
-          return owners.length === 0;
-        });
-
-        // 🌟 Определяем тип фичи, на которой стоит мипл
-        const meepleFeature = t.meeple 
-          ? t.features.find(f => f.id === t.meeple!.featureId)
-          : null;
-        const meepleFeatureType = meepleFeature?.type;
 
         return (
           <g
@@ -234,33 +228,24 @@ export const Board = ({ onGridClick }: BoardProps) => {
             )}
 
             <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
-              {/* 🌟 Передаём rotation и meepleFeatureType в Tile */}
+              {/* 🌟 Tile принимает только id и size — миплы и споты в отдельных слоях */}
               <Tile
                 id={t.templateId as any}
                 size={TILE_SIZE}
-                meeple={t.meeple}
-                meepleFeatureType={meepleFeatureType}
-                rotation={t.rotation}
-                featureHighlights={featureHighlights}
               />
-
-              {phase === 'placeMeeple' && isLastTile && !t.meeple && currentPlayer && availableFeaturesForMeeple.length > 0 && (
-                <g style={{ '--player-color': currentPlayer.color, overflow: 'visible' } as React.CSSProperties}>
-                  {/* 🌟 Передаём rotation в MeepleSelection */}
-                  <MeepleSelection
-                    features={availableFeaturesForMeeple}
-                    rotation={t.rotation}
-                    onPlace={(fid, x, y) => {
-                      console.log(`🖱️ [Board] Выбор спота: фича ${fid}, координаты (${x}, ${y})`);
-                      useGameStore.getState().placeMeeple(fid, x, y);
-                    }}
-                  />
-                </g>
-              )}
             </g>
           </g>
         );
       })}
+
+      {/* 🎨 СЛОЙ 2: ПОДСВЕТКА РЕГИОНОВ */}
+      <RegionOverlay />
+
+      {/* 🎨 СЛОЙ 3: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ (ПОВЕРХ ПОДСВЕТКИ) */}
+      <MeepleSelectionLayer />
+
+      {/* 🎨 СЛОЙ 4: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
+      <MeepleLayer />
     </svg>
   );
 };

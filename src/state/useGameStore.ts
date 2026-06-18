@@ -1,12 +1,28 @@
 // state/useGameStore.ts
 import { create } from 'zustand';
-import type { Player, PlacedTile, PlacedMeeple, Tile } from '@/core/types';
+import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType} from '@/core/types';
 import { TILE_DEFINITIONS } from '@/core/tileData';
-import { rotateFeatures, getTileSides, isValidPlacement, getValidPlacementCells, BOUNDARY_MATCHES, NEIGHBOR_OFFSETS } from '@/core/tileUtils';
+import {
+  rotateFeatures,
+  getTileSides,
+  isValidPlacement,
+  getValidPlacementCells,
+  BOUNDARY_MATCHES,
+  NEIGHBOR_OFFSETS
+} from '@/core/tileUtils';
 import { RegionManager, type FeatureKey } from '@/core/regionManager';
-import { checkRoadCompleteness } from '@/core/scoring';
+import {
+  findCompletedRegionsOnTile,
+  calculateRegionPoints,
+  type CompletedRegion
+} from '@/core/scoring';
 
 export type GamePhase = 'startTurn' | 'placeTile' | 'placeMeeple' | 'endTurn' | 'gameOver';
+
+// 🌟 Длительность анимации одного региона
+const ANIMATION_DURATION = 5000;
+// 🌟 Задержка между анимациями — в 2 раза меньше длины анимации
+const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION / 2;
 
 export interface GameStore {
   deck: Tile[];
@@ -18,15 +34,21 @@ export interface GameStore {
   regionManager: RegionManager;
   showRegions: boolean;
   debugSelectedTile: { x: number; y: number } | null;
-  
+  visibleFeatureTypes: FeatureType[];
+
   initGame: (players: Omit<Player, 'score' | 'meepleCount'>[]) => void;
   drawTile: () => void;
   placeTile: (x: number, y: number, rotation: 0 | 90 | 180 | 270) => boolean;
   placeMeeple: (featureId: string, x: number, y: number) => void;
-  endTurn: () => void; // 🌟 Логика завершения хода теперь сюда
-  processEndTurn: () => void; // 🌟 Новая функция для обработки логики внутри фазы 'endTurn'
   toggleRegions: () => void;
   setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
+  debugForceEndGame: () => void;
+
+  // 🌟 Вспомогательные функции
+  processEndTurn: () => void;
+  processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
+  animateMeepleCompletion: (region: CompletedRegion, startDelay: number) => void;
+  processEndGameInStore: (nextTurn: number) => void;
 }
 
 const createDeck = (): Tile[] => {
@@ -50,8 +72,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   phase: 'startTurn',
   regionManager: new RegionManager(),
   showRegions: true,
+  visibleFeatureTypes: ['road', 'city', 'field'],
   debugSelectedTile: null,
 
+  // ============================================
+  // 🎮 ИНИЦИАЛИЗАЦИЯ ИГРЫ
+  // ============================================
   initGame: (newPlayers) => {
     console.log('🎮 [Store] Инициализация игры...');
     const fullDeck = createDeck();
@@ -72,8 +98,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    console.log(`🎴 [Store] Стартовый тайл установлен. Игра начинается. Фаза: startTurn`);
-
     set({
       players: newPlayers.map(p => ({ ...p, score: 0, meepleCount: 8 })),
       deck: fullDeck,
@@ -87,52 +111,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // 🌟 Теперь это функция автоматической выдачи тайла
+  // ============================================
+  // 🎴 ВЫДАЧА ТАЙЛА
+  // ============================================
   drawTile: () => {
     const state = get();
     if (state.phase !== 'startTurn') {
       console.warn('⚠️ [Store] Неверная фаза для взятия тайла');
       return;
     }
-
-    // 🌟 Защита от повторного вызова
     if (state.drawnTile !== null) {
-      console.warn('⚠️ [Store] Тайл уже выдан, повторный вызов игнорируется');
+      console.warn('⚠️ [Store] Тайл уже выдан');
       return;
     }
 
     const newDeck = [...state.deck];
     let drawnTile: Tile | null = null;
     let attempts = 0;
-    const maxAttempts = newDeck.length; // Защита от бесконечного цикла
+    const maxAttempts = newDeck.length;
 
-    // 🌟 Цикл: пока колода не пуста, берём тайл и проверяем
-    while (newDeck.length > 0 && attempts< maxAttempts) {
+    while (newDeck.length > 0 && attempts < maxAttempts) {
       attempts++;
       const candidate = newDeck.pop()!;
       const validCells = getValidPlacementCells(candidate, state.board);
 
       if (validCells.size > 0) {
-        // ✅ Тайл можно поставить — оставляем его
         drawnTile = candidate;
-        console.log(`🎴 [Store] Выдан тайл ${candidate.id} (валидных клеток: ${validCells.size})`);
-        break;
-      }
-          // 🌟 Если колода пуста после pop — замешивать нечего, сразу выходим
-      if (newDeck.length === 0) {
-        console.log(`🏁 [Store] Последний тайл ${candidate.id} нельзя поставить. Игра окончена.`);
+        console.log(`🎴 [Store] Выдан тайл ${candidate.id}`);
         break;
       }
 
-      // ❌ Тайл нельзя поставить — замешиваем обратно в случайное место
+      if (newDeck.length === 0) {
+        console.log(`🏁 [Store] Последний тайл нельзя поставить.`);
+        break;
+      }
+
       const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
       newDeck.splice(insertIndex, 0, candidate);
-      console.log(`🔄 [Store] Тайл ${candidate.id} нельзя поставить. Замешан обратно в колоду.`);
     }
 
     if (!drawnTile) {
-      // 🏁 Колода пуста или все тайлы нельзя поставить — конец игры
-      console.log('🏁 [Store] Нечего ставить! Переход к фазе gameover.');
       set({ deck: newDeck, phase: 'gameOver' });
       return;
     }
@@ -140,24 +158,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ deck: newDeck, drawnTile, phase: 'placeTile' });
   },
 
+  // ============================================
+  // 📍 РАЗМЕЩЕНИЕ ТАЙЛА
+  // ============================================
   placeTile: (x, y, rotation) => {
     const state = get();
-    if (!state.drawnTile || state.phase !== 'placeTile') {
-      console.warn('⚠️ [Store] Нельзя поставить тайл');
-      return false;
-    }
+    if (!state.drawnTile || state.phase !== 'placeTile') return false;
     const cellKey = `${x},${y}`;
-    if (state.board.has(cellKey)) {
-      console.warn(`⚠️ [Store] Клетка ${cellKey} занята`);
-      return false;
-    }
+    if (state.board.has(cellKey)) return false;
 
     const rotatedFeatures = rotateFeatures(state.drawnTile.features, rotation);
-
-    if (!isValidPlacement(state.board, x, y, rotatedFeatures)) {
-      console.warn(`⚠️ [Store] Отказ: стороны не совпадают в (${x}, ${y})`);
-      return false;
-    }
+    if (!isValidPlacement(state.board, x, y, rotatedFeatures)) return false;
 
     const newBoard = new Map(state.board);
     newBoard.set(cellKey, {
@@ -167,15 +178,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       derivedSides: getTileSides({ ...state.drawnTile, features: rotatedFeatures }),
     });
 
-    const rm = state.regionManager;
-
-    // 🛡️ ШАГ 1: Инициализируем ВСЕ фичи нового тайла в DSU.
+    const rm = state.regionManager.clone();
     for (const feature of rotatedFeatures) {
       const featureKey: FeatureKey = `${x},${y}:${feature.id}`;
       rm.makeSet(featureKey, feature.type, (feature as any).hasShield ?? false);
     }
 
-    // 🛡️ ШАГ 2: Проверяем соседей и объединяем (union) регионы.
     for (const { dx, dy, matchKey } of NEIGHBOR_OFFSETS) {
       const nx = x + dx;
       const ny = y + dy;
@@ -188,196 +196,87 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const theirFeat = neighborTile.features.find(f => f.directions.includes(theirDir));
 
         if (myFeat && theirFeat && myFeat.type === theirFeat.type) {
-          const myKey: FeatureKey = `${x},${y}:${myFeat.id}`;
-          const theirKey: FeatureKey = `${nx},${ny}:${theirFeat.id}`;
-          rm.union(myKey, theirKey);
+          rm.union(`${x},${y}:${myFeat.id}`, `${nx},${ny}:${theirFeat.id}`);
         }
       }
     }
 
-    console.log(`✅ [Store] Тайл ${state.drawnTile.id} установлен в (${x}, ${y})`);
-    set({ board: newBoard, drawnTile: null, phase: 'placeMeeple' }); // 🌟 Переход к фазе размещения мипла
+    console.log(`✅ [Store] Тайл установлен в (${x}, ${y})`);
+    set({ board: newBoard, drawnTile: null, phase: 'placeMeeple', regionManager: rm });
     return true;
   },
 
+  // ============================================
+  // 🔶 РАЗМЕЩЕНИЕ МИПЛА
+  // ============================================
   placeMeeple: (featureId, mx, my) => {
-    set((state) => {
-      const player = state.players[state.currentTurn];
-      if (player.meepleCount <= 0) return console.warn('⚠️ [Store] Нет свободных миплов!'), state;
+    const state = get();
+    const player = state.players[state.currentTurn];
+    if (player.meepleCount <= 0) return;
 
-      const tiles = Array.from(state.board.values());
-      const last = tiles[tiles.length - 1];
-      if (!last || last.meeple) return console.warn('⚠️ [Store] Мипл уже стоит на этом тайле'), state;
+    const tiles = Array.from(state.board.values());
+    const last = tiles[tiles.length - 1];
+    if (!last || last.meeple) return;
 
-      const featureKey: FeatureKey = `${last.x},${last.y}:${featureId}`;
+    const featureKey: FeatureKey = `${last.x},${last.y}:${featureId}`;
+    const owners = state.regionManager.getFeatureOwners(featureKey);
+    if (owners.length > 0) return;
 
-      // 🛡️ ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: Проверяем, не занят ли весь регион целиком
-      const owners = state.regionManager.getFeatureOwners(featureKey);
-      if (owners.length > 0) {
-        return console.warn(`⚠️ [Store] Отказ: Регион фичи ${featureId} уже занят другим миплом!`), state;
-      }
-      //Добавляем мипла
-      state.regionManager.addMeeple(featureKey, player.id);
-      // 🌟 Добавляем владельца (теперь это гарантированно сработает)
-      state.regionManager.addOwner(featureKey, player.id);
+    const rm = state.regionManager.clone();
+    rm.addMeeple(featureKey, player.id);
+    rm.addOwner(featureKey, player.id);
 
-      const newOwners = state.regionManager.getFeatureOwners(featureKey);
-      console.log(`🔶 [Store] Фича ${featureId} теперь принадлежит: ${newOwners.length > 1 ? 'НЕСКОЛЬКИМ игрокам (спорная)' : '1 игроку'}`);
-
-      const newBoard = new Map(state.board);
-      newBoard.set(`${last.x},${last.y}`, {
-        ...last,
-        meeple: { playerId: player.id, featureId, color: player.color, x: mx, y: my } as PlacedMeeple
-      });
-
-      const newPlayers = [...state.players];
-      newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount - 1 };
-
-      // 🌟 АВТОМАТИЧЕСКИЙ ПЕРЕХОД К ФАЗЕ 'endTurn' ПОСЛЕ УСТАНОВКИ МИПЛА
-      console.log(`🔄 [Store] Мипл установлен. Переход к фазе 'endTurn'.`);
-      return {
-        board: newBoard,
-        players: newPlayers,
-        // currentTurn: nextTurn, // 🚫 Не меняем ход здесь
-        // phase: 'draw',         // 🚫 Не меняем фазу на 'draw'
-        phase: 'endTurn' // 🌟 Переходим к фазе завершения хода
-      };
+    const newBoard = new Map(state.board);
+    newBoard.set(`${last.x},${last.y}`, {
+      ...last,
+      meeple: {
+        playerId: player.id,
+        featureId,
+        color: player.color,
+        x: mx,
+        y: my
+      } as PlacedMeeple
     });
 
-    // 🌟 ВАЖНО: Автоматически вызываем endTurn после обновления состояния
-    // Это гарантирует, что processEndTurn выполнится сразу после placeMeeple
-    get().processEndTurn(); // 🌟 Вызов endTurn
+    const newPlayers = [...state.players];
+    newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount - 1 };
+
+    set({
+      board: newBoard,
+      players: newPlayers,
+      regionManager: rm,
+      phase: 'endTurn'
+    });
+
+    queueMicrotask(() => {
+      get().processEndTurn();
+    });
   },
 
-  endTurn: () => { // 🌟 Теперь просто вызывает processEndTurn
-    console.log("🔄 [Store] Начало обработки фазы 'endTurn'.");
-    get().processEndTurn(); // Вызываем логику завершения хода
-  },
-
+  // ============================================
+  // 🔄 ЗАВЕРШЕНИЕ ХОДА
+  // ============================================
   processEndTurn: () => {
-      const state = get();
-      const nextTurn = (state.currentTurn + 1) % state.players.length;
+    console.log("🔄 [Store] Начало обработки фазы 'endTurn'.");
+    const state = get();
+    const nextTurn = (state.currentTurn + 1) % state.players.length;
 
-      // --- ЛОГИКА ПРОВЕРКИ РЕГИОНОВ (из scoring.ts) ---
-      // Найдём последний установленный тайл
-      const tiles = Array.from(state.board.values());
-      const lastTile = tiles[tiles.length - 1]; // Последний тайл в порядке вставки
-      if (lastTile) {
-        console.log(`🔍 [Store] processEndTurn: Проверяем регионы на тайле (${lastTile.x}, ${lastTile.y})`);
-        const newPlayers = [...state.players];
-        const newBoard = new Map(state.board); // Для обновления (удаления мипла из завершённого региона)
+    let lastTile: PlacedTile | undefined;
+    for (const tile of state.board.values()) lastTile = tile;
 
-        // Проверим каждую фичу в последнем тайле
-        for (const feature of lastTile.features) {
-          if (feature.type === 'road') { // Проверяем только дороги
-            const featureKey: FeatureKey = `${lastTile.x},${lastTile.y}:${feature.id}`;
-            const rootKey = state.regionManager.find(featureKey);
-
-            if (rootKey) {
-              const meta = state.regionManager.getMetadata(rootKey);
-              if (meta && !meta.isComplete) { // Проверяем только незавершённые регион
-                // Проверим, завершена ли дорога
-                // 🌟 ИСПОЛЬЗУЕМ ФУНКЦИЮ ИЗ НОВОГО ФАЙЛА
-                if (checkRoadCompleteness(state.board, state.regionManager, rootKey)) {
-                  // --- РЕГИОН ЗАВЕРШЁН ---
-                  const points = meta.segments; // 1 очко за сегмент
-                  state.regionManager.markComplete(rootKey, points);
-
-                  // --- ОПРЕДЕЛЕНИЕ ПОБЕДИТЕЛЕЙ ---
-                  const winners = state.regionManager.getWinnersFromCompletedRegion(rootKey);
-                  console.log(`🏆 [Store] Победители в завершённой дороге: ${winners.join(', ')}`);
-
-                  // --- НАЧИСЛЕНИЕ ОЧКОВ ---
-                  for (const winnerId of winners) {
-                    const playerIndex = newPlayers.findIndex(p => p.id === winnerId);
-                    if (playerIndex !== -1) {
-                        newPlayers[playerIndex].score += points; // Полные очки получает каждый победитель
-                        console.log(`🏆 [Store] Игроку ${newPlayers[playerIndex].name} начислено ${points} очков за завершённую дорогу.`);
-                    }
-                  }
-
-                  // --- ВОЗВРАТ МИПЛОВ ---
-                  // Получаем список всех миплов (ID игроков), участвовавших в регионе, для возврата
-                  const allMeeplesInRegion = state.regionManager.getMeeplesForReturnFromCompletedRegion(rootKey);
-                  console.log(`🔄 [Store] Миплы для возврата из региона: ${allMeeplesInRegion.join(', ')}`);
-                  for(const meepleOwnerId of allMeeplesInRegion) {
-                      const playerIndex = newPlayers.findIndex(p => p.id === meepleOwnerId);
-                      if(playerIndex !== -1) {
-                          newPlayers[playerIndex].meepleCount += 1;
-                          console.log(`🔄 [Store] Мипл возвращён игроку ${newPlayers[playerIndex].name}`);
-                      }
-                  }
-
-                  // 🌟 ШАГ 1: Помечаем миплов как "завершающихся" (анимация +N и растворение)
-                  // НЕ удаляем их сразу — пусть CSS отыграет анимацию
-                  const completingTileKeys: string[] = [];
-                  for (const regionFeatureKey of meta.featureKeys) {
-                    const [tileCoord, featureId] = regionFeatureKey.split(':'); // 🌟 Извлекаем featureId
-                    const tileKey = tileCoord;
-                    const tileWithMeeple = newBoard.get(tileKey);
-                    
-                    if (tileWithMeeple && tileWithMeeple.meeple) {
-                      // 🌟 ПРОВЕРКА: мипл должен стоять именно на этой фиче, а не на другой фиче того же тайла
-                      if (tileWithMeeple.meeple.featureId === featureId) {
-                        // Помечаем мипла для анимации
-                        newBoard.set(tileKey, {
-                          ...tileWithMeeple,
-                          meeple: {
-                            ...tileWithMeeple.meeple,
-                            isCompleting: true,
-                            points: points
-                          }
-                        });
-                        completingTileKeys.push(tileKey);
-                        console.log(`✨ [Store] Мипл на тайле ${tileKey} (фича ${featureId}) помечен для анимации завершения (+${points} очков)`);
-                      }
-                    }
-                  }
-
-                  // 🌟 ШАГ 2: Откладываем реальное удаление миплов на время анимации (1500мс)
-                  if (completingTileKeys.length > 0) {
-                    setTimeout(() => {
-                      const currentState = get();
-                      const currentBoard = new Map(currentState.board);
-                      let changed = false;
-                      
-                      for (const tileKey of completingTileKeys) {
-                        const tile = currentBoard.get(tileKey);
-                        if (tile && tile.meeple && tile.meeple.isCompleting) {
-                          currentBoard.set(tileKey, { ...tile, meeple: undefined });
-                          changed = true;
-                          console.log(`🧹 [Store] Мипл удалён с тайла ${tileKey} (анимация завершена)`);
-                        }
-                      }
-                      
-                      if (changed) {
-                        set({ board: currentBoard });
-                      }
-                    }, 5000); // Длительность анимации
-                  }
-                }
-              }
-            }
-          }
-        }
-
-      // Обновим состояние с новыми игроками и доской (если убрали миплов)
-      set({ players: newPlayers, board: newBoard });
+    let completedRegions: CompletedRegion[] = [];
+    if (lastTile) {
+      completedRegions = findCompletedRegionsOnTile(state.board, state.regionManager, lastTile);
     }
-    // ------------------------------
 
-    // 🌟 НОВАЯ ЛОГИКА: Определяем следующую фазу
-    console.log(`🔄 [Store] Ход переходит к: ${state.players[nextTurn]?.name}`);
+    if (completedRegions.length > 0) {
+      get().processCompletedRegionsInStore(completedRegions);
+    }
 
     if (state.deck.length === 0) {
-      console.log('🏁 [Store] Колода пуста! Переход к фазе gameover.');
-      set({
-        currentTurn: nextTurn,
-        drawnTile: null,
-        phase: 'gameOver'
-      });
+      console.log('🏁 [Store] Колода пуста! Переход к концу игры.');
+      get().processEndGameInStore(nextTurn);
     } else {
-      // 🌟 Переходим в фазу 'draw' — UI автоматически вызовет drawTile
       set({
         currentTurn: nextTurn,
         drawnTile: null,
@@ -386,6 +285,216 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  // ============================================
+  // 🌟 ВСПОМОГАТЕЛЬНАЯ: обработка завершённых регионов
+  // Используется и в середине игры, и в конце
+  // ============================================
+  processCompletedRegionsInStore: (regions: CompletedRegion[]) => {
+    const state = get();
+    const rm = state.regionManager.clone();
+    const newPlayers = [...state.players];
+
+    for (let i = 0; i < regions.length; i++) {
+      const region = regions[i];
+      // 🌟 Задержка: i * (ANIMATION_DURATION / 2)
+      const startDelay = i * DELAY_BETWEEN_ANIMATIONS;
+
+      rm.markComplete(region.rootKey, region.points);
+
+      // Начисляем очки победителям
+      for (const winnerId of region.winners) {
+        const playerIndex = newPlayers.findIndex(p => p.id === winnerId);
+        if (playerIndex !== -1) {
+          newPlayers[playerIndex] = {
+            ...newPlayers[playerIndex],
+            score: newPlayers[playerIndex].score + region.points
+          };
+          console.log(`🏆 [Store] Игроку ${newPlayers[playerIndex].name} +${region.points} очков за ${region.type}`);
+        }
+      }
+
+      // Возвращаем миплы всем владельцам
+      for (const meepleOwnerId of region.allMeepleOwners) {
+        const playerIndex = newPlayers.findIndex(p => p.id === meepleOwnerId);
+        if (playerIndex !== -1) {
+          newPlayers[playerIndex].meepleCount += 1;
+          console.log(`🔄 [Store] Мипл возвращён игроку ${newPlayers[playerIndex].name}`);
+        }
+      }
+
+      // Запускаем анимацию с задержкой
+      get().animateMeepleCompletion(region, startDelay);
+    }
+
+    set({ players: newPlayers, regionManager: rm });
+  },
+
+  // ============================================
+  // ✨ ВСПОМОГАТЕЛЬНАЯ: анимация завершения миплов
+  // ============================================
+  animateMeepleCompletion: (region: CompletedRegion, startDelay: number = 0) => {
+    const animatedPlayers = new Set<string>();
+    const meeplesToAnimate: Array<{
+      tileKey: string;
+      meeple: PlacedMeeple;
+      points: number | undefined;
+    }> = [];
+
+    for (const regionFeatureKey of region.featureKeys) {
+      const [tileCoord, featureId] = regionFeatureKey.split(':');
+      const tileKey = tileCoord;
+
+      const currentState = get();
+      const tileWithMeeple = currentState.board.get(tileKey);
+
+      if (tileWithMeeple && tileWithMeeple.meeple) {
+        if (tileWithMeeple.meeple.featureId === featureId) {
+          const meepleOwnerId = tileWithMeeple.meeple.playerId;
+          const showPoints = !animatedPlayers.has(meepleOwnerId);
+
+          meeplesToAnimate.push({
+            tileKey,
+            meeple: tileWithMeeple.meeple,
+            points: showPoints ? region.points : undefined
+          });
+
+          if (showPoints) {
+            animatedPlayers.add(meepleOwnerId);
+          }
+        }
+      }
+    }
+
+    if (meeplesToAnimate.length === 0) return;
+
+    // ШАГ 1: Отложенная пометка для анимации
+    setTimeout(() => {
+      const currentState = get();
+      const currentBoard = new Map(currentState.board);
+
+      for (const { tileKey, meeple, points } of meeplesToAnimate) {
+        const tile = currentBoard.get(tileKey);
+        if (tile && tile.meeple) {
+          currentBoard.set(tileKey, {
+            ...tile,
+            meeple: {
+              ...meeple,
+              isCompleting: true,
+              points
+            }
+          });
+        }
+      }
+
+      set({ board: currentBoard });
+      console.log(`✨ [Store] Анимация региона ${region.rootKey} запущена (задержка ${startDelay}мс)`);
+    }, startDelay);
+
+    // ШАГ 2: Отложенное удаление миплов после анимации
+    setTimeout(() => {
+      const currentState = get();
+      const currentBoard = new Map(currentState.board);
+      let changed = false;
+
+      for (const { tileKey } of meeplesToAnimate) {
+        const tile = currentBoard.get(tileKey);
+        if (tile && tile.meeple && tile.meeple.isCompleting) {
+          currentBoard.set(tileKey, { ...tile, meeple: undefined });
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        set({ board: currentBoard });
+      }
+    }, startDelay + ANIMATION_DURATION);
+  },
+
+  // ============================================
+  // 🏁 ВСПОМОГАТЕЛЬНАЯ: обработка конца игры
+  // 🌟 Теперь с поэтапной анимацией, как в середине игры
+  // ============================================
+  processEndGameInStore: (nextTurn: number) => {
+    const state = get();
+    const rm = state.regionManager;
+
+    console.log('🏁 [Store] === КОНЕЦ ИГРЫ: сбор всех регионов с миплами ===');
+
+    // 🌟 ШАГ 1: Собираем ВСЕ регионы с миплами в формате CompletedRegion
+    const regionsWithMeeples: CompletedRegion[] = [];
+    const processedRegions = new Set<string>();
+
+    for (const tile of state.board.values()) {
+      for (const feature of tile.features) {
+        const featureKey: FeatureKey = `${tile.x},${tile.y}:${feature.id}`;
+        const root = rm.find(featureKey);
+
+        if (!root || processedRegions.has(root)) continue;
+        processedRegions.add(root);
+
+        const meta = rm.getMetadata(root);
+        if (!meta || meta.meepleCounts.size === 0) continue;
+
+        // 🌟 Подсчёт очков БЕЗ удвоения (isEndGame = true)
+        const points = calculateRegionPoints(state.board, rm, root, true);
+
+        // Находим победителей (доминантов)
+        const maxCount = Math.max(...Array.from(meta.meepleCounts.values()));
+        const winners = Array.from(meta.meepleCounts.entries())
+          .filter(([_, count]) => count === maxCount)
+          .map(([ownerId]) => ownerId);
+
+        const allMeepleOwners = Array.from(meta.meepleCounts.keys());
+
+        regionsWithMeeples.push({
+          rootKey: root,
+          type: meta.type,
+          points,
+          winners,
+          allMeepleOwners,
+          featureKeys: [...meta.featureKeys]
+        });
+
+        console.log(`🏆 [Store] EndGame: Регион ${meta.type} ${root} — ${points} очков`);
+      }
+    }
+
+    // 🌟 ШАГ 2: Используем ту же функцию, что и в середине игры
+    // Она сама запустит поэтапную анимацию с задержкой DELAY_BETWEEN_ANIMATIONS
+    if (regionsWithMeeples.length > 0) {
+      get().processCompletedRegionsInStore(regionsWithMeeples);
+    }
+
+    // 🌟 ШАГ 3: После ВСЕХ анимаций — переходим в gameOver
+    // Общая длительность: (regions.length - 1) * DELAY_BETWEEN_ANIMATIONS + ANIMATION_DURATION
+    const totalAnimationTime = regionsWithMeeples.length > 0
+      ? (regionsWithMeeples.length - 1) * DELAY_BETWEEN_ANIMATIONS + ANIMATION_DURATION
+      : 0;
+
+    setTimeout(() => {
+      set({
+        currentTurn: nextTurn,
+        drawnTile: null,
+        phase: 'gameOver'
+      });
+      console.log(`🏁 [Store] Переход в фазу gameOver`);
+    }, totalAnimationTime);
+  },
+
+  // ============================================
+  // 🎨 UI-действия
+  // ============================================
+  debugForceEndGame: () => {
+    console.log('🐛 [DEBUG] Принудительный конец игры');
+    const state = get();
+    const nextTurn = (state.currentTurn + 1) % state.players.length;
+    
+    // Очищаем колоду
+    set({ deck: [] });
+    
+    // Запускаем процесс конца игры
+    get().processEndGameInStore(nextTurn);
+},
   toggleRegions: () => {
     set((state) => ({ showRegions: !state.showRegions }));
   },

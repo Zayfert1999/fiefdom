@@ -1,5 +1,6 @@
 // renderer/DebugPanel.tsx
 import { useGameStore } from '@/state/useGameStore';
+import { calculateMonasteryPoints } from '@/core/scoring'; // 🌟 Импортируем логику подсчёта
 
 export const DebugPanel = () => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
@@ -7,6 +8,7 @@ export const DebugPanel = () => {
   const regionManager = useGameStore(s => s.regionManager);
   const players = useGameStore(s => s.players);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
+  const debugForceEndGame = useGameStore(s => s.debugForceEndGame);
 
   if (!debugSelectedTile) return null;
 
@@ -16,7 +18,10 @@ export const DebugPanel = () => {
   if (!tile) {
     return (
       <div style={panelStyle}>
-        <h3>🐛 Debug Panel</h3>
+        <div style={headerStyle}>
+          <h3 style={{ margin: 0 }}>🐛 Debug Panel</h3>
+          <button onClick={debugForceEndGame} style={endGameBtnStyle} title="Принудительно завершить игру">🏁</button>
+        </div>
         <p>Тайл не найден в ({x}, {y})</p>
         <button onClick={() => setDebugSelectedTile(null)} style={btnStyle}>Закрыть</button>
       </div>
@@ -25,7 +30,11 @@ export const DebugPanel = () => {
 
   return (
     <div style={panelStyle}>
-      <h3>🐛 Debug Panel</h3>
+      <div style={headerStyle}>
+        <h3 style={{ margin: 0 }}>🐛 Debug Panel</h3>
+        <button onClick={debugForceEndGame} style={endGameBtnStyle} title="Принудительно завершить игру">🏁</button>
+      </div>
+
       <div style={sectionStyle}>
         <h4>📍 Тайл</h4>
         <p><strong>ID:</strong> {tile.templateId}</p>
@@ -39,10 +48,12 @@ export const DebugPanel = () => {
         {tile.features.map((feature, idx) => {
           const featureKey = `${x},${y}:${feature.id}`;
           const owners = regionManager.getFeatureOwners(featureKey);
-          // 🌟 Получаем метаданные через корневой ключ
           const rootKey = regionManager.find(featureKey);
           const metadata = rootKey ? regionManager.getMetadata(rootKey) : undefined;
           const regionKeys = metadata ? Array.from(metadata.featureKeys) : [];
+
+          // 🌟 НОВОЕ: Вычисляем текущее состояние монастыря
+          const monasteryState = feature.type === 'monastery' ? calculateMonasteryPoints(board, x, y) : null;
 
           return (
             <div key={idx} style={featureStyle}>
@@ -53,20 +64,23 @@ export const DebugPanel = () => {
                 const player = players.find(p => p.id === id);
                 return `${player?.name} (${player?.color})`;
               }).join(', ') : 'Нет'}</p>
+
+              {/* 🌟 Блок специфичной информации для монастыря */}
+              {feature.type === 'monastery' && monasteryState && (
+                <p style={{ margin: '2px 0', color: '#d4a373' }}>Соседей вокруг: {monasteryState.points - 1} / 8</p>
+              )}
+
               {metadata && (
                 <>
                   <p>Размер региона: {metadata.segments} тайл(ов)</p>
                   <p>Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
                   <p style={{ color: metadata.isComplete ? '#4CAF50' : '#FF9800' }}>
-                    Статус завершения: {metadata.isComplete ? 'ЗАВЕРШЁН' : 'НЕ ЗАВЕРШЁН'}
+                    Статус завершения (DSU): {metadata.isComplete ? 'ЗАВЕРШЁН' : 'НЕ ЗАВЕРШЁН'}
                   </p>
-                  {metadata.isComplete && (
-                    <p>Очки: {metadata.points}</p>
-                  )}
-                  {/* --- ОТОБРАЖЕНИЕ ВЛАДЕЛЬЦЕВ ВСЕГО РЕГИОНА И ИХ МИПЛОВ --- */}
-                    <div>
+                  {metadata.isComplete && <p>Очки в метаданных: {metadata.points}</p>}
+                  
+                  <div>
                     <p>Владельцы региона и миплы:</p>
-                    {/* --- ДОБАВЛЕНА ПРОВЕРКА if (metadata) --- */}
                     {metadata && metadata.meepleCounts.size > 0 ? (
                       <ul style={{ margin: '2px 0', paddingLeft: '15px' }}>
                         {Array.from(metadata.meepleCounts.entries()).map(([playerId, count]) => {
@@ -82,7 +96,7 @@ export const DebugPanel = () => {
                       <p style={{ margin: '2px 0', fontSize: '11px' }}>Нет миплов</p>
                     )}
                   </div>
-                  {/* ---------------------------------------- */}
+
                   <details>
                     <summary style={{ cursor: 'pointer', marginTop: '5px', color: '#aaa' }}>
                       Ключи региона ({regionKeys.length})
@@ -107,8 +121,9 @@ export const DebugPanel = () => {
   );
 };
 
-// ... (стили без изменений)
-
+// ============================================
+// 🎨 Стили
+// ============================================
 const panelStyle: React.CSSProperties = {
   position: 'fixed',
   top: '70px',
@@ -125,6 +140,30 @@ const panelStyle: React.CSSProperties = {
   overflowY: 'auto',
   zIndex: 1000,
   boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '15px',
+  paddingBottom: '10px',
+  borderBottom: '1px solid #4a90e2',
+};
+
+const endGameBtnStyle: React.CSSProperties = {
+  width: '32px',
+  height: '32px',
+  padding: 0,
+  background: '#27ae60',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '16px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 const sectionStyle: React.CSSProperties = {

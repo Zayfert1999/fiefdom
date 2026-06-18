@@ -8,7 +8,7 @@ import { DebugPanel } from '@/renderer/DebugPanel';
 export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
-    placeTile, endTurn, initGame, drawTile, // 🌟 Добавили drawTile
+    placeTile, processEndTurn, initGame, drawTile, // 🌟 Добавили drawTile
     showRegions, toggleRegions
   } = useGameStore();
 
@@ -52,7 +52,7 @@ export default function App() {
 
   const handleSkipMeeple = () => {
     console.log('⏭️ [App] Игрок пропускает мипла → следующий ход');
-    endTurn();
+    processEndTurn();
   };
 
   const currentPlayer = players[currentTurn];

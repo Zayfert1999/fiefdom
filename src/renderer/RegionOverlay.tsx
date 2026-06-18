@@ -10,6 +10,7 @@ export const RegionOverlay = () => {
   const players = useGameStore(s => s.players);
   const showRegions = useGameStore(s => s.showRegions);
   const containerRef = useRef<SVGGElement>(null);
+  const visibleFeatureTypes = useGameStore(s => s.visibleFeatureTypes);
 
   // 🌟 ИСПРАВЛЕНО: ВСЕГДА вычисляем регионы, даже если showRegions = false
   // Это нужно, чтобы rect'ы оставались в DOM для CSS-transition
@@ -24,6 +25,9 @@ export const RegionOverlay = () => {
 
     for (const tile of board.values()) {
       for (const feature of tile.features) {
+        // 🌟 Пропускаем фичи невидимых типов
+        if (!visibleFeatureTypes.includes(feature.type)) continue;
+
         const featureKey = `${tile.x},${tile.y}:${feature.id}`;
         const owners = regionManager.getFeatureOwners(featureKey);
 

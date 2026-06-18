@@ -146,49 +146,25 @@ export class RegionManager {
       console.warn(`⚠️ [RegionManager] Не найдены метаданные для завершения региона: ${key}`);
     }
   }
-  // ----------------------------------------------------
 
-  // --- ОБНОВЛЁННЫЙ МЕТОД: Получить все миплы (ID игроков) из завершённого региона для возврата ---
-  // Теперь возвращает список ID игроков, чьи миплы нужно вернуть (тех, кто участвовал в подсчёте)
-  getMeeplesForReturnFromCompletedRegion(key: FeatureKey): string[] {
-    const root = this.find(key);
-    if (!root) return [];
-
-    const meta = this.metadata.get(root);
-    if (meta && meta.isComplete) {
-      // Возвращаем список игроков, у которых были миплы в регионе
-      // Это нужно для возврата миплов
-      return Array.from(meta.meepleCounts.entries())
-                  .flatMap(([playerId, count]) => Array(count).fill(playerId));
-    }
-    return []; // Возвращаем пустой массив, если регион не завершён
-  }
-  // ----------------------------------------------------
-
-  // --- НОВЫЙ МЕТОД: Определить победителя(ей) в регионе ---
-  // Возвращает массив ID игроков, набравших максимальное количество миплов
-  getWinnersFromCompletedRegion(key: FeatureKey): string[] {
-    const root = this.find(key);
-    if (!root) return [];
-
-    const meta = this.metadata.get(root);
-    if (meta && meta.isComplete) {
-      let maxCount = -1;
-      const winners: string[] = [];
-
-      for (const [playerId, count] of meta.meepleCounts) {
-        if (count > maxCount) {
-          maxCount = count;
-          winners.length = 0; // Очищаем предыдущих победителей
-          winners.push(playerId);
-        } else if (count === maxCount) {
-          winners.push(playerId); // Добавляем к победителям при равенстве
+  clone(): RegionManager {
+    const copy = new RegionManager();
+    copy.parent = new Map(this.parent);
+    copy.metadata = new Map(
+      Array.from(this.metadata.entries()).map(([key, meta]) => [
+        key,
+        {
+          type: meta.type,
+          hasShield: meta.hasShield,
+          segments: meta.segments,
+          isComplete: meta.isComplete,
+          points: meta.points,
+          owners: new Set(meta.owners),
+          featureKeys: new Set(meta.featureKeys),
+          meepleCounts: new Map(meta.meepleCounts),
         }
-      }
-      console.log(`🏆 [RegionManager] Победители в регионе ${key}: ${winners.join(', ')}, миплов: ${maxCount}`);
-      return winners;
-    }
-    return []; // Возвращаем пустой массив, если регион не завершён
+      ])
+    );
+    return copy;
   }
-  // ----------------------------------------------------
 }

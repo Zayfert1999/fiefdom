@@ -106,9 +106,8 @@ function calculateRoadPoints(
 
   const basePoints = uniqueTiles.size;
   
-  // 🌟 В середине игры завершённые дороги удваиваются, в конце — нет
+  const totalPoints = uniqueTiles.size;
   const isComplete = checkRegionCompleteness(board, rm, rootKey, 'road');
-  const totalPoints = (!isEndGame && isComplete) ? basePoints * 2 : basePoints;
 
   console.log(`🛣️ [Scoring] Дорога ${rootKey}: ${basePoints} тайлов, замкнута: ${isComplete}, endGame: ${isEndGame}, очки: ${totalPoints}`);
   return totalPoints;
@@ -163,6 +162,7 @@ function calculateCityPoints(
 
 /**
  * 🌟 Подсчёт очков за поле
+ * 3 очка за каждый замкнутый город, граничащий с полем
  */
 function calculateFieldPoints(
   board: Map<string, PlacedTile>,
@@ -191,12 +191,13 @@ function calculateFieldPoints(
 
       let neighborX = x;
       let neighborY = y;
+      let oppositeDir: string = '';  // 🌟 НОВОЕ: противоположное направление
 
       switch (dir) {
-        case 'N': neighborY--; break;
-        case 'E': neighborX++; break;
-        case 'S': neighborY++; break;
-        case 'W': neighborX--; break;
+        case 'N': neighborY--; oppositeDir = 'S'; break;
+        case 'E': neighborX++; oppositeDir = 'W'; break;
+        case 'S': neighborY++; oppositeDir = 'N'; break;
+        case 'W': neighborX--; oppositeDir = 'E'; break;
       }
 
       const neighborKey = `${neighborX},${neighborY}`;
@@ -205,6 +206,12 @@ function calculateFieldPoints(
 
       for (const neighborFeature of neighborTile.features) {
         if (neighborFeature.type === 'city') {
+          // 🌟 ИСПРАВЛЕНО: проверяем, что город действительно граничит с полем
+          // (имеет противоположное направление)
+          if (!neighborFeature.directions.includes(oppositeDir as any)) {
+            continue;
+          }
+          
           const cityFeatureKey = `${neighborX},${neighborY}:${neighborFeature.id}`;
           const cityRoot = rm.find(cityFeatureKey);
           if (cityRoot) {
@@ -357,7 +364,7 @@ export function findCompletedRegionsOnTile(
       console.log(`✅ [Scoring] Монастырь на (${x},${y}) завершён (+${points} очков)`);
     }
   }
-  
+
   return completed;
 }
 

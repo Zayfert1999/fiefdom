@@ -18,12 +18,4 @@
     <line x1="57.5" y1="100" x2="57.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
     <line x1="42.5" y1="100" x2="42.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>
   </g>
-
-
-
-<g id="highlights" class="highlights-layer" style="pointer-events: none;">
-  <rect y="0" width="42" height="100" fill="var(--player-color, white)" class="highlight" data-feature="field_w" stroke="none" opacity="0"/>
-  <rect x="58" y="0" width="42" height="100" fill="var(--player-color, white)" class="highlight" data-feature="field_e" stroke="none" opacity="0"/>
-  <rect x="42" width="16" height="100" fill="var(--player-color, white)" class="highlight" data-feature="road_ns" stroke="none" opacity="0"/>
-</g>
 </svg>

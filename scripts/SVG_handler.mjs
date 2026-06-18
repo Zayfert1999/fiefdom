@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-
 import fs from 'fs';
 import path from 'path';
 import * as cheerio from 'cheerio';
 
 const SVG_DIR = './src/assets/svg/tiles';
 const TILE_DATA_PATH = './src/core/tileData.ts';
-const HIGHLIGHTS_GROUP_ID = 'highlights';
 
 // --- 1. Парсинг ID фич из tileData.ts ---
 function parseFeatureIdsFromTileData(filePath) {
@@ -15,13 +13,13 @@ function parseFeatureIdsFromTileData(filePath) {
     console.error(`❌ Файл не найден: ${filePath}`);
     process.exit(1);
   }
+
   const content = fs.readFileSync(filePath, 'utf-8');
   const featureIds = new Map();
 
   // Ищем pattern: id: 'some_id', type: 'some_type'
   const featureRegex = /\{\s*id:\s*['"]([^'"]+)['"]\s*,\s*type:\s*['"]([^'"]+)['"]/g;
   let match;
-
   while ((match = featureRegex.exec(content)) !== null) {
     featureIds.set(match[1], match[2]);
   }
@@ -55,7 +53,7 @@ function removeJunk($) {
   $('[id]').each((_, el) => {
     const $el = $(el);
     const id = $el.attr('id');
-    
+
     // Не трогаем ID у элементов, которые имеют data-name
     if ($el.attr('data-name')) return;
 
@@ -69,76 +67,7 @@ function removeJunk($) {
   return removedCount;
 }
 
-// --- 3. Создание копии элемента для подсветки (ИЗМЕНЕНО: ЗАЛИВКА ВМЕСТО ОБВОДКИ) ---
-function createHighlightCopy($el, featureId, $) {
-  const $copy = $el.clone();
-
-  // Очищаем атрибуты, оставляем только геометрические
-  if ($copy.length > 0 && $copy[0] && $copy[0].type === 'tag' && $copy[0].attribs) {
-    const allowedAttrs = new Set([
-      'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'points', 
-      'x1', 'y1', 'x2', 'y2',
-      'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray'
-    ]);
-
-    const attrsToRemove = [];
-    for (const attrName in $copy[0].attribs) {
-      if (!allowedAttrs.has(attrName)) {
-        attrsToRemove.push(attrName);
-      }
-    }
-    for (const attrName of attrsToRemove) {
-      $copy.removeAttr(attrName);
-    }
-  }
-
-  // Удаляем вложенные текстовые узлы или другие теги внутри фигуры
-  if ($copy.length > 0 && $copy[0] && $copy[0].type === 'tag') {
-    $copy.contents().filter(function() {
-      return this.type === 'tag' && !['path', 'circle', 'ellipse', 'rect', 'polygon', 'polyline', 'line'].includes(this.tagName.toLowerCase());
-    }).remove();
-  }
-
-  // --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
-  // Применяем стили подсветки как ЗАЛИВКУ
-  $copy.attr('class', 'highlight');
-  $copy.attr('data-feature', featureId);
-  
-  // Убираем обводку
-  $copy.attr('stroke', 'none');
-  
-  // Делаем полупрозрачную заливку цветом игрока
-  // Используем rgba или opacity для прозрачности
-  $copy.attr('fill', 'var(--player-color, white)');
-  $copy.attr('opacity', '0'); // Прозрачность 0%
-  
-  // Убираем vector-effect, так как он влияет на stroke, а у нас его нет
-  $copy.removeAttr('vector-effect');
-  // -----------------------
-
-  return $copy;
-}
-
-// --- 4. Форматирование XML ---
-function formatXML(xml) {
-  let formatted = '';
-  let indent = 0;
-  const tab = '  ';
-
-  xml.split(/>\s*</).forEach((node) => {
-    if (node.match(/^\/\w/)) {
-      indent--;
-    }
-    formatted += '\n' + tab.repeat(Math.max(0, indent)) + '<' + node + '>';
-    if (node.match(/^<?\w[^>]*[^\/]$/) && !node.startsWith('?') && !node.startsWith('!') && !node.startsWith('/')) {
-      indent++;
-    }
-  });
-  
-  return formatted.trim().substring(1); 
-}
-
-// --- 5. Основная обработка файла ---
+// --- 3. Основная обработка файла ---
 function processSVG(filePath, featureIds) {
   const fileName = path.basename(filePath);
   console.log(`\n🎨 Обработка: ${fileName}`);
@@ -153,7 +82,8 @@ function processSVG(filePath, featureIds) {
     const stats = {
       junkRemoved: 0,
       duplicatesRemoved: 0,
-      highlightsCreated: 0,
+      validFeatures: 0,
+      invalidFeatures: 0,
       foundFeatureIds: [],
     };
 
@@ -164,12 +94,12 @@ function processSVG(filePath, featureIds) {
     $(selector).each((i, elem) => {
       const $el = $(elem);
       const dataName = $el.attr('data-name');
-
       if (!dataName) return;
 
       // Проверка 1: Есть ли этот ID в tileData?
       if (!featureIds.has(dataName)) {
-        stats.junkRemoved++;
+        stats.invalidFeatures++;
+        console.warn(`   ⚠️  Неизвестный data-name: "${dataName}" (пропущен)`);
         return;
       }
 
@@ -181,46 +111,32 @@ function processSVG(filePath, featureIds) {
 
       uniqueElements.set(dataName, $el);
       stats.foundFeatureIds.push(dataName);
+      stats.validFeatures++;
     });
 
-    console.log(`   📍 Найдено валидных фич: ${stats.foundFeatureIds.join(', ')}`);
+    console.log(`   📍 Валидных фич: ${stats.foundFeatureIds.join(', ') || '(нет)'}`);
 
-    // Б. Удаляем старые слои подсветки
+    // Б. Удаляем старые слои подсветки (если остались от предыдущих версий)
+    const oldHighlightsRemoved = $('[data-feature]').length + $(`.highlights-layer`).length;
     $('[data-feature]').remove();
-    $(`.${HIGHLIGHTS_GROUP_ID}`).remove();
-    $(`#${HIGHLIGHTS_GROUP_ID}`).remove();
+    $('.highlights-layer').remove();
+    $('#highlights').remove();
 
-    // В. Создаем новый слой подсветки
-    if (uniqueElements.size > 0) {
-      const highlightElements = [];
-
-      for (const [featureId, $el] of uniqueElements) {
-        const $highlightCopy = createHighlightCopy($el, featureId, $);
-        highlightElements.push($.html($highlightCopy));
-        stats.highlightsCreated++;
-      }
-
-      const highlightsHTML = [
-        `<g id="${HIGHLIGHTS_GROUP_ID}" class="${HIGHLIGHTS_GROUP_ID}-layer" style="pointer-events: none;">`,
-        ...highlightElements.map(el => '  ' + el),
-        '</g>'
-      ].join('\n');
-
-      $('svg').append('\n' + highlightsHTML + '\n');
+    if (oldHighlightsRemoved > 0) {
+      console.log(`   🗑️  Удалено старых слоёв подсветки: ${oldHighlightsRemoved}`);
     }
 
-    // Г. Чистка мусора
+    // В. Чистка мусора
     const junkCleaned = removeJunk($);
     stats.junkRemoved += junkCleaned;
 
-    // Д. Сохранение
+    // Г. Сохранение
     let output = $.xml();
     output = output.replace(/^<\?xml.*?\?>\s*/, '');
     output = '<?xml version="1.0" encoding="UTF-8"?>\n' + output;
-
     fs.writeFileSync(filePath, output, 'utf-8');
-    console.log(`   ✅ Готово: ${stats.highlightsCreated} подсветок, ${stats.duplicatesRemoved} дублей skipped, ${stats.junkRemoved} мусора skipped.`);
 
+    console.log(`   ✅ Готово: ${stats.validFeatures} валидных фич, ${stats.duplicatesRemoved} дублей, ${stats.junkRemoved} мусора`);
     return stats;
   } catch (error) {
     console.error(`❌ Ошибка при обработке ${fileName}:`, error.message);
@@ -229,7 +145,8 @@ function processSVG(filePath, featureIds) {
 }
 
 // --- ЗАПУСК ---
-console.log('🚀 Запуск SVG Handler (Fill Mode)');
+console.log('🚀 Запуск SVG Handler (валидация data-name + чистка)');
+console.log('ℹ️  Слой подсветки больше не генерируется — используется RegionOverlay.tsx\n');
 
 const featureIds = parseFeatureIdsFromTileData(TILE_DATA_PATH);
 if (featureIds.size === 0) {
@@ -248,7 +165,8 @@ console.log(`📂 Найдено ${files.length} SVG файлов`);
 let totalStats = {
   junkRemoved: 0,
   duplicatesRemoved: 0,
-  highlightsCreated: 0,
+  validFeatures: 0,
+  invalidFeatures: 0,
   filesProcessed: 0,
   allFoundIds: new Set(),
 };
@@ -259,7 +177,8 @@ for (const file of files) {
   if (stats) {
     totalStats.junkRemoved += stats.junkRemoved;
     totalStats.duplicatesRemoved += stats.duplicatesRemoved;
-    totalStats.highlightsCreated += stats.highlightsCreated;
+    totalStats.validFeatures += stats.validFeatures;
+    totalStats.invalidFeatures += stats.invalidFeatures;
     totalStats.filesProcessed++;
     stats.foundFeatureIds.forEach(id => totalStats.allFoundIds.add(id));
   }
@@ -267,10 +186,11 @@ for (const file of files) {
 
 console.log('\n' + '='.repeat(60));
 console.log('📊 ИТОГО:');
-console.log(` 📁 Файлов: ${totalStats.filesProcessed}`);
-console.log(` 🗑️ Мусор: ${totalStats.junkRemoved}`);
-console.log(` 🚫 Дубликаты: ${totalStats.duplicatesRemoved}`);
-console.log(` ✨ Подсветки создано: ${totalStats.highlightsCreated}`);
-console.log(` 🌟 Всего уникальных фич: ${totalStats.allFoundIds.size}`);
+console.log(` 📁 Файлов обработано: ${totalStats.filesProcessed}`);
+console.log(` ✅ Валидных фич: ${totalStats.validFeatures}`);
+console.log(` ⚠️  Неизвестных data-name: ${totalStats.invalidFeatures}`);
+console.log(` 🚫 Дубликатов: ${totalStats.duplicatesRemoved}`);
+console.log(` 🗑️ Мусора удалено: ${totalStats.junkRemoved}`);
+console.log(` 🌟 Уникальных фич: ${totalStats.allFoundIds.size}`);
 console.log('='.repeat(60));
 console.log('✨ Готово!');

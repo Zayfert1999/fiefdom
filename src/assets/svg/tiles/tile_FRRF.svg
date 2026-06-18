@@ -18,12 +18,4 @@
     <path d="M100,57.5h-34c-4.69,0-8.5,3.81-8.5,8.5v34" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
     <path d="M42.5,100v-34c0-12.96,10.54-23.5,23.5-23.5h34" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>
   </g>
-
-
-
-<g id="highlights" class="highlights-layer" style="pointer-events: none;">
-  <path d="M100,0v42h-34c-13.23,0-24,10.77-24,24v34H0V0h100Z" fill="var(--player-color, white)" class="highlight" data-feature="field_nw" stroke="none" opacity="0"/>
-  <path d="M66,58h34v42h-42v-34c0-4.41,3.59-8,8-8Z" fill="var(--player-color, white)" class="highlight" data-feature="field_se" stroke="none" opacity="0"/>
-  <path d="M58,100h-16v-34c0-13.23,10.77-24,24-24h34v16h-34c-4.41,0-8,3.59-8,8v34Z" fill="var(--player-color, white)" class="highlight" data-feature="road_se" stroke="none" opacity="0"/>
-</g>
 </svg>

@@ -42,16 +42,4 @@
   <g id="v" data-name="village">
     <circle cx="50" cy="50" r="20" fill="#cc0"/>
   </g>
-
-
-
-<g id="highlights" class="highlights-layer" style="pointer-events: none;">
-  <path d="M100,0v42h-31.67c-3.08-7.07-10.13-12-18.33-12s-15.25,4.93-18.33,12H0V0c10.44,7.37,21.36,14.58,33.81,17.8,24.85,6.84,46.47-3.18,66.19-17.8Z" fill="var(--player-color, white)" class="highlight" data-feature="field_ne-nw" stroke="none" opacity="0"/>
-  <path d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="var(--player-color, white)" class="highlight" data-feature="field_sw" stroke="none" opacity="0"/>
-  <path d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="var(--player-color, white)" class="highlight" data-feature="field_se" stroke="none" opacity="0"/>
-  <path d="M58,68.33v31.67h-16v-31.67c.16.08.33.15.5.21,2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46c.17-.06.34-.13.5-.21Z" fill="var(--player-color, white)" class="highlight" data-feature="road_s" stroke="none" opacity="0"/>
-  <path d="M31.46,57.5c.06.17.13.34.21.5H0v-16h31.67c-.08.16-.15.33-.21.5-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5Z" fill="var(--player-color, white)" class="highlight" data-feature="road_w" stroke="none" opacity="0"/>
-  <path d="M100,42v16h-31.67c.08-.16.15-.33.21-.5.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5c-.06-.17-.13-.34-.21-.5h31.67Z" fill="var(--player-color, white)" class="highlight" data-feature="road_e" stroke="none" opacity="0"/>
-  <path d="M100,0c-19.72,14.62-41.34,24.64-66.19,17.8C21.36,14.58,10.44,7.37,0,0h100Z" fill="var(--player-color, white)" class="highlight" data-feature="city_n" stroke="none" opacity="0"/>
-</g>
 </svg>

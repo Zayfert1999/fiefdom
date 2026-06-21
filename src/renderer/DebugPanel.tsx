@@ -1,6 +1,6 @@
 // renderer/DebugPanel.tsx
 import { useGameStore } from '@/state/useGameStore';
-import { calculateMonasteryPoints } from '@/core/scoring'; // 🌟 Импортируем логику подсчёта
+import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@/core/scoring'; // 🌟 Импортируем логику подсчёта
 
 export const DebugPanel = () => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
@@ -55,6 +55,22 @@ export const DebugPanel = () => {
           // 🌟 НОВОЕ: Вычисляем текущее состояние монастыря
           const monasteryState = feature.type === 'monastery' ? calculateMonasteryPoints(board, x, y) : null;
 
+                    // 🌟 Специфичная информация для полей
+          const fieldState = feature.type === 'field' && rootKey 
+            ? getAdjacentCitiesForField(board, regionManager, rootKey) 
+            : null;
+          
+          // Считаем статистику по полю
+          let fieldStats = null;
+          if (fieldState) {
+            const total = fieldState.size;
+            let completed = 0;
+            for (const isComplete of fieldState.values()) {
+              if (isComplete) completed++;
+            }
+            fieldStats = { total, completed };
+          }
+
           return (
             <div key={idx} style={featureStyle}>
               <strong>#{idx + 1} {feature.id}</strong>
@@ -67,12 +83,21 @@ export const DebugPanel = () => {
 
               {/* 🌟 Блок специфичной информации для монастыря */}
               {feature.type === 'monastery' && monasteryState && (
-                <p style={{ margin: '2px 0', color: '#d4a373' }}>Соседей вокруг: {monasteryState.points - 1} / 8</p>
+                <p style={{ margin: '2px 0', color: '#d4a373' }}>⛪ Соседей вокруг: {monasteryState.points - 1} / 8</p>
+              )}
+
+              {/* 🌟 Блок специфичной информации для поля */}
+              {feature.type === 'field' && fieldStats && (
+                <p style={{ margin: '4px 0', color: '#4CAF50' }}>🌾 Всего/Завершённых городов в регионе: {fieldStats.total}/{fieldStats.completed}</p>
               )}
 
               {metadata && (
                 <>
                   <p>Размер региона: {metadata.segments} тайл(ов)</p>
+                  {/* 🌟 Щит показываем только для городов*/}
+                  {metadata.type === 'city' && (
+                    <p style={{ color: '#4a90e2' }}>🛡️ Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
+                  )}
                   <p>Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
                   <p style={{ color: metadata.isComplete ? '#4CAF50' : '#FF9800' }}>
                     Статус завершения (DSU): {metadata.isComplete ? 'ЗАВЕРШЁН' : 'НЕ ЗАВЕРШЁН'}

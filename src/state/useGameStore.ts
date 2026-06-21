@@ -36,13 +36,14 @@ export interface GameStore {
   debugSelectedTile: { x: number; y: number } | null;
   visibleFeatureTypes: FeatureType[];
 
-  initGame: (players: Omit<Player, 'score' | 'meepleCount'>[]) => void;
+  initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
   drawTile: () => void;
   placeTile: (x: number, y: number, rotation: 0 | 90 | 180 | 270) => boolean;
   placeMeeple: (featureId: string, x: number, y: number) => void;
   toggleRegions: () => void;
   setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
   debugForceEndGame: () => void;
+  
 
   // 🌟 Вспомогательные функции
   processEndTurn: () => void;
@@ -99,7 +100,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     set({
-      players: newPlayers.map(p => ({ ...p, score: 0, meepleCount: 8 })),
+      players: newPlayers.map(p => ({ 
+        ...p,
+        meepleCount: 8,
+        pointsByCategory: {
+          road: 0,
+          city: 0,
+          field: 0,
+          monastery: 0,
+        },
+        score: 0
+      })),
       deck: fullDeck,
       board: gameBoard,
       currentTurn: 0,
@@ -305,9 +316,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       for (const winnerId of region.winners) {
         const playerIndex = newPlayers.findIndex(p => p.id === winnerId);
         if (playerIndex !== -1) {
+          const player = newPlayers[playerIndex];
+          // 🌟 НОВОЕ: распределяем очки по категории региона
           newPlayers[playerIndex] = {
-            ...newPlayers[playerIndex],
-            score: newPlayers[playerIndex].score + region.points
+            ...player,
+            score: player.score + region.points,
+            pointsByCategory: {
+              ...player.pointsByCategory,
+              [region.type]: player.pointsByCategory[region.type] + region.points
+            }
           };
           console.log(`🏆 [Store] Игроку ${newPlayers[playerIndex].name} +${region.points} очков за ${region.type}`);
         }
@@ -434,6 +451,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         const meta = rm.getMetadata(root);
         if (!meta || meta.meepleCounts.size === 0) continue;
+
+        //Пропуск завершенных регионов
+        if (meta.isComplete) continue;
 
         // 🌟 Подсчёт очков БЕЗ удвоения (isEndGame = true)
         const points = calculateRegionPoints(state.board, rm, root, true);

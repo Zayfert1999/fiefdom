@@ -161,8 +161,62 @@ function calculateCityPoints(
 }
 
 /**
+ * 🌟 Поиск всех городов, граничащих с полем
+ * Экспортируется для использования в DebugPanel
+ * 
+ * Поле граничит с городом ТОЛЬКО через adjacentCities на том же тайле.
+ * Если поле в тайле A соединено через DSU с полем в тайле B,
+ * и поле B граничит с городом — то весь регион поля получает очки за этот город.
+ * 
+ * @returns Map<cityRootKey, isComplete> — ключ города и флаг его завершённости
+ */
+export function getAdjacentCitiesForField(
+  board: Map<string, PlacedTile>,
+  rm: RegionManager,
+  rootKey: FeatureKey
+): Map<string, boolean> {
+  const meta = rm.getMetadata(rootKey);
+  if (!meta || meta.type !== 'field') return new Map();
+
+  const adjacentCities = new Map<string, boolean>();
+
+  // 🌟 Проходим по всем фичам поля в регионе (уже объединены через DSU)
+  for (const featureKey of meta.featureKeys) {
+    const [tileCoord, featureId] = featureKey.split(':');
+    const [xStr, yStr] = tileCoord.split(',');
+    const x = parseInt(xStr, 10);
+    const y = parseInt(yStr, 10);
+    const placedTile = board.get(`${x},${y}`);
+    if (!placedTile) continue;
+
+    const fieldFeature = placedTile.features.find(f => f.id === featureId);
+    if (!fieldFeature || fieldFeature.type !== 'field') continue;
+
+    // 🌟 Проверяем adjacentCities на этом поле
+    // Это единственный способ, которым поле может граничить с городом
+    if (fieldFeature.adjacentCities) {
+      for (const cityId of fieldFeature.adjacentCities) {
+        const cityFeatureKey = `${x},${y}:${cityId}`;
+        const cityRoot = rm.find(cityFeatureKey);
+        if (cityRoot) {
+          // Проверяем завершённость города и сохраняем результат
+          const isComplete = checkRegionCompleteness(board, rm, cityRoot, 'city');
+          adjacentCities.set(cityRoot, isComplete);
+        }
+      }
+    }
+  }
+
+  return adjacentCities;
+}
+
+/**
  * 🌟 Подсчёт очков за поле
  * 3 очка за каждый замкнутый город, граничащий с полем
+ * 
+ * Поле граничит с городом ТОЛЬКО через adjacentCities на том же тайле.
+ * Если поле в тайле A соединено через DSU с полем в тайле B,
+ * и поле B граничит с городом — то весь регион поля получает очки за этот город.
  */
 function calculateFieldPoints(
   board: Map<string, PlacedTile>,
@@ -172,61 +226,12 @@ function calculateFieldPoints(
   const meta = rm.getMetadata(rootKey);
   if (!meta || meta.type !== 'field') return 0;
 
-  const adjacentCities = new Set<string>();
-
-  for (const featureKey of meta.featureKeys) {
-    const [tileCoord, featureId] = featureKey.split(':');
-    const [xStr, yStr] = tileCoord.split(',');
-    const x = parseInt(xStr, 10);
-    const y = parseInt(yStr, 10);
-    const placedTile = board.get(`${x},${y}`);
-    
-    if (!placedTile) continue;
-
-    const fieldFeature = placedTile.features.find(f => f.id === featureId);
-    if (!fieldFeature || fieldFeature.type !== 'field') continue;
-
-    for (const dir of fieldFeature.directions) {
-      if (dir === 'C') continue;
-
-      let neighborX = x;
-      let neighborY = y;
-      let oppositeDir: string = '';  // 🌟 НОВОЕ: противоположное направление
-
-      switch (dir) {
-        case 'N': neighborY--; oppositeDir = 'S'; break;
-        case 'E': neighborX++; oppositeDir = 'W'; break;
-        case 'S': neighborY++; oppositeDir = 'N'; break;
-        case 'W': neighborX--; oppositeDir = 'E'; break;
-      }
-
-      const neighborKey = `${neighborX},${neighborY}`;
-      const neighborTile = board.get(neighborKey);
-      if (!neighborTile) continue;
-
-      for (const neighborFeature of neighborTile.features) {
-        if (neighborFeature.type === 'city') {
-          // 🌟 ИСПРАВЛЕНО: проверяем, что город действительно граничит с полем
-          // (имеет противоположное направление)
-          if (!neighborFeature.directions.includes(oppositeDir as any)) {
-            continue;
-          }
-          
-          const cityFeatureKey = `${neighborX},${neighborY}:${neighborFeature.id}`;
-          const cityRoot = rm.find(cityFeatureKey);
-          if (cityRoot) {
-            adjacentCities.add(cityRoot);
-          }
-        }
-      }
-    }
-  }
+  // 🌟 Используем вынесенную функцию
+  const adjacentCities = getAdjacentCitiesForField(board, rm, rootKey);
 
   let completedCities = 0;
-  for (const cityRoot of adjacentCities) {
-    if (checkRegionCompleteness(board, rm, cityRoot, 'city')) {
-      completedCities++;
-    }
+  for (const isComplete of adjacentCities.values()) {
+    if (isComplete) completedCities++;
   }
 
   const points = completedCities * 3;

@@ -4,6 +4,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { Board } from '@/renderer/Board';
 import { Tile } from '@/renderer/Tile';
 import { DebugPanel } from '@/renderer/DebugPanel';
+import { GameOverScreen } from '@/renderer/GameOverScreen';
 
 export default function App() {
   const {
@@ -241,6 +242,9 @@ export default function App() {
 
       {/* 🐛 Рендерим дебаг-панель поверх всего */}
       <DebugPanel />
+
+      {/* 🌟 НОВОЕ: Экран конца игры — рендерится поверх всех элементов */}
+      {phase === 'gameOver' && <GameOverScreen />}
     </div>
   );
 }

@@ -16,6 +16,7 @@ export interface TileFeature {
   hasShield?: boolean;
   directions: Direction[];
   spots: MeepleSpot[];
+  adjacentCities?: string[];
 }
 
 export interface Tile {
@@ -29,8 +30,14 @@ export interface Player {
   id: string;
   name: string;
   color: string;
-  score: number;
   meepleCount: number;
+  pointsByCategory: {
+    road: number,
+    city: number,
+    field: number,
+    monastery: number,
+  };
+  score: number;
 }
 
 export interface PlacedMeeple {

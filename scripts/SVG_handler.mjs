@@ -13,7 +13,6 @@ function parseFeatureIdsFromTileData(filePath) {
     console.error(`❌ Файл не найден: ${filePath}`);
     process.exit(1);
   }
-
   const content = fs.readFileSync(filePath, 'utf-8');
   const featureIds = new Map();
 
@@ -87,7 +86,8 @@ function processSVG(filePath, featureIds) {
       foundFeatureIds: [],
     };
 
-    // А. Находим все фигурные элементы с data-name
+    // 🌟 ШАГ А: Находим все фигурные элементы с data-name
+    // И сразу удаляем дубликаты
     const selector = 'path, circle, rect, polygon, polyline, line, ellipse';
     const uniqueElements = new Map();
 
@@ -105,7 +105,10 @@ function processSVG(filePath, featureIds) {
 
       // Проверка 2: Дубликаты
       if (uniqueElements.has(dataName)) {
+        // 🌟 ИСПРАВЛЕНО: удаляем дубликат из DOM
+        $el.remove();
         stats.duplicatesRemoved++;
+        console.log(`   🗑️  Удалён дубликат data-name: "${dataName}" (id="${$el.attr('id') || 'нет'}")`);
         return;
       }
 
@@ -116,7 +119,7 @@ function processSVG(filePath, featureIds) {
 
     console.log(`   📍 Валидных фич: ${stats.foundFeatureIds.join(', ') || '(нет)'}`);
 
-    // Б. Удаляем старые слои подсветки (если остались от предыдущих версий)
+    // 🌟 ШАГ Б: Удаляем старые слои подсветки (если остались от предыдущих версий)
     const oldHighlightsRemoved = $('[data-feature]').length + $(`.highlights-layer`).length;
     $('[data-feature]').remove();
     $('.highlights-layer').remove();
@@ -126,16 +129,16 @@ function processSVG(filePath, featureIds) {
       console.log(`   🗑️  Удалено старых слоёв подсветки: ${oldHighlightsRemoved}`);
     }
 
-    // В. Чистка мусора
+    // 🌟 ШАГ В: Чистка мусора (включая пустые группы после удаления дубликатов)
     const junkCleaned = removeJunk($);
     stats.junkRemoved += junkCleaned;
 
-    // Г. Сохранение
+    // 🌟 ШАГ Г: Сохранение
     let output = $.xml();
     output = output.replace(/^<\?xml.*?\?>\s*/, '');
     output = '<?xml version="1.0" encoding="UTF-8"?>\n' + output;
-    fs.writeFileSync(filePath, output, 'utf-8');
 
+    fs.writeFileSync(filePath, output, 'utf-8');
     console.log(`   ✅ Готово: ${stats.validFeatures} валидных фич, ${stats.duplicatesRemoved} дублей, ${stats.junkRemoved} мусора`);
     return stats;
   } catch (error) {
@@ -149,6 +152,7 @@ console.log('🚀 Запуск SVG Handler (валидация data-name + чи�
 console.log('ℹ️  Слой подсветки больше не генерируется — используется RegionOverlay.tsx\n');
 
 const featureIds = parseFeatureIdsFromTileData(TILE_DATA_PATH);
+
 if (featureIds.size === 0) {
   console.error('❌ Не найдено ID фич в tileData.ts!');
   process.exit(1);
@@ -174,6 +178,7 @@ let totalStats = {
 for (const file of files) {
   const filePath = path.join(SVG_DIR, file);
   const stats = processSVG(filePath, featureIds);
+
   if (stats) {
     totalStats.junkRemoved += stats.junkRemoved;
     totalStats.duplicatesRemoved += stats.duplicatesRemoved;
@@ -189,7 +194,7 @@ console.log('📊 ИТОГО:');
 console.log(` 📁 Файлов обработано: ${totalStats.filesProcessed}`);
 console.log(` ✅ Валидных фич: ${totalStats.validFeatures}`);
 console.log(` ⚠️  Неизвестных data-name: ${totalStats.invalidFeatures}`);
-console.log(` 🚫 Дубликатов: ${totalStats.duplicatesRemoved}`);
+console.log(` 🚫 Дубликатов удалено: ${totalStats.duplicatesRemoved}`);
 console.log(` 🗑️ Мусора удалено: ${totalStats.junkRemoved}`);
 console.log(` 🌟 Уникальных фич: ${totalStats.allFoundIds.size}`);
 console.log('='.repeat(60));

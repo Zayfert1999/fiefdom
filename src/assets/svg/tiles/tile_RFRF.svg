@@ -5,14 +5,11 @@
       <rect id="b" data-name="field_w" y="0" width="42" height="100" fill="#6c0"/>
       <rect id="c" data-name="field_e" x="58" y="0" width="42" height="100" fill="#6c0"/>
     </g>
-    <g>
-      <rect id="d" data-name="field_w" y="0" width="42" height="100" fill="#6c0"/>
-      <rect id="e" data-name="field_e" x="58" y="0" width="42" height="100" fill="#6c0"/>
-    </g>
+    
   </g>
   <g id="f" data-name="road">
     <rect id="g" data-name="road_ns" x="42" width="16" height="100" fill="#e6e6e6"/>
-    <rect id="h" data-name="road_ns" x="42" width="16" height="100" fill="#e6e6e6"/>
+    
   </g>
   <g id="i" data-name="roadBorder">
     <line x1="57.5" y1="100" x2="57.5" y2="0" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>

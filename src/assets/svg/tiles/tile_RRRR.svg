@@ -7,12 +7,7 @@
       <path id="e" data-name="field_sw" d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="#6c0"/>
       <path id="f" data-name="field_se" d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="#6c0"/>
     </g>
-    <g>
-      <path id="g" data-name="field_nw" d="M42,0v31.67c-4.62,2.01-8.32,5.71-10.33,10.33H0V0h42Z" fill="#6c0"/>
-      <path id="h" data-name="field_ne" d="M100,0v42h-31.67c-2.01-4.62-5.71-8.32-10.33-10.33V0h42Z" fill="#6c0"/>
-      <path id="i" data-name="field_sw" d="M42,68.33v31.67H0v-42h31.67c2.01,4.62,5.71,8.32,10.33,10.33Z" fill="#6c0"/>
-      <path id="j" data-name="field_se" d="M100,58v42h-42v-31.67c4.62-2.01,8.32-5.71,10.33-10.33h31.67Z" fill="#6c0"/>
-    </g>
+    
   </g>
   <g id="k" data-name="road">
     <g>
@@ -21,12 +16,7 @@
       <path id="n" data-name="road_n" d="M58,0v32h-.5v-.54c-2.32-.94-4.85-1.46-7.5-1.46s-5.18.52-7.5,1.46v.54h-.5V0h16Z" fill="#e6e6e6"/>
       <path id="o" data-name="road_s" d="M58,68v32h-16v-32h.5v.54c2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46v-.54h.5Z" fill="#e6e6e6"/>
     </g>
-    <g>
-      <path id="p" data-name="road_w" d="M31.46,42.5c-.94,2.32-1.46,4.85-1.46,7.5s.52,5.18,1.46,7.5h.54v.5H0v-16h32v.5h-.54Z" fill="#e6e6e6"/>
-      <path id="q" data-name="road_e" d="M100,42v16h-32v-.5h.54c.94-2.32,1.46-4.85,1.46-7.5s-.52-5.18-1.46-7.5h-.54v-.5h32Z" fill="#e6e6e6"/>
-      <path id="r" data-name="road_n" d="M58,0v32h-.5v-.54c-2.32-.94-4.85-1.46-7.5-1.46s-5.18.52-7.5,1.46v.54h-.5V0h16Z" fill="#e6e6e6"/>
-      <path id="s" data-name="road_s" d="M58,68v32h-16v-32h.5v.54c2.32.94,4.85,1.46,7.5,1.46s5.18-.52,7.5-1.46v-.54h.5Z" fill="#e6e6e6"/>
-    </g>
+    
   </g>
   <g id="t" data-name="roadBorder">
     <polyline points="57.5 67 57.5 68 57.5 68.54 57.5 100" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>

@@ -2,11 +2,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <g id="b" data-name="field">
     <path id="c" data-name="field_new" d="M0,0v100h42v-25h16v25h42V0H0ZM74,74H26v-22l14-6v-11l10-9,10,9v11l14,6v22Z" fill="#6c0"/>
-    <path id="d" data-name="field_new" d="M0,0v100h42v-25h16v25h42V0H0ZM74,74H26v-22l14-6v-11l10-9,10,9v11l14,6v22Z" fill="#6c0"/>
+    
   </g>
   <g id="e" data-name="road">
     <rect id="f" data-name="road_s" x="42" y="75" width="16" height="25" fill="#e6e6e6"/>
-    <rect id="g" data-name="road_s" x="42" y="75" width="16" height="25" fill="#e6e6e6"/>
+    
   </g>
   <g id="h" data-name="roadBorder">
     <line x1="42.5" y1="100" x2="42.5" y2="75" fill="#e6e6e6" stroke="#b3b3b3" stroke-miterlimit="10"/>

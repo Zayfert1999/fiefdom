@@ -5,14 +5,11 @@
       <path id="b" data-name="field_nw" d="M100,0v42h-34c-13.23,0-24,10.77-24,24v34H0V0h100Z" fill="#6c0"/>
       <path id="c" data-name="field_se" d="M66,58h34v42h-42v-34c0-4.41,3.59-8,8-8Z" fill="#6c0"/>
     </g>
-    <g>
-      <path id="d" data-name="field_nw" d="M100,0v42h-34c-13.23,0-24,10.77-24,24v34H0V0h100Z" fill="#6c0"/>
-      <path id="e" data-name="field_se" d="M66,58h34v42h-42v-34c0-4.41,3.59-8,8-8Z" fill="#6c0"/>
-    </g>
+    
   </g>
   <g id="f" data-name="road">
     <path id="g" data-name="road_se" d="M58,100h-16v-34c0-13.23,10.77-24,24-24h34v16h-34c-4.41,0-8,3.59-8,8v34Z" fill="#e6e6e6"/>
-    <path id="h" data-name="road_se" d="M58,100h-16v-34c0-13.23,10.77-24,24-24h34v16h-34c-4.41,0-8,3.59-8,8v34Z" fill="#e6e6e6"/>
+    
   </g>
   <g id="i" data-name="roadBorder">
     <path d="M100,57.5h-34c-4.69,0-8.5,3.81-8.5,8.5v34" fill="none" stroke="#b3b3b3" stroke-miterlimit="10"/>

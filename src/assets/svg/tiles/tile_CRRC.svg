@@ -5,14 +5,11 @@
       <path id="d" data-name="field_ne-sw" d="M100,0v42c-30.9,0-58,27.1-58,58H0L100,0Z" fill="#6c0"/>
       <path id="e" data-name="field_se" d="M100,58v42h-42c0-21.98,20.02-42,42-42Z" fill="#6c0"/>
     </g>
-    <g>
-      <path id="f" data-name="field_ne-sw" d="M100,0v42c-30.9,0-58,27.1-58,58H0L100,0Z" fill="#6c0"/>
-      <path id="g" data-name="field_se" d="M100,58v42h-42c0-21.98,20.02-42,42-42Z" fill="#6c0"/>
-    </g>
+    
   </g>
   <g id="h" data-name="road">
     <path id="i" data-name="road_se" d="M58,100h-16c0-30.9,27.1-58,58-58v16c-21.98,0-42,20.02-42,42Z" fill="#e6e6e6"/>
-    <path id="j" data-name="road_se" d="M58,100h-16c0-30.9,27.1-58,58-58v16c-21.98,0-42,20.02-42,42Z" fill="#e6e6e6"/>
+    
   </g>
   <g id="k" data-name="roadBorder">
     <path d="M99.5,57.5c-21.88.3-41.7,20.12-42,42" fill="none" stroke="#b3b3b3" stroke-linecap="square" stroke-miterlimit="10"/>
@@ -20,7 +17,7 @@
   </g>
   <g id="l" data-name="city">
     <polygon id="m" data-name="city_nw" points="0 0 0 100 100 0 0 0" fill="#960"/>
-    <polygon id="n" data-name="city_nw" points="0 0 0 100 100 0 0 0" fill="#960"/>
+    
   </g>
   <g id="o" data-name="cityBorder">
     <line x1="100" y2="100" fill="none" stroke="#d1bc8d" stroke-miterlimit="10" stroke-width="2"/>

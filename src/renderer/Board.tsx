@@ -6,6 +6,7 @@ import { getValidPlacementCells } from '@/core/tileUtils';
 import { RegionOverlay } from './RegionOverlay';
 import { MeepleSelectionLayer } from './MeepleSelectionLayer';
 import { MeepleLayer } from './MeepleLayer';
+import { CompletionOverlay } from './CompletionOverlay';
 
 const TILE_SIZE = 100;
 
@@ -240,6 +241,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
 
       {/* 🎨 СЛОЙ 2: ПОДСВЕТКА РЕГИОНОВ */}
       <RegionOverlay />
+      <CompletionOverlay />
 
       {/* 🎨 СЛОЙ 3: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ (ПОВЕРХ ПОДСВЕТКИ) */}
       <MeepleSelectionLayer />

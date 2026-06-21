@@ -21,8 +21,14 @@ export type GamePhase = 'startTurn' | 'placeTile' | 'placeMeeple' | 'endTurn' | 
 
 // 🌟 Длительность анимации одного региона
 const ANIMATION_DURATION = 5000;
-// 🌟 Задержка между анимациями — в 2 раза меньше длины анимации
+// 🌟 Задержка между анимациями
 const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION / 2;
+
+export interface CompletionAnimation {
+  region: CompletedRegion;
+  startTime: number;
+}
+
 
 export interface GameStore {
   deck: Tile[];
@@ -35,6 +41,7 @@ export interface GameStore {
   showRegions: boolean;
   debugSelectedTile: { x: number; y: number } | null;
   visibleFeatureTypes: FeatureType[];
+  completionAnimations: CompletionAnimation[];
 
   initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
   drawTile: () => void;
@@ -43,13 +50,12 @@ export interface GameStore {
   toggleRegions: () => void;
   setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
   debugForceEndGame: () => void;
-  
 
   // 🌟 Вспомогательные функции
   processEndTurn: () => void;
   processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
-  animateMeepleCompletion: (region: CompletedRegion, startDelay: number) => void;
   processEndGameInStore: (nextTurn: number) => void;
+  animateRegionCompletion: (region: CompletedRegion, startDelay?: number) => void;
 }
 
 const createDeck = (): Tile[] => {
@@ -75,6 +81,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   showRegions: true,
   visibleFeatureTypes: ['road', 'city', 'field'],
   debugSelectedTile: null,
+  completionAnimations: [],
 
   // ============================================
   // 🎮 ИНИЦИАЛИЗАЦИЯ ИГРЫ
@@ -119,6 +126,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       regionManager: rm,
       showRegions: true,
       debugSelectedTile: null,
+      completionAnimations: [],
     });
   },
 
@@ -310,6 +318,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // 🌟 Задержка: i * (ANIMATION_DURATION / 2)
       const startDelay = i * DELAY_BETWEEN_ANIMATIONS;
 
+      // 🌟 НОВОЕ: одна функция для всей анимации
+      get().animateRegionCompletion(region, startDelay);
+
       rm.markComplete(region.rootKey, region.points);
 
       // Начисляем очки победителям
@@ -338,93 +349,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           console.log(`🔄 [Store] Мипл возвращён игроку ${newPlayers[playerIndex].name}`);
         }
       }
-
-      // Запускаем анимацию с задержкой
-      get().animateMeepleCompletion(region, startDelay);
     }
 
     set({ players: newPlayers, regionManager: rm });
-  },
-
-  // ============================================
-  // ✨ ВСПОМОГАТЕЛЬНАЯ: анимация завершения миплов
-  // ============================================
-  animateMeepleCompletion: (region: CompletedRegion, startDelay: number = 0) => {
-    const animatedPlayers = new Set<string>();
-    const meeplesToAnimate: Array<{
-      tileKey: string;
-      meeple: PlacedMeeple;
-      points: number | undefined;
-    }> = [];
-
-    for (const regionFeatureKey of region.featureKeys) {
-      const [tileCoord, featureId] = regionFeatureKey.split(':');
-      const tileKey = tileCoord;
-
-      const currentState = get();
-      const tileWithMeeple = currentState.board.get(tileKey);
-
-      if (tileWithMeeple && tileWithMeeple.meeple) {
-        if (tileWithMeeple.meeple.featureId === featureId) {
-          const meepleOwnerId = tileWithMeeple.meeple.playerId;
-          const showPoints = !animatedPlayers.has(meepleOwnerId);
-
-          meeplesToAnimate.push({
-            tileKey,
-            meeple: tileWithMeeple.meeple,
-            points: showPoints ? region.points : undefined
-          });
-
-          if (showPoints) {
-            animatedPlayers.add(meepleOwnerId);
-          }
-        }
-      }
-    }
-
-    if (meeplesToAnimate.length === 0) return;
-
-    // ШАГ 1: Отложенная пометка для анимации
-    setTimeout(() => {
-      const currentState = get();
-      const currentBoard = new Map(currentState.board);
-
-      for (const { tileKey, meeple, points } of meeplesToAnimate) {
-        const tile = currentBoard.get(tileKey);
-        if (tile && tile.meeple) {
-          currentBoard.set(tileKey, {
-            ...tile,
-            meeple: {
-              ...meeple,
-              isCompleting: true,
-              points
-            }
-          });
-        }
-      }
-
-      set({ board: currentBoard });
-      console.log(`✨ [Store] Анимация региона ${region.rootKey} запущена (задержка ${startDelay}мс)`);
-    }, startDelay);
-
-    // ШАГ 2: Отложенное удаление миплов после анимации
-    setTimeout(() => {
-      const currentState = get();
-      const currentBoard = new Map(currentState.board);
-      let changed = false;
-
-      for (const { tileKey } of meeplesToAnimate) {
-        const tile = currentBoard.get(tileKey);
-        if (tile && tile.meeple && tile.meeple.isCompleting) {
-          currentBoard.set(tileKey, { ...tile, meeple: undefined });
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        set({ board: currentBoard });
-      }
-    }, startDelay + ANIMATION_DURATION);
   },
 
   // ============================================
@@ -499,6 +426,106 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       console.log(`🏁 [Store] Переход в фазу gameOver`);
     }, totalAnimationTime);
+  },
+
+  animateRegionCompletion: (region: CompletedRegion, startDelay: number = 0) => {
+    console.log(`✨ [Store] Запуск анимации региона ${region.type} ${region.rootKey} (задержка ${startDelay}мс)`);
+    
+    // 🌟 Собираем миплов региона для анимации
+    const animatedPlayers = new Set<string>();
+    const meeplesToAnimate: Array<{
+      tileKey: string;
+      meeple: PlacedMeeple;
+      points: number | undefined;
+    }> = [];
+    
+    for (const regionFeatureKey of region.featureKeys) {
+      const [tileCoord, featureId] = regionFeatureKey.split(':');
+      const currentState = get();
+      const tileWithMeeple = currentState.board.get(tileCoord);
+      
+      if (tileWithMeeple?.meeple?.featureId === featureId) {
+        const meepleOwnerId = tileWithMeeple.meeple.playerId;
+        const showPoints = !animatedPlayers.has(meepleOwnerId);
+        
+        meeplesToAnimate.push({
+          tileKey: tileCoord,
+          meeple: tileWithMeeple.meeple,
+          points: showPoints ? region.points : undefined,
+        });
+        
+        if (showPoints) animatedPlayers.add(meepleOwnerId);
+      }
+    }
+    
+    // ============================================
+    // 🎬 ФАЗА 1: Начало анимации (startDelay)
+    // - Добавляем обводку региона
+    // - Помечаем миплов как isCompleting
+    // ============================================
+    setTimeout(() => {
+      // 1.1 Добавляем обводку
+      const animation = { region, startTime: Date.now() };
+      set((state) => ({
+        completionAnimations: [...state.completionAnimations, animation],
+      }));
+      console.log(`✨ [Store] Обводка добавлена для региона ${region.rootKey}`);
+      
+      // 1.2 Помечаем миплов как isCompleting (для CSS-анимации в Tile)
+      if (meeplesToAnimate.length > 0) {
+        const currentState = get();
+        const currentBoard = new Map(currentState.board);
+        
+        for (const { tileKey, meeple, points } of meeplesToAnimate) {
+          const tile = currentBoard.get(tileKey);
+          if (tile?.meeple) {
+            currentBoard.set(tileKey, {
+              ...tile,
+              meeple: { ...meeple, isCompleting: true, points },
+            });
+          }
+        }
+        
+        set({ board: currentBoard });
+        console.log(`✨ [Store] Миплы помечены для анимации (${meeplesToAnimate.length} шт.)`);
+      }
+    }, startDelay);
+    
+    // ============================================
+    // 🎬 ФАЗА 2: Конец анимации (startDelay + ANIMATION_DURATION)
+    // - Удаляем миплов с доски
+    // - Убираем обводку региона
+    // ============================================
+    setTimeout(() => {
+      // 2.1 Удаляем миплов
+      if (meeplesToAnimate.length > 0) {
+        const currentState = get();
+        const currentBoard = new Map(currentState.board);
+        let boardChanged = false;
+        
+        for (const { tileKey } of meeplesToAnimate) {
+          const tile = currentBoard.get(tileKey);
+          if (tile?.meeple?.isCompleting) {
+            currentBoard.set(tileKey, { ...tile, meeple: undefined });
+            boardChanged = true;
+          }
+        }
+        
+        if (boardChanged) {
+          set({ board: currentBoard });
+          console.log(`✨ [Store] Миплы удалены с доски`);
+        }
+      }
+      
+      // 2.2 Убираем обводку
+      set((state) => ({
+        completionAnimations: state.completionAnimations.filter(
+          a => a.region.rootKey !== region.rootKey
+        ),
+      }));
+      console.log(`✨ [Store] Обводка убрана для региона ${region.rootKey}`);
+      console.log(`✨ [Store] Анимация региона ${region.rootKey} завершена`);
+    }, startDelay + ANIMATION_DURATION);
   },
 
   // ============================================

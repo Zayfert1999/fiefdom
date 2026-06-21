@@ -19,6 +19,38 @@
 }
 
 /* ============================================
+   ✨ COMPLETION OVERLAY — подсветка завершённых регионов
+   ============================================ */
+
+/* 🌟 Контейнер обводки — не перехватывает клики */
+.completion-overlay {
+  pointer-events: none;
+}
+
+/* 🌟 Группа с пульсацией */
+.completion-highlight {
+  animation: completion-pulse 1s ease-in-out infinite;
+}
+
+/* 🌟 Сам rect обводки */
+.completion-rect {
+  fill: #faefae;
+  stroke: #FFD700;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 16px #FFD700);
+}
+
+/* 🌟 Пульсация: от полной непрозрачности к полупрозрачной */
+@keyframes completion-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ============================================
    🔶 ПОДСВЕТКА СПОТОВ ДЛЯ МИПЛОВ
    ============================================ */
 

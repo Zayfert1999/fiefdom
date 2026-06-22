@@ -301,3 +301,87 @@ export function applyTileToBoardAndRM(
 
   return { newBoard, newRM };
 }
+
+/**
+ * 💀 Находит все "мёртвые" клетки — пустые клетки-кандидаты,
+ * в которые ни один тайл из колоды не может быть поставлен
+ * (ни в одном из 4 поворотов).
+ * 
+ * Используется для подсветки клеток, куда уже нельзя поставить тайл
+ * до конца игры.
+ * 
+ * @param board Текущая доска
+ * @param deck Оставшаяся колода тайлов
+ * @returns Set координат "мёртвых" клеток в формате "x,y"
+ */
+export function findDeadCells(
+  board: Map<string, PlacedTile>,
+  deck: Tile[]
+): Set<string> {
+  // 🌟 Если колода пуста — все пустые клетки мёртвые
+  if (deck.length === 0) {
+    const emptyNeighbors = new Set<string>();
+    for (const tile of board.values()) {
+      for (const { dx, dy } of NEIGHBOR_OFFSETS) {
+        const nx = tile.x + dx;
+        const ny = tile.y + dy;
+        const key = `${nx},${ny}`;
+        if (!board.has(key)) {
+          emptyNeighbors.add(key);
+        }
+      }
+    }
+    console.log(`💀 [TileUtils] Колода пуста — все ${emptyNeighbors.size} соседей мёртвые`);
+    return emptyNeighbors;
+  }
+  
+  // 🌟 ШАГ 1: Собираем все пустые клетки-кандидаты (соседи существующих тайлов)
+  const candidateCells = new Set<string>();
+  for (const tile of board.values()) {
+    for (const { dx, dy } of NEIGHBOR_OFFSETS) {
+      const nx = tile.x + dx;
+      const ny = tile.y + dy;
+      const key = `${nx},${ny}`;
+      if (!board.has(key)) {
+        candidateCells.add(key);
+      }
+    }
+  }
+  
+  // 🌟 ШАГ 2: Для каждой клетки проверяем все тайлы × все повороты
+  const deadCells = new Set<string>();
+  
+  for (const cellKey of candidateCells) {
+    const [xStr, yStr] = cellKey.split(',');
+    const x = parseInt(xStr, 10);
+    const y = parseInt(yStr, 10);
+    
+    let canBePlaced = false;
+    
+    // 🌟 Перебираем все тайлы в колоде
+    for (const tile of deck) {
+      // 🌟 Перебираем все 4 поворота
+      for (const rotation of [0, 90, 180, 270] as const) {
+        const rotatedFeatures = rotateFeatures(tile.features, rotation);
+        
+        if (isValidPlacement(board, x, y, rotatedFeatures)) {
+          canBePlaced = true;
+          break; // 🌟 РАННИЙ ВЫХОД: нашли подходящий тайл
+        }
+      }
+      
+      if (canBePlaced) break; // 🌟 РАННИЙ ВЫХОД: клетка жива
+    }
+    
+    if (!canBePlaced) {
+      deadCells.add(cellKey);
+    }
+  }
+  
+  console.log(
+    `💀 [TileUtils] Найдено мёртвых клеток: ${deadCells.size} из ${candidateCells.size} кандидатов ` +
+    `(колода: ${deck.length} тайлов)`
+  );
+  
+  return deadCells;
+}

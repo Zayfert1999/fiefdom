@@ -41,12 +41,14 @@ export interface GameStore {
   completionAnimations: CompletionAnimation[];
   previewTile: PreviewTile | null;
   previewRegionManager: RegionManager | null;
+  showDeadCells: boolean;
 
   initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
   drawTile: () => void;
   placeTile: (x: number, y: number, rotation: 0 | 90 | 180 | 270) => boolean;
   placeMeeple: (featureId: string, x: number, y: number) => void;
   toggleRegions: () => void;
+  toggleDeadCells: () => void;
   setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
   debugForceEndGame: () => void;
   startPreview: (x: number, y: number) => void;
@@ -83,6 +85,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   phase: 'startTurn',
   regionManager: new RegionManager(),
   showRegions: true,
+  showDeadCells: false,
   visibleFeatureTypes: ['road', 'city', 'field'],
   debugSelectedTile: null,
   completionAnimations: [],
@@ -643,8 +646,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Запускаем процесс конца игры
     get().processEndGameInStore(nextTurn);
 },
+
   toggleRegions: () => {
     set((state) => ({ showRegions: !state.showRegions }));
+  },
+
+  toggleDeadCells: () => {
+    set((state) => ({ showDeadCells: !state.showDeadCells }));
+    console.log(`💀 [Store] Показ мёртвых клеток: ${!get().showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}`);
   },
 
   setDebugSelectedTile: (coords) => {

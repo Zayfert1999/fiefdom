@@ -125,12 +125,16 @@
 }
 
 /* Фон клетки */
-.valid-cell {
+.valid-cell-bg {
   fill: rgba(255, 255, 255, 0.15);
+}
+
+.valid-cell-border {
+  fill: none;
   stroke: white;
   stroke-width: 2;
-  stroke-dasharray: 4 4;
-  transition: fill 0.2s ease, stroke 0.2s ease;
+  stroke-dasharray: 6 4;
+  opacity: 0.6;
 }
 
 /* Крестик "+" в центре валидной клетки */
@@ -157,6 +161,43 @@
   opacity: 1;
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
   transform: scale(1.2);
+}
+
+/* ============================================
+   💀 DEAD CELLS — подсветка мёртвых клеток
+   ============================================ */
+
+/* 🌟 Контейнер мёртвой клетки */
+.dead-cell {
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* 🌟 Полупрозрачный фон клетки */
+.dead-cell-bg {
+  fill: rgba(231, 76, 60, 0.15);
+}
+
+/* 🌟 Пунктирная красная рамка */
+.dead-cell-border {
+  fill: none;
+  stroke: #e74c3c;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  opacity: 0.6;
+}
+
+/* 🌟 Крестик в центре */
+.dead-cell-cross {
+  stroke: #e74c3c;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+
+/* 🌟 Общий контейнер оверлея */
+.cells-overlay {
+  pointer-events: none;
 }
 
 /* ============================================

@@ -11,7 +11,7 @@ export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
     processEndTurn, initGame, drawTile, // 🌟 Добавили drawTile
-    showRegions, toggleRegions,
+    showRegions, toggleRegions, showDeadCells, toggleDeadCells,
     previewTile, startPreview, confirmPreview, cancelPreview
   } = useGameStore();
 
@@ -90,6 +90,19 @@ const handleBoardClick = (x: number, y: number) => {
         flexWrap: 'wrap'
       }}>
         <span>👤 Ход: <strong>{currentPlayer?.name || '---'}</strong></span>
+        
+        {/* 💀 НОВОЕ: Кнопка toggle мёртвых клеток */}
+        <button
+          onClick={toggleDeadCells}
+          style={{
+            ...btnStyle,
+            background: showDeadCells ? '#e74c3c' : '#555',
+          }}
+          title="Показать клетки, куда нельзя поставить ни один тайл из колоды"
+        >
+          💀 {showDeadCells ? 'Мёртвые: ВКЛ' : 'Мёртвые: ВЫКЛ'}
+        </button>
+        
         {/* 🌟 Информация о колоде перемещена в панель действий */}
         <button
           onClick={toggleRegions}

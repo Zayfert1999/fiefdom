@@ -2,11 +2,12 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from './Tile';
-import { getValidPlacementCells } from '@/core/tileUtils';
+import { getValidPlacementCells, rotateFeatures } from '@/core/tileUtils';
 import { RegionOverlay } from './RegionOverlay';
 import { MeepleSelectionLayer } from './MeepleSelectionLayer';
 import { MeepleLayer } from './MeepleLayer';
 import { CompletionOverlay } from './CompletionOverlay';
+import { CellsOverlay } from './CellsOverlay';
 
 const TILE_SIZE = 100;
 
@@ -129,28 +130,28 @@ export const Board = ({ onGridClick }: BoardProps) => {
       featureId: string,
       rm: typeof regionManager
     ) => {
-        const featureKey = `${x},${y}:${featureId}`;
-        const owners = rm.getFeatureOwners(featureKey);
+      const featureKey = `${x},${y}:${featureId}`;
+      const owners = rm.getFeatureOwners(featureKey);
 
-        if (owners.length > 0) {
-          const meta = rm.getMetadata(featureKey);
-          if (!meta) return;
+      if (owners.length > 0) {
+        const meta = rm.getMetadata(featureKey);
+        if (!meta) return;
 
-          const maxCount = Math.max(...owners.map(id => meta.meepleCounts.get(id) || 0));
-          const dominantOwners = owners.filter(id => (meta.meepleCounts.get(id) || 0) === maxCount);
+        const maxCount = Math.max(...owners.map(id => meta.meepleCounts.get(id) || 0));
+        const dominantOwners = owners.filter(id => (meta.meepleCounts.get(id) || 0) === maxCount);
 
-          if (dominantOwners.length === 1) {
-            const player = players.find(p => p.id === dominantOwners[0]);
-            if (player) combinations.add(player.color);
-          } else {
-            const colors = dominantOwners
-              .map(id => players.find(p => p.id === id)?.color || '#ffffff')
-              .sort()
-              .join('|');
-            combinations.add(colors);
-          }
+        if (dominantOwners.length === 1) {
+          const player = players.find(p => p.id === dominantOwners[0]);
+          if (player) combinations.add(player.color);
+        } else {
+          const colors = dominantOwners
+            .map(id => players.find(p => p.id === id)?.color || '#ffffff')
+            .sort()
+            .join('|');
+          combinations.add(colors);
         }
-};
+      }
+    };
 
     // 🌟 Используем previewRegionManager если есть (он содержит объединённые регионы)
     const activeRM = previewRegionManager || regionManager;
@@ -233,33 +234,11 @@ export const Board = ({ onGridClick }: BoardProps) => {
       <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#grid)" pointerEvents="none" />
       <line x1="-10000" y1="0" x2="10000" y2="0" className="axis-line" pointerEvents="none" />
       <line x1="0" y1="-10000" x2="0" y2="10000" className="axis-line" pointerEvents="none" />
+      
+      {/* 🟢💀 СЛОЙ 1: СЛОЙ КЛЕТОК (ВАЛИДНЫЕ И МЕРТВЫЕ) */}
+      <CellsOverlay onGridClick={onGridClick} validCells={validCells} />
 
-      {/* 🌟 ВАЛИДНЫЕ КЛЕТКИ */}
-      {Array.from(validCells).map(key => {
-        const [x, y] = key.split(',').map(Number);
-        const px = x * TILE_SIZE;
-        const py = y * TILE_SIZE;
-        const cx = px + TILE_SIZE / 2;
-        const cy = py + TILE_SIZE / 2;
-        const plusSize = 15;
-
-        return (
-          <g
-            key={key}
-            className="valid-cell-container"
-            onClick={(e) => {
-              e.stopPropagation();
-              onGridClick(x, y);
-            }}
-          >
-            <rect className="valid-cell" x={px} y={py} width={TILE_SIZE} height={TILE_SIZE} />
-            <line className="valid-cell-plus" x1={cx - plusSize} y1={cy} x2={cx + plusSize} y2={cy} />
-            <line className="valid-cell-plus" x1={cx} y1={cy - plusSize} x2={cx} y2={cy + plusSize} />
-          </g>
-        );
-      })}
-
-      {/* 🎨 СЛОЙ 1: ТАЙЛЫ (только графика) */}
+      {/* 🎨 СЛОЙ 2: ТАЙЛЫ (только графика) */}
       {Array.from(board.values()).map((t) => {
         const key = `${t.x},${t.y}`;
         const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
@@ -288,7 +267,7 @@ export const Board = ({ onGridClick }: BoardProps) => {
         );
       })}
 
-      {/* 🌟 НОВОЕ: СЛОЙ ПРИМЕРКИ ТАЙЛА */}
+      {/* 🌟 СЛОЙ 3: ПРИМЕРКА ТАЙЛА */}
       {previewTile && (
         <g
           className="preview-tile"
@@ -316,14 +295,14 @@ export const Board = ({ onGridClick }: BoardProps) => {
       )}
 
 
-      {/* 🎨 СЛОЙ 2: ПОДСВЕТКА РЕГИОНОВ */}
+      {/* 🎨 СЛОЙ 4: ПОДСВЕТКА РЕГИОНОВ */}
       <RegionOverlay regionManagerOverride={previewRegionManager || undefined} />
       <CompletionOverlay />
 
-      {/* 🎨 СЛОЙ 3: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ (ПОВЕРХ ПОДСВЕТКИ) */}
+      {/* 🎨 СЛОЙ 5: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ */}
       <MeepleSelectionLayer />
 
-      {/* 🎨 СЛОЙ 4: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
+      {/* 🎨 СЛОЙ 6: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
       <MeepleLayer />
     </svg>
   );

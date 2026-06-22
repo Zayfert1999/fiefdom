@@ -122,14 +122,19 @@ export const Board = ({ onGridClick }: BoardProps) => {
   const uniqueColorCombinations = useMemo(() => {
     const combinations = new Set<string>();
 
-    for (const tile of board.values()) {
-      for (const feature of tile.features) {
-        const featureKey = `${tile.x},${tile.y}:${feature.id}`;
-        const owners = regionManager.getFeatureOwners(featureKey);
+    // 🌟 Вспомогательная функция: обработка одной фичи
+    const processFeature = (
+      x: number,
+      y: number,
+      featureId: string,
+      rm: typeof regionManager
+    ) => {
+        const featureKey = `${x},${y}:${featureId}`;
+        const owners = rm.getFeatureOwners(featureKey);
 
         if (owners.length > 0) {
-          const meta = regionManager.getMetadata(featureKey);
-          if (!meta) continue;
+          const meta = rm.getMetadata(featureKey);
+          if (!meta) return;
 
           const maxCount = Math.max(...owners.map(id => meta.meepleCounts.get(id) || 0));
           const dominantOwners = owners.filter(id => (meta.meepleCounts.get(id) || 0) === maxCount);
@@ -145,11 +150,28 @@ export const Board = ({ onGridClick }: BoardProps) => {
             combinations.add(colors);
           }
         }
+};
+
+    // 🌟 Используем previewRegionManager если есть (он содержит объединённые регионы)
+    const activeRM = previewRegionManager || regionManager;
+
+    // 🌟 ШАГ 1: Обычные тайлы из board
+    for (const tile of board.values()) {
+      for (const feature of tile.features) {
+        processFeature(tile.x, tile.y, feature.id, activeRM);
+      }
+    }
+
+    // 🌟 ШАГ 2: Preview-тайл (если есть)
+    if (previewTile && previewRegionManager) {
+      const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
+      for (const feature of rotatedFeatures) {
+        processFeature(previewTile.x, previewTile.y, feature.id, previewRegionManager);
       }
     }
 
     return Array.from(combinations);
-  }, [board, regionManager, players]);
+  }, [board, regionManager, previewRegionManager, previewTile, players]);
 
   return (
     <svg

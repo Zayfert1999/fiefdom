@@ -50,6 +50,37 @@
   }
 }
 
+/* 🌟 PREVIEW-TILE — полупрозрачный тайл на доске во время примерки */
+.preview-tile {
+  opacity: 0.85;
+  filter: drop-shadow(0 0 15px rgba(74, 144, 226, 0.8));
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.preview-tile:hover {
+  opacity: 1;
+  filter: drop-shadow(0 0 20px rgba(74, 144, 226, 1));
+}
+
+/* Полупрозрачный оверлей с пунктирной рамкой */
+.preview-tile-overlay {
+  fill: rgba(74, 144, 226, 0.1);
+  stroke: #4a90e2;
+  stroke-width: 3;
+  stroke-dasharray: 8 4;
+  pointer-events: none;
+  animation: preview-pulse 2s ease-in-out infinite;
+}
+
+@keyframes preview-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
 /* ============================================
    🔶 ПОДСВЕТКА СПОТОВ ДЛЯ МИПЛОВ
    ============================================ */

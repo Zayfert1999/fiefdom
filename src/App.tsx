@@ -1,19 +1,21 @@
 // App.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Board } from '@/renderer/Board';
 import { Tile } from '@/renderer/Tile';
 import { DebugPanel } from '@/renderer/DebugPanel';
 import { GameOverScreen } from '@/renderer/GameOverScreen';
+import { getValidPlacementCells } from '@/core/tileUtils';
 
 export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
-    placeTile, processEndTurn, initGame, drawTile, // 🌟 Добавили drawTile
-    showRegions, toggleRegions
+    processEndTurn, initGame, drawTile, // 🌟 Добавили drawTile
+    showRegions, toggleRegions,
+    previewTile, startPreview, confirmPreview, cancelPreview
   } = useGameStore();
 
-  const [previewRotation, setPreviewRotation] = useState<0 | 90 | 180 | 270>(0);
+  const board = useGameStore(s => s.board);
 
   useEffect(() => {
     if (players.length === 0) {
@@ -36,20 +38,32 @@ export default function App() {
     }
   }, [phase, drawnTile, drawTile]); // 🌟 Добавлена зависимость drawnTile
 
-  const handleRotate = () => {
-    const next = ((previewRotation + 90) % 360) as 0 | 90 | 180 | 270;
-    setPreviewRotation(next);
-  };
+    // 🌟 НОВОЕ: вычисляем валидные ячейки
+  const validCells = useMemo(() => {
+    if (!drawnTile) return new Set<string>();
+    return getValidPlacementCells(drawnTile, board);
+  }, [drawnTile, board]);
 
-  const handleBoardClick = (x: number, y: number) => {
-    if (phase === 'placeTile' && drawnTile) {
-      console.log(`📍 [App] Попытка установки тайла в (${x}, ${y})`);
-      const success = placeTile(x, y, previewRotation);
-      if (success) {
-        setPreviewRotation(0);
+const handleBoardClick = (x: number, y: number) => {
+  if (phase === 'placeTile' && drawnTile) {
+    const cellKey = `${x},${y}`;
+    if (validCells.has(cellKey)) {
+      // 🌟 Если уже есть previewTile на этой позиции — ничего не делаем
+      if (previewTile && previewTile.x === x && previewTile.y === y) {
+        return;
       }
+      
+      // 🌟 Если есть previewTile на другой позиции — отменяем и начинаем новую
+      if (previewTile) {
+        console.log(`🔄 [App] Перемещение примерки: (${previewTile.x},${previewTile.y}) → (${x},${y})`);
+        cancelPreview();
+      }
+      
+      console.log(`👁️ [App] Начало примерки в (${x}, ${y})`);
+      startPreview(x, y);
     }
-  };
+  }
+};
 
   const handleSkipMeeple = () => {
     console.log('⏭️ [App] Игрок пропускает мипла → следующий ход');
@@ -149,7 +163,10 @@ export default function App() {
       )}
 
       {/* 🗺️ Игровое поле */}
-      <Board onGridClick={handleBoardClick} />
+      <Board 
+        onGridClick={handleBoardClick}
+      />
+      
 
       {/* 🤲 ПАНЕЛЬ ДЕЙСТВИЙ (Правый нижний угол) — теперь с информацией о колоде и превью тайла */}
       {showPreviewPanel && (
@@ -169,44 +186,77 @@ export default function App() {
           zIndex: 1000,
           backdropFilter: 'blur(8px)',
           minWidth: '140px'
+          
         }}>
-          {/* 🌟 Информация о колоде перемещена сюда */}
-          <div style={{ alignSelf: 'flex-start' }}>
-            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px' }}>📦 Колода: {deck.length}</span>
+          {/* 📦 Информация о колоде*/}
+          <div style={{ 
+            color: '#fff',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            width: '100%',
+            textAlign: 'center',
+            borderBottom: '1px solid rgba(255, 215, 0, 0.3)',
+          }}>
+            📦 Колода: {deck.length}
           </div>
 
-          {/* 🎴 Превью тайла (только в фазе placeTile) */}
-          {phase === 'placeTile' && drawnTile && (
+          {/* 🎴 Тайл в руке (без preview) */}
+          {phase === 'placeTile' && drawnTile && !previewTile && (
             <>
               <div
-                onClick={handleRotate}
-                title="Нажмите, чтобы повернуть"
                 style={{
-                  cursor: 'pointer',
                   border: '1px solid #555',
                   borderRadius: '8px',
                   overflow: 'hidden',
                   background: '#1a1a1a',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.05)';
-                  (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 16px rgba(74, 144, 226, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
-                  (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                 }}
               >
                 <svg width={100} height={100} style={{ display: 'block' }}>
-                  <g transform={`translate(50, 50) rotate(${previewRotation}) translate(-50, -50)`}>
-                    <Tile id={drawnTile.id as any} size={100} />
-                  </g>
+                  <Tile id={drawnTile.id as any} size={100} />
                 </svg>
               </div>
               <div style={{ color: '#888', fontSize: '11px', textAlign: 'center' }}>
-                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле<br />
+                Кликни на <span style={{ color: '#ffffff' }}>белый маркер</span> на поле<br />
+              </div>
+            </>
+          )}
+
+          {/* 👁️ Примерка тайла*/}
+          {previewTile && (
+            <>
+              <button
+                onClick={confirmPreview}
+                style={{
+                  ...btnStyle,
+                  width: '100%',
+                  background: '#2ecc71',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                ✅ Подтвердить
+              </button>
+
+              <button
+                onClick={cancelPreview}
+                style={{
+                  ...btnStyle,
+                  width: '100%',
+                  background: '#e74c3c',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                ❌ Отменить
+              </button>
+
+              <div style={{ color: '#fff', fontSize: '12px', textAlign: 'center' }}>
+                <span style={{ color: '#888', fontSize: '11px' }}>
+                  {previewTile.validRotations.length > 1
+                    ? 'Кликни на тайл для поворота'
+                    : 'Поворот фиксирован'}
+                </span>
               </div>
             </>
           )}

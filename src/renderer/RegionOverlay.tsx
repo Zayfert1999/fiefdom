@@ -2,14 +2,23 @@
 import { useMemo, useEffect, useRef } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { cloneFeatureGeometry, calculateBoundingBox} from '@/core/cloneFeatureGeometry';
+import { rotateFeatures } from '@/core/tileUtils';
+import type { RegionManager } from '@/core/regionManager';
 
-export const RegionOverlay = () => {
+interface RegionOverlayProps {
+  // 🌟 НОВОЕ: опциональный override для RegionManager (используется при примерке)
+  regionManagerOverride?: RegionManager;
+}
+
+export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => {
   const board = useGameStore(s => s.board);
-  const regionManager = useGameStore(s => s.regionManager);
+  const storeRegionManager = useGameStore(s => s.regionManager);
   const players = useGameStore(s => s.players);
   const showRegions = useGameStore(s => s.showRegions);
   const visibleFeatureTypes = useGameStore(s => s.visibleFeatureTypes);
   const containerRef = useRef<SVGGElement>(null);
+  const previewTile = useGameStore(s => s.previewTile);
+  const regionManager = regionManagerOverride || storeRegionManager;
 
   const regions = useMemo(() => {
     const regionMap = new Map<string, {
@@ -20,6 +29,7 @@ export const RegionOverlay = () => {
       featureId: string;
     }[]>();
 
+    // 🌟 ШАГ 1: Обычные тайлы из board
     for (const tile of board.values()) {
       for (const feature of tile.features) {
         if (!visibleFeatureTypes.includes(feature.type)) continue;
@@ -43,8 +53,36 @@ export const RegionOverlay = () => {
       }
     }
 
+    // 🌟 ШАГ 2: Preview-тайл (если есть)
+    if (previewTile) {
+      // 🌟 Поворачиваем фичи preview-тайла
+      const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
+      
+      for (const feature of rotatedFeatures) {
+        if (!visibleFeatureTypes.includes(feature.type)) continue;
+        
+        const featureKey = `${previewTile.x},${previewTile.y}:${feature.id}`;
+        const owners = regionManager.getFeatureOwners(featureKey);
+        
+        // 🌟 Если у фичи есть владельцы (через union с существующим регионом) — добавляем
+        if (owners.length > 0) {
+          const root = regionManager.find(featureKey);
+          if (root) {
+            if (!regionMap.has(root)) regionMap.set(root, []);
+            regionMap.get(root)!.push({
+              featureKey,
+              tileX: previewTile.x,
+              tileY: previewTile.y,
+              rotation: previewTile.rotation,
+              featureId: feature.id
+            });
+          }
+        }
+      }
+    }
+
     return Array.from(regionMap.entries());
-  }, [board, regionManager, players, visibleFeatureTypes]);
+  }, [board, regionManager, players, visibleFeatureTypes, previewTile]);
 
   const getPatternId = (featureKey: string): string => {
     const owners = regionManager.getFeatureOwners(featureKey);

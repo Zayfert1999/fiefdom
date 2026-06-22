@@ -1,5 +1,6 @@
 // core/tileUtils.ts
-import type { Direction, FeatureType, Tile, TileFeature } from './types';
+import type { Direction, FeatureType, Tile, TileFeature, PlacedTile } from './types';
+import { RegionManager, type FeatureKey } from '@/core/regionManager';
 
 const COMPASS_ORDER: Direction[] = ['N','NE(N)', 'NE', 'NE(E)', 'E', 'SE(E)', 'SE', 'SE(S)', 'S', 'SW(S)', 'SW', 'SW(W)', 'W', 'NW(W)', 'NW', 'NW(N)'];
 
@@ -209,3 +210,94 @@ export const getValidPlacementCells = (
 
   return validSet;
 };
+
+
+/**
+ * 🌟 Возвращает массив валидных поворотов для тайла на конкретной позиции.
+ * Используется при примерке тайла — чтобы знать, какие повороты доступны.
+ * 
+ * @param tile Тайл из руки
+ * @param board Текущая доска
+ * @param x Координата X для установки
+ * @param y Координата Y для установки
+ * @returns Массив валидных поворотов (0, 90, 180, 270). Может быть пустым.
+ */
+export function getValidRotations(
+  tile: Tile,
+  board: Map<string, PlacedTile>,
+  x: number,
+  y: number
+): (0 | 90 | 180 | 270)[] {
+  const rotations: (0 | 90 | 180 | 270)[] = [];
+  
+  for (const rotation of [0, 90, 180, 270] as const) {
+    const rotatedFeatures = rotateFeatures(tile.features, rotation);
+    
+    if (isValidPlacement(board, x, y, rotatedFeatures)) {
+      rotations.push(rotation);
+    }
+  }
+  
+  console.log(
+    `🔄 [TileUtils] getValidRotations для ${tile.id} в (${x}, ${y}): ` +
+    `валидных поворотов: ${rotations.length}/4 [${rotations.join(', ')}°]`
+  );
+  
+  return rotations;
+}
+
+/**
+ * 🌟 Применяет тайл к доске и RegionManager.
+ * Возвращает новый board и новый RM с объединёнными регионами.
+ * 
+ * Используется в:
+ * - placeTile (окончательная установка)
+ * - startPreview (создание previewRM)
+ * - rotatePreview (пересоздание previewRM)
+ */
+export function applyTileToBoardAndRM(
+  board: Map<string, PlacedTile>,
+  regionManager: RegionManager,
+  tile: Tile,
+  x: number,
+  y: number,
+  rotation: 0 | 90 | 180 | 270
+): { newBoard: Map<string, PlacedTile>; newRM: RegionManager } {
+  const rotatedFeatures = rotateFeatures(tile.features, rotation);
+
+  // 🌟 Новый board
+  const newBoard = new Map(board);
+  newBoard.set(`${x},${y}`, {
+    templateId: tile.id,
+    x, y, rotation,
+    features: rotatedFeatures,
+    derivedSides: getTileSides({ ...tile, features: rotatedFeatures }),
+  });
+
+  // 🌟 Новый RM с объединёнными регионами
+  const newRM = regionManager.clone();
+  
+  for (const feature of rotatedFeatures) {
+    const featureKey: FeatureKey = `${x},${y}:${feature.id}`;
+    newRM.makeSet(featureKey, feature.type, (feature as any).hasShield ?? false);
+  }
+
+  for (const { dx, dy, matchKey } of NEIGHBOR_OFFSETS) {
+    const nx = x + dx;
+    const ny = y + dy;
+    const neighborTile = newBoard.get(`${nx},${ny}`);
+    if (!neighborTile) continue;
+
+    const matches = BOUNDARY_MATCHES[matchKey];
+    for (const { my: myDir, their: theirDir } of matches) {
+      const myFeat = rotatedFeatures.find(f => f.directions.includes(myDir));
+      const theirFeat = neighborTile.features.find(f => f.directions.includes(theirDir));
+
+      if (myFeat && theirFeat && myFeat.type === theirFeat.type) {
+        newRM.union(`${x},${y}:${myFeat.id}`, `${nx},${ny}:${theirFeat.id}`);
+      }
+    }
+  }
+
+  return { newBoard, newRM };
+}

@@ -23,6 +23,11 @@ export const Board = ({ onGridClick }: BoardProps) => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
 
+  // 🌟 НОВОЕ: состояние примерки
+  const previewTile = useGameStore(s => s.previewTile);
+  const previewRegionManager = useGameStore(s => s.previewRegionManager);
+  const rotatePreview = useGameStore(s => s.rotatePreview);
+
   // 🌟 ДИНАМИЧЕСКИЙ VIEWBOX
   const viewBox = useMemo(() => {
     if (board.size === 0) return '-150 -150 300 300';
@@ -36,6 +41,14 @@ export const Board = ({ onGridClick }: BoardProps) => {
       if (tile.y > maxY) maxY = tile.y;
     }
 
+    // 🌟 Учитываем previewTile в границах
+    if (previewTile) {
+      if (previewTile.x < minX) minX = previewTile.x;
+      if (previewTile.x > maxX) maxX = previewTile.x;
+      if (previewTile.y < minY) minY = previewTile.y;
+      if (previewTile.y > maxY) maxY = previewTile.y;
+    }
+
     const padding = 2;
     const x = (minX - padding) * TILE_SIZE;
     const y = (minY - padding) * TILE_SIZE;
@@ -43,13 +56,20 @@ export const Board = ({ onGridClick }: BoardProps) => {
     const height = (maxY - minY + 1 + padding * 2) * TILE_SIZE;
 
     return `${x} ${y} ${width} ${height}`;
-  }, [board]);
+  }, [board, previewTile]);
 
   // 🟢 Расчёт валидных клеток
   const validCells = useMemo(() => {
     if (!drawnTile || phase !== 'placeTile') return new Set<string>();
-    return getValidPlacementCells(drawnTile, board);
-  }, [drawnTile, board, phase]);
+    const cells = getValidPlacementCells(drawnTile, board);
+    
+    // 🌟 Исключаем текущую позицию previewTile из подсветки
+    if (previewTile) {
+      cells.delete(`${previewTile.x},${previewTile.y}`);
+    }
+    
+    return cells;
+  }, [drawnTile, board, phase, previewTile]);
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
@@ -89,6 +109,13 @@ export const Board = ({ onGridClick }: BoardProps) => {
     } else {
       handleSvgClick(e);
     }
+  };
+
+    // 🌟 НОВОЕ: обработчик клика на preview-тайл (поворот)
+  const handlePreviewClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log(`🔄 [Board] Клик на preview-тайл → поворот`);
+    rotatePreview();
   };
 
   // 🌟 Собираем уникальные комбинации цветов для глобальных паттернов
@@ -239,8 +266,36 @@ export const Board = ({ onGridClick }: BoardProps) => {
         );
       })}
 
+      {/* 🌟 НОВОЕ: СЛОЙ ПРИМЕРКИ ТАЙЛА */}
+      {previewTile && (
+        <g
+          className="preview-tile"
+          transform={`translate(${previewTile.x * TILE_SIZE}, ${previewTile.y * TILE_SIZE})`}
+          onClick={handlePreviewClick}
+          style={{ cursor: 'pointer', overflow: 'visible' }}
+        >
+          {/* Поворот содержимого */}
+          <g transform={`rotate(${previewTile.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
+            <Tile
+              id={previewTile.tile.id as any}
+              size={TILE_SIZE}
+            />
+          </g>
+          
+          {/* Полупрозрачный оверлей с пунктирной рамкой */}
+          <rect
+            className="preview-tile-overlay"
+            x={0}
+            y={0}
+            width={TILE_SIZE}
+            height={TILE_SIZE}
+          />
+        </g>
+      )}
+
+
       {/* 🎨 СЛОЙ 2: ПОДСВЕТКА РЕГИОНОВ */}
-      <RegionOverlay />
+      <RegionOverlay regionManagerOverride={previewRegionManager || undefined} />
       <CompletionOverlay />
 
       {/* 🎨 СЛОЙ 3: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ (ПОВЕРХ ПОДСВЕТКИ) */}

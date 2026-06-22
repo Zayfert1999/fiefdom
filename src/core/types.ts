@@ -59,3 +59,13 @@ export interface PlacedTile {
   derivedSides: [FeatureType, FeatureType, FeatureType, FeatureType];
   meeple?: PlacedMeeple;
 }
+
+// Превью тайла
+export interface PreviewTile {
+  tile: Tile;
+  x: number;
+  y: number;
+  rotation: 0 | 90 | 180 | 270;           // 🌟 Явный тип
+  validRotations: (0 | 90 | 180 | 270)[]; // 🌟 Явный тип массива
+  currentRotationIndex: number;
+}

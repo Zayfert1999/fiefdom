@@ -1,14 +1,12 @@
 // state/useGameStore.ts
 import { create } from 'zustand';
-import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType} from '@/core/types';
+import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType, PreviewTile} from '@/core/types';
 import { TILE_DEFINITIONS } from '@/core/tileData';
 import {
-  rotateFeatures,
   getTileSides,
-  isValidPlacement,
+  applyTileToBoardAndRM,
   getValidPlacementCells,
-  BOUNDARY_MATCHES,
-  NEIGHBOR_OFFSETS
+  getValidRotations
 } from '@/core/tileUtils';
 import { RegionManager, type FeatureKey } from '@/core/regionManager';
 import {
@@ -29,7 +27,6 @@ export interface CompletionAnimation {
   startTime: number;
 }
 
-
 export interface GameStore {
   deck: Tile[];
   board: Map<string, PlacedTile>;
@@ -42,6 +39,8 @@ export interface GameStore {
   debugSelectedTile: { x: number; y: number } | null;
   visibleFeatureTypes: FeatureType[];
   completionAnimations: CompletionAnimation[];
+  previewTile: PreviewTile | null;
+  previewRegionManager: RegionManager | null;
 
   initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
   drawTile: () => void;
@@ -50,6 +49,11 @@ export interface GameStore {
   toggleRegions: () => void;
   setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
   debugForceEndGame: () => void;
+  startPreview: (x: number, y: number) => void;
+  rotatePreview: () => void;
+  confirmPreview: () => void;
+  cancelPreview: () => void;
+  
 
   // 🌟 Вспомогательные функции
   processEndTurn: () => void;
@@ -82,6 +86,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   visibleFeatureTypes: ['road', 'city', 'field'],
   debugSelectedTile: null,
   completionAnimations: [],
+  previewTile: null,
+  previewRegionManager: null,
 
   // ============================================
   // 🎮 ИНИЦИАЛИЗАЦИЯ ИГРЫ
@@ -183,46 +189,141 @@ export const useGameStore = create<GameStore>((set, get) => ({
   placeTile: (x, y, rotation) => {
     const state = get();
     if (!state.drawnTile || state.phase !== 'placeTile') return false;
+    
     const cellKey = `${x},${y}`;
     if (state.board.has(cellKey)) return false;
 
-    const rotatedFeatures = rotateFeatures(state.drawnTile.features, rotation);
-    if (!isValidPlacement(state.board, x, y, rotatedFeatures)) return false;
-
-    const newBoard = new Map(state.board);
-    newBoard.set(cellKey, {
-      templateId: state.drawnTile.id,
-      x, y, rotation,
-      features: rotatedFeatures,
-      derivedSides: getTileSides({ ...state.drawnTile, features: rotatedFeatures }),
-    });
-
-    const rm = state.regionManager.clone();
-    for (const feature of rotatedFeatures) {
-      const featureKey: FeatureKey = `${x},${y}:${feature.id}`;
-      rm.makeSet(featureKey, feature.type, (feature as any).hasShield ?? false);
-    }
-
-    for (const { dx, dy, matchKey } of NEIGHBOR_OFFSETS) {
-      const nx = x + dx;
-      const ny = y + dy;
-      const neighborTile = newBoard.get(`${nx},${ny}`);
-      if (!neighborTile) continue;
-
-      const matches = BOUNDARY_MATCHES[matchKey];
-      for (const { my: myDir, their: theirDir } of matches) {
-        const myFeat = rotatedFeatures.find(f => f.directions.includes(myDir));
-        const theirFeat = neighborTile.features.find(f => f.directions.includes(theirDir));
-
-        if (myFeat && theirFeat && myFeat.type === theirFeat.type) {
-          rm.union(`${x},${y}:${myFeat.id}`, `${nx},${ny}:${theirFeat.id}`);
-        }
-      }
-    }
+    // 🌟 Используем общую утилиту
+    const { newBoard, newRM } = applyTileToBoardAndRM(
+      state.board,
+      state.regionManager,
+      state.drawnTile,
+      x, y, rotation
+    );
 
     console.log(`✅ [Store] Тайл установлен в (${x}, ${y})`);
-    set({ board: newBoard, drawnTile: null, phase: 'placeMeeple', regionManager: rm });
+    set({ board: newBoard, regionManager: newRM });
     return true;
+  },
+
+  // ============================================
+  // 👁️ НАЧАЛО ПРИМЕРКИ
+  // Вызывается при клике на валидную ячейку
+  // ============================================
+  startPreview: (x, y) => {
+    const state = get();
+    if (!state.drawnTile || state.phase !== 'placeTile') {
+      console.warn('⚠️ [Store] Нельзя начать примерку: нет тайла или неверная фаза');
+      return;
+    }
+    
+    // 🌟 Получаем все валидные повороты для этой позиции
+    const validRotations = getValidRotations(state.drawnTile, state.board, x, y);
+    if (validRotations.length === 0) {
+      console.warn(`⚠️ [Store] Нет валидных поворотов для (${x}, ${y})`);
+      return;
+    }
+    
+    const rotation = validRotations[0];
+
+    // 🌟 Используем общую утилиту
+    const { newRM: previewRM } = applyTileToBoardAndRM(
+      state.board,
+      state.regionManager,
+      state.drawnTile,
+      x, y, rotation
+    );
+    
+    set({
+      previewTile: {
+        tile: state.drawnTile,
+        x, y,
+        rotation,
+        validRotations,
+        currentRotationIndex: 0,
+      },
+      previewRegionManager: previewRM,
+    });
+    
+    console.log(`👁️ [Store] Примерка начата: (${x}, ${y}), поворот ${rotation}°, валидных поворотов: ${validRotations.length}`);
+  },
+  
+  // ============================================
+  // 🔄 ПОВОРОТ ПРИМЕРКИ
+  // Вызывается при клике на preview-тайл
+  // ============================================
+  rotatePreview: () => {
+    const state = get();
+    if (!state.previewTile) return;
+    
+    const { tile, x, y, validRotations, currentRotationIndex } = state.previewTile;
+    
+    // 🌟 Если только один валидный поворот — поворачивать некуда
+    if (validRotations.length <= 1) {
+      console.log(`🔄 [Store] Поворот заблокирован: только 1 валидный поворот (${validRotations[0]}°)`);
+      return;
+    }
+    
+    const nextIndex = (currentRotationIndex + 1) % validRotations.length;
+    const newRotation = validRotations[nextIndex];
+    
+    // 🌟 Используем общую утилиту
+    const { newRM: previewRM } = applyTileToBoardAndRM(
+      state.board,
+      state.regionManager,
+      tile,
+      x, y, newRotation
+    );
+    
+    set({
+      previewTile: {
+        ...state.previewTile,
+        rotation: newRotation,
+        currentRotationIndex: nextIndex,
+      },
+      previewRegionManager: previewRM,
+    });
+    
+    console.log(`🔄 [Store] Поворот примерки: ${newRotation}° (${nextIndex + 1}/${validRotations.length})`);
+  },
+  
+  // ============================================
+  // ✅ НОВОЕ: ПОДТВЕРЖДЕНИЕ ПРИМЕРКИ
+  // Применяет preview-тайл к доске
+  // ============================================
+  confirmPreview: () => {
+    const state = get();
+    if (!state.previewTile || !state.previewRegionManager) {
+      console.warn('⚠️ [Store] Нет preview-тайла для подтверждения');
+      return;
+    }
+    
+    const { x, y, rotation } = state.previewTile;
+    
+    // 🌟 Применяем тайл к доске (используем placeTile, но без проверки фазы)
+    const success = get().placeTile(x, y, rotation);
+    
+    if (success) {
+      set({
+        previewTile: null,
+        previewRegionManager: null,
+        drawnTile: null,
+        phase: 'placeMeeple',
+      });
+      console.log(`✅ [Store] Примерка подтверждена: (${x}, ${y})`);
+    }
+  },
+  
+  // ============================================
+  // ❌ НОВОЕ: ОТМЕНА ПРИМЕРКИ
+  // Возвращает тайл в руку
+  // ============================================
+  cancelPreview: () => {
+    set({
+      previewTile: null,
+      previewRegionManager: null,
+    });
+    console.log(`❌ [Store] Примерка отменена`);
   },
 
   // ============================================

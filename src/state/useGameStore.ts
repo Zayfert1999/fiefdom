@@ -54,11 +54,16 @@ export interface GameStore {
   initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
   drawTile: () => void;
   placeTile: (x: number, y: number, rotation: 0 | 90 | 180 | 270) => boolean;
-  placeMeeple: (featureId: string, x: number, y: number) => void;
+  // Методы управления временным миплом
+  selectMeepleSpot: (featureId: string, x: number, y: number) => void;
+  removePlacedMeeple: () => void;
+  confirmMeeple: () => void;
+
   toggleRegions: () => void;
   toggleDeadCells: () => void;
   setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
   debugForceEndGame: () => void;
+  // Методы управления превью тайла 
   startPreview: (x: number, y: number) => void;
   rotatePreview: () => void;
   confirmPreview: () => void;
@@ -352,25 +357,49 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   // ============================================
-  // 🔶 РАЗМЕЩЕНИЕ МИПЛА
+  // 🔶 НОВОЕ: ВЫБОР СПОТА ДЛЯ ВРЕМЕННОГО МИПЛА
+  // Ставит временный мипл в board с isTemporary: true
+  // НЕ меняет RegionManager
   // ============================================
-  placeMeeple: (featureId, mx, my) => {
+  selectMeepleSpot: (featureId, mx, my) => {
     const state = get();
+    if (state.phase !== 'placeMeeple') {
+      console.warn('⚠️ [Store] Неверная фаза для выбора спота');
+      return;
+    }
+    
     const player = state.players[state.currentTurn];
-    if (player.meepleCount <= 0) return;
-
+    if (player.meepleCount <= 0) {
+      console.warn('⚠️ [Store] У игрока нет миплов');
+      return;
+    }
+    
     const tiles = Array.from(state.board.values());
     const last = tiles[tiles.length - 1];
-    if (!last || last.meeple) return;
-
+    if (!last) {
+      console.warn('⚠️ [Store] Нет тайлов на доске');
+      return;
+    }
+    
     const featureKey: FeatureKey = `${last.x},${last.y}:${featureId}`;
+    
+    // 🌟 Проверяем, что фича свободна
     const owners = state.regionManager.getFeatureOwners(featureKey);
-    if (owners.length > 0) return;
-
-    const rm = state.regionManager.clone();
-    rm.addMeeple(featureKey, player.id);
-    rm.addOwner(featureKey, player.id);
-
+    if (owners.length > 0) {
+      console.warn(`⚠️ [Store] Фича ${featureId} уже занята`);
+      return;
+    }
+    
+    // 🌟 Если уже есть временный мипл — возвращаем мипл игроку
+    const newPlayers = [...state.players];
+    if (last.meeple?.isTemporary) {
+      newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount + 1 };
+      console.log(`🔄 [Store] Перемещение временного мипла`);
+    } else {
+      newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount - 1 };
+    }
+    
+    // 🌟 Ставим временный мипл в board
     const newBoard = new Map(state.board);
     newBoard.set(`${last.x},${last.y}`, {
       ...last,
@@ -379,20 +408,100 @@ export const useGameStore = create<GameStore>((set, get) => ({
         featureId,
         color: player.color,
         x: mx,
-        y: my
-      } as PlacedMeeple
+        y: my,
+        isTemporary: true,  // 🌟 Флаг временного мипла
+      } as PlacedMeeple,
     });
-
-    const newPlayers = [...state.players];
-    newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount - 1 };
-
+    
     set({
       board: newBoard,
       players: newPlayers,
-      regionManager: rm,
-      phase: 'endTurn'
     });
+    
+    console.log(`🔶 [Store] Временный мипл поставлен на ${featureId} (${mx}, ${my})`);
+  },
 
+  // ============================================
+  // ❌ НОВОЕ: УДАЛЕНИЕ ВРЕМЕННОГО МИПЛА
+  // Убирает временный мипл из board, возвращает мипл игроку
+  // ============================================
+  removePlacedMeeple: () => {
+    const state = get();
+    if (state.phase !== 'placeMeeple') {
+      console.warn('⚠️ [Store] Неверная фаза для удаления мипла');
+      return;
+    }
+    
+    const tiles = Array.from(state.board.values());
+    const last = tiles[tiles.length - 1];
+    if (!last?.meeple?.isTemporary) {
+      console.warn('⚠️ [Store] Нет временного мипла для удаления');
+      return;
+    }
+    
+    const player = state.players[state.currentTurn];
+    
+    // 🌟 Убираем мипла из board
+    const newBoard = new Map(state.board);
+    newBoard.set(`${last.x},${last.y}`, { ...last, meeple: undefined });
+    
+    // 🌟 Возвращаем мипл игроку
+    const newPlayers = [...state.players];
+    newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount + 1 };
+    
+    set({
+      board: newBoard,
+      players: newPlayers,
+    });
+    
+    console.log(`❌ [Store] Временный мипл удалён, мипл возвращён игроку ${player.name}`);
+  },
+
+  // ============================================
+  // ✅ НОВОЕ: ПОДТВЕРЖДЕНИЕ ХОДА
+  // Превращает временный мипл в постоянный ИЛИ пропускает ход
+  // ============================================
+  confirmMeeple: () => {
+    const state = get();
+    if (state.phase !== 'placeMeeple') {
+      console.warn('⚠️ [Store] Неверная фаза для подтверждения');
+      return;
+    }
+    
+    const tiles = Array.from(state.board.values());
+    const last = tiles[tiles.length - 1];
+    
+    if (last?.meeple?.isTemporary) {
+      const { featureId} = last.meeple;
+      const player = state.players[state.currentTurn];
+      const featureKey: FeatureKey = `${last.x},${last.y}:${featureId}`;
+      
+      // 🌟 Превращаем временный мипл в постоянный
+      const newBoard = new Map(state.board);
+      newBoard.set(`${last.x},${last.y}`, {
+        ...last,
+        meeple: { ...last.meeple, isTemporary: false },
+      });
+      
+      // 🌟 Теперь меняем RM (добавляем мипла)
+      const newRM = state.regionManager.clone();
+      newRM.addMeeple(featureKey, player.id);
+      newRM.addOwner(featureKey, player.id);
+      
+      set({
+        board: newBoard,
+        regionManager: newRM,
+        phase: 'endTurn',
+      });
+      
+      console.log(`✅ [Store] Мипл подтверждён на ${featureId}`);
+    } else {
+      // 🌟 Пропуск мипла
+      set({ phase: 'endTurn' });
+      console.log(`⏭️ [Store] Пропуск мипла`);
+    }
+    
+    // 🌟 Запускаем processEndTurn
     queueMicrotask(() => {
       get().processEndTurn();
     });

@@ -10,9 +10,11 @@ import { getValidPlacementCells } from '@/core/tileUtils';
 export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
-    processEndTurn, initGame, drawTile, // 🌟 Добавили drawTile
+    initGame, drawTile, // 🌟 Добавили drawTile
     showRegions, toggleRegions, showDeadCells, toggleDeadCells,
-    previewTile, startPreview, confirmPreview, cancelPreview
+    previewTile, startPreview, confirmPreview, cancelPreview,
+    confirmMeeple
+
   } = useGameStore();
 
   const board = useGameStore(s => s.board);
@@ -65,10 +67,6 @@ const handleBoardClick = (x: number, y: number) => {
   }
 };
 
-  const handleSkipMeeple = () => {
-    console.log('⏭️ [App] Игрок пропускает мипла → следующий ход');
-    processEndTurn();
-  };
 
   const currentPlayer = players[currentTurn];
 
@@ -275,29 +273,25 @@ const handleBoardClick = (x: number, y: number) => {
             </>
           )}
 
-          {/* 🔶 Кнопка пропуска мипла (только в фазе placeMeeple) */}
+          {/* 🔶 Кнопка подтверждения мипла (только в фазе placeMeeple) */}
           {phase === 'placeMeeple' && (
             <>
-              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px', textAlign: 'center' }}>
+              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
                 🎯 Поставить мипла?
               </span>
               <button
-                onClick={handleSkipMeeple}
+                onClick={confirmMeeple}  // 🌟 ИЗМЕНЕНО: confirmMeeple вместо handleSkipMeeple
                 style={{
                   ...btnStyle,
                   width: '100%',
                   background: '#2ecc71',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
                   fontSize: '13px'
                 }}
               >
-                ⏭️ Пропустить мипла
+                ✅ Подтвердить
               </button>
               <div style={{ color: '#888', fontSize: '11px', textAlign: 'center' }}>
-                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле,<br />
+                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле
               </div>
             </>
           )}

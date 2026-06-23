@@ -4,12 +4,22 @@ import { Meeple } from './Meeple';
 
 const TILE_SIZE = 100;
 
+// 🌟 Простая функция затемнения цвета (прямо здесь, без отдельного файла)
+const darken = (hex: string, amount = 0.4): string => {
+  const c = hex.replace('#', '');
+  const r = Math.max(0, Math.floor(parseInt(c.substring(0, 2), 16) * (1 - amount)));
+  const g = Math.max(0, Math.floor(parseInt(c.substring(2, 4), 16) * (1 - amount)));
+  const b = Math.max(0, Math.floor(parseInt(c.substring(4, 6), 16) * (1 - amount)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+};
+
 /**
  * 🌟 Отдельный слой для миплов.
  * Рендерится ПОВЕРХ подсветки регионов (RegionOverlay).
  */
 export const MeepleLayer = () => {
   const board = useGameStore(s => s.board);
+  const removePlacedMeeple = useGameStore(s => s.removePlacedMeeple);
 
   return (
     <g className="meeple-layer" style={{ overflow: 'visible' }}>
@@ -26,6 +36,14 @@ export const MeepleLayer = () => {
           compensation += 90;
         }
 
+        const strokeColor = t.meeple.isCompleting ? 'none' : darken(t.meeple.color);
+
+        // 🌟 НОВОЕ: определяем, временный ли мипл
+        const isTemporary = t.meeple.isTemporary === true;
+        const meepleClassName = isTemporary 
+          ? 'meeple-temporary' 
+          : (t.meeple.isCompleting ? 'meeple-completing' : '');
+
         return (
             <g
                 key={`${t.x},${t.y}`}
@@ -34,13 +52,28 @@ export const MeepleLayer = () => {
             >
                 {/* 🌟 Мипл с анимацией */}
                 <g transform={`translate(${t.meeple.x}, ${t.meeple.y})`}>
-                <g className={t.meeple.isCompleting ? 'meeple-completing' : ''} style={{ overflow: 'visible' }}>
+                  {/* 🌟 ИСПРАВЛЕНО: объединили style в один объект */}
+                  <g 
+                    className={meepleClassName} 
+                    onClick={isTemporary ? (e) => {
+                      e.stopPropagation();
+                      console.log(`🖱️ [MeepleLayer] Клик по временному миплу на (${t.x}, ${t.y})`);
+                      removePlacedMeeple();
+                    } : undefined}
+                    style={{ 
+                      overflow: 'visible',
+                      cursor: isTemporary ? 'pointer' : 'default'
+                    } as React.CSSProperties}
+                  >
                     <g transform={`rotate(${compensation}, 0, 0)`}>
-                    <g transform="translate(-15, -15)">
-                        <Meeple color={t.meeple.color} size={30} />
+                      <g transform="translate(-16, -16)">
+                        <Meeple 
+                          color={t.meeple.color} 
+                          stroke={strokeColor}
+                        />
+                      </g>
                     </g>
-                    </g>
-                </g>
+                  </g>
                 </g>
 
                 {/* 🌟 Текст "+N" вынесен на уровень тайла — масштабируется независимо */}

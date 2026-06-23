@@ -48,6 +48,7 @@ export interface PlacedMeeple {
   y: number;
   isCompleting?: boolean; // Помечен для удаления (анимация)
   points?: number;        // Очки, полученные за регион
+  isTemporary?: boolean; // Временный мипл (редактируется)
 }
 
 export interface PlacedTile {

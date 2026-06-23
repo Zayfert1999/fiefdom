@@ -21,14 +21,22 @@ export const MeepleSelectionLayer = () => {
   const phase = useGameStore(s => s.phase);
   const currentPlayer = useGameStore(s => s.players[s.currentTurn]);
   const regionManager = useGameStore(s => s.regionManager);
+  const selectMeepleSpot = useGameStore(s => s.selectMeepleSpot);  // 🌟 НОВОЕ
 
   // 🌟 Находим последний тайл и вычисляем доступные фичи
   const lastTileData = useMemo(() => {
     if (phase !== 'placeMeeple' || !currentPlayer) return null;
-
+    
+    // 🌟 Проверка: есть ли миплы у игрока
+    if (currentPlayer.meepleCount <= 0) return null;
+    
     const tiles = Array.from(board.values());
     const lastTile = tiles[tiles.length - 1];
-    if (!lastTile || lastTile.meeple) return null;
+    
+    if (!lastTile) return null;
+    
+    // 🌟 ИЗМЕНЕНО: если есть ПОСТОЯННЫЙ мипл (не временный) — не показываем споты
+    if (lastTile.meeple && !lastTile.meeple.isTemporary) return null;
 
     const baseTileDef = TILE_DEFINITIONS.find(def => def.id === lastTile.templateId);
     const featuresForRendering = baseTileDef ? baseTileDef.features : lastTile.features;
@@ -36,7 +44,16 @@ export const MeepleSelectionLayer = () => {
     const availableFeatures = featuresForRendering.filter(feature => {
       const featureKey = `${lastTile.x},${lastTile.y}:${feature.id}`;
       const owners = regionManager.getFeatureOwners(featureKey);
-      return owners.length === 0;
+      
+      // 🌟 Если фича уже занята постоянным миплом — пропускаем
+      if (owners.length > 0) return false;
+      
+      // 🌟 Если на этой фиче уже стоит ВРЕМЕННЫЙ мипл — скрываем её спот
+      if (lastTile.meeple?.isTemporary && lastTile.meeple.featureId === feature.id) {
+        return false;
+      }
+      
+      return true;
     });
 
     if (availableFeatures.length === 0) return null;
@@ -48,7 +65,7 @@ export const MeepleSelectionLayer = () => {
       features: availableFeatures
     };
   }, [board, phase, currentPlayer, regionManager]);
-
+  
   // 🌟 Если нет данных для отображения — ничего не рендерим
   if (!lastTileData) return null;
 
@@ -96,7 +113,7 @@ export const MeepleSelectionLayer = () => {
             onClick={(e) => {
               e.stopPropagation();
               console.log(`🖱️ [MeepleSelectionLayer] Выбор спота: фича ${m.featureId}, координаты (${m.x}, ${m.y})`);
-              useGameStore.getState().placeMeeple(m.featureId, m.x, m.y);
+              selectMeepleSpot(m.featureId, m.x, m.y);
             }}
             style={{ cursor: 'pointer', pointerEvents: 'auto' }} // 🌟 Споты кликабельны
           >

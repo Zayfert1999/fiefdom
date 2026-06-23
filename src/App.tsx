@@ -38,7 +38,7 @@ export default function App() {
     }
   }, [phase, drawnTile, drawTile]); // 🌟 Добавлена зависимость drawnTile
 
-    // 🌟 НОВОЕ: вычисляем валидные ячейки
+  // 🟢 Расчёт валидных клеток
   const validCells = useMemo(() => {
     if (!drawnTile) return new Set<string>();
     return getValidPlacementCells(drawnTile, board);
@@ -178,6 +178,7 @@ const handleBoardClick = (x: number, y: number) => {
       {/* 🗺️ Игровое поле */}
       <Board 
         onGridClick={handleBoardClick}
+        validCells={validCells}
       />
       
 

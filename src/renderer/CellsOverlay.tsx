@@ -21,7 +21,7 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
   const previewTile = useGameStore(s => s.previewTile);
 
   // 💀 Мёртвые клетки с учётом preview-тайла
-  const deadCells = useMemo(() => {
+  const allDeadCells = useMemo(() => {
     
     // 🌟 ЛОГИКА:
     // - Если НЕТ previewTile → drawnTile в руке → доступен → добавляем в колоду
@@ -57,10 +57,48 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
     return dead;
   }, [board, deck, drawnTile, phase, showDeadCells, previewTile]);
 
+  // 🌟 ОДИН useMemo для всех трёх типов клеток
+  const { pureValidCells, pureDeadCells, conflictedCells } = useMemo(() => {
+    const conflicted = new Set<string>();
+    const pureValid = new Set<string>();
+    const pureDead = new Set<string>();
+
+    // 🟡 Конфликтные: валидные сейчас, но станут мёртвыми после preview
+    if (previewTile) {
+      for (const cell of validCells) {
+        if (allDeadCells.has(cell)) {
+          conflicted.add(cell);
+        }
+      }
+    }
+
+    // 🟢 Чистые валидные (не конфликтные)
+    for (const cell of validCells) {
+      if (!conflicted.has(cell)) {
+        pureValid.add(cell);
+      }
+    }
+
+    // 💀 Чистые мёртвые (не конфликтные)
+    if (showDeadCells) {
+      for (const cell of allDeadCells) {
+        if (!conflicted.has(cell)) {
+          pureDead.add(cell);
+        }
+      }
+    }
+
+    return {
+      pureValidCells: pureValid,
+      pureDeadCells: pureDead,
+      conflictedCells: conflicted,
+    };
+  }, [validCells, allDeadCells, previewTile, showDeadCells]);
+
   return (
     <g className="cells-overlay" pointerEvents="none">
       {/* 💀 МЁРТВЫЕ КЛЕТКИ — рендерим первыми (под валидными) */}
-      {showDeadCells && Array.from(deadCells).map((cellKey) => {
+      {showDeadCells && Array.from(pureDeadCells).map((cellKey) => {
         const [x, y] = cellKey.split(',').map(Number);
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
@@ -69,25 +107,15 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
         const crossSize = 20;
 
         return (
-          <g key={`dead-${cellKey}`} className="dead-cell">
-            {/* Полупрозрачный фон */}
-            <rect
-              className="dead-cell-bg"
-              x={px}
-              y={py}
-              width={TILE_SIZE}
-              height={TILE_SIZE}
-            />
-            
+          <g key={`dead-${cellKey}`} className="dead-cell-container">         
             {/* Красная пунктирная рамка */}
             <rect
-              className="dead-cell-border"
+              className="dead-cell"
               x={px + 2}
               y={py + 2}
               width={TILE_SIZE - 4}
               height={TILE_SIZE - 4}
             />
-            
             {/* Крестик в центре */}
             <line
               className="dead-cell-cross"
@@ -107,8 +135,54 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
         );
       })}
 
+      {/* 🟡 КОНФЛИКТНЫЕ КЛЕТКИ — белая заливка + красный крестик */}
+      {Array.from(conflictedCells).map(key => {
+        const [x, y] = key.split(',').map(Number);
+        const px = x * TILE_SIZE;
+        const py = y * TILE_SIZE;
+        const cx = px + TILE_SIZE / 2;
+        const cy = py + TILE_SIZE / 2;
+        const crossSize = 20;
+
+        return (
+          <g
+            key={`conflicted-${key}`}
+            className="conflicted-cell-container"
+            style={{ pointerEvents: 'auto' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onGridClick(x, y);
+            }}
+          >
+            {/* 🌟 Заливка и рамка валидной клетки) */}
+            <rect 
+              className="valid-cell" 
+              x={px+2} 
+              y={py+2} 
+              width={TILE_SIZE-4} 
+              height={TILE_SIZE-4} 
+            />
+            {/* 🌟 Крестик мёртвой клетки */}
+            <line 
+              className="dead-cell-cross" 
+              x1={cx - crossSize} 
+              y1={cy - crossSize} 
+              x2={cx + crossSize} 
+              y2={cy + crossSize} 
+            />
+            <line 
+              className="dead-cell-cross" 
+              x1={cx + crossSize} 
+              y1={cy - crossSize} 
+              x2={cx - crossSize} 
+              y2={cy + crossSize} 
+            />
+          </g>
+        );
+      })}
+
       {/* 🟢 ВАЛИДНЫЕ КЛЕТКИ — рендерим поверх мёртвых */}
-      {Array.from(validCells).map(key => {
+      {Array.from(pureValidCells).map(key => {
         const [x, y] = key.split(',').map(Number);
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
@@ -126,17 +200,11 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
               onGridClick(x, y);
             }}
           >
-            <rect 
-                className="valid-cell-bg" 
-                x={px} 
-                y={py} 
-                width={TILE_SIZE} 
-                height={TILE_SIZE} 
-            />
+
             <rect
-                className="valid-cell-border"
-                x={px + 2}
-                y={py + 2}
+                className="valid-cell"
+                x={px+2}
+                y={py+2}
                 width={TILE_SIZE - 4}
                 height={TILE_SIZE - 4}
             />

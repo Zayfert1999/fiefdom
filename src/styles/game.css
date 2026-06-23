@@ -124,17 +124,12 @@
   transition: all 0.2s ease;
 }
 
-/* Фон клетки */
-.valid-cell-bg {
+.valid-cell {
   fill: rgba(255, 255, 255, 0.15);
-}
-
-.valid-cell-border {
-  fill: none;
   stroke: white;
   stroke-width: 2;
   stroke-dasharray: 6 4;
-  opacity: 0.6;
+  stroke-opacity: 0.6;
 }
 
 /* Крестик "+" в центре валидной клетки */
@@ -164,27 +159,46 @@
 }
 
 /* ============================================
+   🟡 CONFLICTED CELLS — валидные, но станут мёртвыми
+   Зелёная заливка (как у валидной) + красный крестик (как у мёртвой)
+   ============================================ */
+
+/* 🌟 Контейнер конфликтной клетки */
+.conflicted-cell-container {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.conflicted-cell-container:hover .valid-cell{
+  fill: rgba(255, 255, 255, 0.3);
+  stroke: white;
+  stroke-width: 3;
+}
+
+.conflicted-cell-container:hover .dead-cell-cross{
+  stroke-width: 4;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 100, 100, 0.8));
+  transform: scale(1.2);
+}
+
+/* ============================================
    💀 DEAD CELLS — подсветка мёртвых клеток
    ============================================ */
 
 /* 🌟 Контейнер мёртвой клетки */
-.dead-cell {
+.dead-cell-container {
   pointer-events: none;
   transition: opacity 0.3s ease;
 }
 
-/* 🌟 Полупрозрачный фон клетки */
-.dead-cell-bg {
-  fill: rgba(231, 76, 60, 0.15);
-}
-
 /* 🌟 Пунктирная красная рамка */
-.dead-cell-border {
-  fill: none;
+.dead-cell {
+  fill: rgba(231, 76, 60, 0.15);
   stroke: #e74c3c;
   stroke-width: 2;
   stroke-dasharray: 6 4;
-  opacity: 0.6;
+  stroke-opacity: 0.6;
 }
 
 /* 🌟 Крестик в центре */
@@ -192,7 +206,11 @@
   stroke: #e74c3c;
   stroke-width: 3;
   stroke-linecap: round;
-  opacity: 0.7;
+  pointer-events: none;
+  opacity: 0.9;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  transform-origin: center;
+  transform-box: fill-box;
 }
 
 /* 🌟 Общий контейнер оверлея */

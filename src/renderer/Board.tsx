@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from './Tile';
-import { getValidPlacementCells, rotateFeatures } from '@/core/tileUtils';
+import { rotateFeatures } from '@/core/tileUtils';
 import { RegionOverlay } from './RegionOverlay';
 import { MeepleSelectionLayer } from './MeepleSelectionLayer';
 import { MeepleLayer } from './MeepleLayer';
@@ -13,12 +13,11 @@ const TILE_SIZE = 100;
 
 type BoardProps = {
   onGridClick: (x: number, y: number) => void;
+  validCells: Set<string>;
 };
 
-export const Board = ({ onGridClick }: BoardProps) => {
+export const Board = ({ onGridClick, validCells }: BoardProps) => {
   const board = useGameStore(s => s.board);
-  const drawnTile = useGameStore(s => s.drawnTile);
-  const phase = useGameStore(s => s.phase);
   const regionManager = useGameStore(s => s.regionManager);
   const players = useGameStore(s => s.players);
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
@@ -58,19 +57,6 @@ export const Board = ({ onGridClick }: BoardProps) => {
 
     return `${x} ${y} ${width} ${height}`;
   }, [board, previewTile]);
-
-  // 🟢 Расчёт валидных клеток
-  const validCells = useMemo(() => {
-    if (!drawnTile || phase !== 'placeTile') return new Set<string>();
-    const cells = getValidPlacementCells(drawnTile, board);
-    
-    // 🌟 Исключаем текущую позицию previewTile из подсветки
-    if (previewTile) {
-      cells.delete(`${previewTile.x},${previewTile.y}`);
-    }
-    
-    return cells;
-  }, [drawnTile, board, phase, previewTile]);
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;

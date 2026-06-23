@@ -121,7 +121,6 @@
 /* Контейнер валидной клетки */
 .valid-cell-container {
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .valid-cell {
@@ -139,7 +138,7 @@
   stroke-linecap: round;
   pointer-events: none;
   opacity: 0.9;
-  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease-in-out;
   transform-origin: center;
   transform-box: fill-box;
 }
@@ -166,7 +165,6 @@
 /* 🌟 Контейнер конфликтной клетки */
 .conflicted-cell-container {
   cursor: pointer;
-  transition: opacity 0.2s;
 }
 
 .conflicted-cell-container:hover .valid-cell{
@@ -176,10 +174,11 @@
 }
 
 .conflicted-cell-container:hover .dead-cell-cross{
+  stroke: white;
   stroke-width: 4;
   opacity: 1;
-  filter: drop-shadow(0 0 6px rgba(255, 100, 100, 0.8));
-  transform: scale(1.2);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+  transform: scale(1.2) rotate(90deg);
 }
 
 /* ============================================
@@ -189,7 +188,6 @@
 /* 🌟 Контейнер мёртвой клетки */
 .dead-cell-container {
   pointer-events: none;
-  transition: opacity 0.3s ease;
 }
 
 /* 🌟 Пунктирная красная рамка */
@@ -208,9 +206,10 @@
   stroke-linecap: round;
   pointer-events: none;
   opacity: 0.9;
-  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease-in-out;
   transform-origin: center;
   transform-box: fill-box;
+  transform: rotate(45deg);
 }
 
 /* 🌟 Общий контейнер оверлея */

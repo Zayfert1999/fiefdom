@@ -27,6 +27,13 @@ export interface CompletionAnimation {
   startTime: number;
 }
 
+// Информация о последнем поставленном тайле игрока
+export interface LastPlacedTile {
+  x: number;
+  y: number;
+  color: string;  // Цвет игрока
+}
+
 export interface GameStore {
   deck: Tile[];
   board: Map<string, PlacedTile>;
@@ -42,6 +49,7 @@ export interface GameStore {
   previewTile: PreviewTile | null;
   previewRegionManager: RegionManager | null;
   showDeadCells: boolean;
+  lastPlacedTiles: Map<string, LastPlacedTile>;
 
   initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
   drawTile: () => void;
@@ -86,11 +94,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   regionManager: new RegionManager(),
   showRegions: true,
   showDeadCells: false,
-  visibleFeatureTypes: ['road', 'city', 'field'],
+  visibleFeatureTypes: ['field'],
   debugSelectedTile: null,
   completionAnimations: [],
   previewTile: null,
   previewRegionManager: null,
+  lastPlacedTiles: new Map(),
 
   // ============================================
   // 🎮 ИНИЦИАЛИЗАЦИЯ ИГРЫ
@@ -136,6 +145,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       showRegions: true,
       debugSelectedTile: null,
       completionAnimations: [],
+      lastPlacedTiles: new Map(),
     });
   },
 
@@ -305,12 +315,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     // 🌟 Применяем тайл к доске (используем placeTile, но без проверки фазы)
     const success = get().placeTile(x, y, rotation);
-    
+
     if (success) {
+
+      // 🌟 Получаем текущего игрока ИЗ state
+      const currentPlayer = state.players[state.currentTurn];
+      
+      // 🌟 Обновляем подсветку ТОЛЬКО для текущего игрока
+      const newLastPlacedTiles = new Map(state.lastPlacedTiles);
+      newLastPlacedTiles.set(currentPlayer.id, {
+        x, y,
+        color: currentPlayer.color,
+      });
+
       set({
         previewTile: null,
         previewRegionManager: null,
         drawnTile: null,
+        lastPlacedTiles: newLastPlacedTiles,
         phase: 'placeMeeple',
       });
       console.log(`✅ [Store] Примерка подтверждена: (${x}, ${y})`);

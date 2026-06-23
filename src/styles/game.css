@@ -50,7 +50,10 @@
   }
 }
 
-/* 🌟 PREVIEW-TILE — полупрозрачный тайл на доске во время примерки */
+/* ============================================
+   ✨ PREVIEW-TILE — полупрозрачный тайл на доске во время примерки
+   ============================================ */
+
 .preview-tile {
   opacity: 0.85;
   filter: drop-shadow(0 0 15px rgba(74, 144, 226, 0.8));
@@ -215,6 +218,40 @@
 /* 🌟 Общий контейнер оверлея */
 .cells-overlay {
   pointer-events: none;
+}
+
+/* ============================================
+   🎯 LAST PLACED TILE — постоянная подсветка последних тайлов игроков
+   ============================================ */
+
+/* 🌟 Контейнер — не перехватывает клики */
+.last-placed-tile {
+  pointer-events: none;
+  animation: last-tile-breathe 2.5s ease-in-out infinite;
+}
+
+/* 🌟 Рамка цвета игрока */
+.last-placed-tile-border {
+  fill: none;
+  stroke-width: 3;
+  opacity: 0.5;
+}
+/* 🌟 Внутреннее свечение (второй слой) */
+.last-placed-tile-glow {
+  fill: none;
+  stroke-width: 6;
+  opacity: 0.3;
+  filter: blur(2px);
+}
+
+/* 🌟 Анимация дыхания */
+@keyframes last-tile-breathe {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }
 
 /* ============================================

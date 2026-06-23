@@ -97,8 +97,10 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
       handleSvgClick(e);
     }
   };
+  // Получаем lastPlacedTiles из store
+  const lastPlacedTiles = useGameStore(s => s.lastPlacedTiles);
 
-    // 🌟 НОВОЕ: обработчик клика на preview-тайл (поворот)
+  // 🌟 НОВОЕ: обработчик клика на preview-тайл (поворот)
   const handlePreviewClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     console.log(`🔄 [Board] Клик на preview-тайл → поворот`);
@@ -280,15 +282,44 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
         </g>
       )}
 
-
       {/* 🎨 СЛОЙ 4: ПОДСВЕТКА РЕГИОНОВ */}
       <RegionOverlay regionManagerOverride={previewRegionManager || undefined} />
       <CompletionOverlay />
 
-      {/* 🎨 СЛОЙ 5: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ */}
+      {/* 🌟 СЛОЙ 5 — ПОДСВЕТКА ПОСЛЕДНИХ ТАЙЛОВ ВСЕХ ИГРОКОВ */}
+      {Array.from(lastPlacedTiles.entries()).map(([playerId, tile]) => (
+        <g
+          key={`last-${playerId}`}
+          className="last-placed-tile"
+          transform={`translate(${tile.x * TILE_SIZE}, ${tile.y * TILE_SIZE})`}
+          pointerEvents="none"
+        >
+
+          {/* 🌟 Слой внутреннего свечения (размытый, широкий) */}
+          <rect
+            className="last-placed-tile-glow"
+            x={4}
+            y={4}
+            width={TILE_SIZE - 8}
+            height={TILE_SIZE - 8}
+            style={{ stroke: tile.color }}
+          />
+          {/* Рамка цвета игрока */}
+          <rect
+            className="last-placed-tile-border"
+            x={1.5}
+            y={1.5}
+            width={TILE_SIZE - 3}
+            height={TILE_SIZE - 3}
+            style={{ stroke: tile.color }}
+          />
+        </g>
+      ))}
+
+      {/* 🎨 СЛОЙ 6: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ */}
       <MeepleSelectionLayer />
 
-      {/* 🎨 СЛОЙ 6: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
+      {/* 🎨 СЛОЙ 7: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
       <MeepleLayer />
     </svg>
   );

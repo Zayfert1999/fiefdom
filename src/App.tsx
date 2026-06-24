@@ -10,7 +10,7 @@ import { getValidPlacementCells } from '@/core/tileUtils';
 export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
-    initGame, drawTile, // 🌟 Добавили drawTile
+    initGame, drawTile, totalTiles,
     showRegions, toggleRegions, showDeadCells, toggleDeadCells,
     previewTile, startPreview, confirmPreview, cancelPreview, rollbackMove,
     confirmMeeple
@@ -211,7 +211,7 @@ const handleBoardClick = (x: number, y: number) => {
             borderBottom: '1px solid rgba(255, 215, 0, 0.3)',
             paddingBottom: '8px',
           }}>
-            📦 Колода: {deck.length}
+            📦 Колода: {`${deck.length} / ${totalTiles}`}
           </div>
           
           <div style={{

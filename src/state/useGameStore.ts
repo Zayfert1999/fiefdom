@@ -48,6 +48,7 @@ export interface MoveSnapshot {
 
 export interface GameStore {
   deck: Tile[];
+  totalTiles: number;
   board: Map<string, PlacedTile>;
   players: Player[];
   currentTurn: number;
@@ -111,6 +112,7 @@ const createDeck = (): Tile[] => {
 
 export const useGameStore = create<GameStore>((set, get) => ({
   deck: [],
+  totalTiles: 0,
   board: new Map(),
   players: [],
   currentTurn: 0,
@@ -133,6 +135,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   initGame: (newPlayers) => {
     console.log('🎮 [Store] Инициализация игры...');
     const fullDeck = createDeck();
+    const totalTiles = fullDeck.length
     const gameBoard = new Map<string, PlacedTile>();
     const startingTile = fullDeck.pop();
     const rm = new RegionManager();
@@ -163,6 +166,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         score: 0
       })),
       deck: fullDeck,
+      totalTiles,
       board: gameBoard,
       currentTurn: 0,
       drawnTile: null,

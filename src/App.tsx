@@ -12,7 +12,7 @@ export default function App() {
     players, currentTurn, drawnTile, deck, phase,
     initGame, drawTile, // 🌟 Добавили drawTile
     showRegions, toggleRegions, showDeadCells, toggleDeadCells,
-    previewTile, startPreview, confirmPreview, cancelPreview,
+    previewTile, startPreview, confirmPreview, cancelPreview, rollbackMove,
     confirmMeeple
 
   } = useGameStore();
@@ -186,6 +186,8 @@ const handleBoardClick = (x: number, y: number) => {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
+          width: '300px',                  
+          height: '300px',
           background: 'rgba(30, 30, 30, 0.95)',
           border: '2px solid #4a90e2',
           borderRadius: '16px',
@@ -196,8 +198,7 @@ const handleBoardClick = (x: number, y: number) => {
           gap: '12px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
           zIndex: 1000,
-          backdropFilter: 'blur(8px)',
-          minWidth: '140px'
+          backdropFilter: 'blur(8px)'
           
         }}>
           {/* 📦 Информация о колоде*/}
@@ -208,93 +209,94 @@ const handleBoardClick = (x: number, y: number) => {
             width: '100%',
             textAlign: 'center',
             borderBottom: '1px solid rgba(255, 215, 0, 0.3)',
+            paddingBottom: '8px',
           }}>
             📦 Колода: {deck.length}
           </div>
+          
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '10px',
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+          }}>
+            {/* 🎴 Тайл в руке (без preview) */}
+            {phase === 'placeTile' && drawnTile && !previewTile && (
+              <>
+                <div
+                  style={{
+                    border: '1px solid #555',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    background: '#1a1a1a',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <svg width={170} height={170} style={{ display: 'block' }}>
+                    <Tile id={drawnTile.id as any} size={170} />
+                  </svg>
+                </div>
+              </>
+            )}
 
-          {/* 🎴 Тайл в руке (без preview) */}
-          {phase === 'placeTile' && drawnTile && !previewTile && (
-            <>
-              <div
-                style={{
-                  border: '1px solid #555',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  background: '#1a1a1a',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                }}
-              >
-                <svg width={100} height={100} style={{ display: 'block' }}>
-                  <Tile id={drawnTile.id as any} size={100} />
-                </svg>
-              </div>
-              <div style={{ color: '#888', fontSize: '11px', textAlign: 'center' }}>
-                Кликни на <span style={{ color: '#ffffff' }}>белый маркер</span> на поле<br />
-              </div>
-            </>
-          )}
+            {/* 👁️ Примерка тайла*/}
+            {previewTile && (
+              <>
+                <button onClick={confirmPreview} style={confirmBtnStyle}>
+                  ✅ Подтвердить
+                </button>
 
-          {/* 👁️ Примерка тайла*/}
-          {previewTile && (
-            <>
-              <button
-                onClick={confirmPreview}
-                style={{
-                  ...btnStyle,
-                  width: '100%',
-                  background: '#2ecc71',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                ✅ Подтвердить
-              </button>
+                <button onClick={cancelPreview} style={cancelBtnStyle}>
+                  ↩️ Вернуться
+                </button>
+              </>
+            )}
 
-              <button
-                onClick={cancelPreview}
-                style={{
-                  ...btnStyle,
-                  width: '100%',
-                  background: '#e74c3c',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                ❌ Отменить
-              </button>
+            {/* 🔶 Кнопка подтверждения мипла (только в фазе placeMeeple) */}
+            {phase === 'placeMeeple' && (
+              <>              
+                <button onClick={confirmMeeple} style={confirmBtnStyle}>
+                  ✅ Подтвердить
+                </button>
 
-              <div style={{ color: '#fff', fontSize: '12px', textAlign: 'center' }}>
-                <span style={{ color: '#888', fontSize: '11px' }}>
-                  {previewTile.validRotations.length > 1
-                    ? 'Кликни на тайл для поворота'
-                    : 'Поворот фиксирован'}
-                </span>
-              </div>
-            </>
-          )}
-
-          {/* 🔶 Кнопка подтверждения мипла (только в фазе placeMeeple) */}
-          {phase === 'placeMeeple' && (
-            <>
-              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
-                🎯 Поставить мипла?
-              </span>
-              <button
-                onClick={confirmMeeple}  // 🌟 ИЗМЕНЕНО: confirmMeeple вместо handleSkipMeeple
-                style={{
-                  ...btnStyle,
-                  width: '100%',
-                  background: '#2ecc71',
-                  fontSize: '13px'
-                }}
-              >
-                ✅ Подтвердить
-              </button>
-              <div style={{ color: '#888', fontSize: '11px', textAlign: 'center' }}>
-                Кликни на <span style={{ color: '#32cd32' }}>зелёный маркер</span> на поле
-              </div>
-            </>
-          )}
+                {/* 🌟 НОВОЕ: Кнопка отката */}
+                <button onClick={rollbackMove} style={cancelBtnStyle}>
+                  ↩️ Вернуться
+                </button>
+              </>
+            )}
+          </div>
+              {/* 🌟 ПОДСКАЗКА — всегда внизу, фиксированная высота */}
+          <div style={{
+            color: '#888',
+            fontSize: '12px',
+            textAlign: 'center',
+            marginTop: 'auto',              
+            height: '40px',                  
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingTop: '8px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            width: '100%',
+          }}>
+            {phase === 'placeTile' && !previewTile && (
+              <>Кликни на&nbsp; <span style={{ color: '#fff' }}>белый маркер</span>&nbsp; на поле</>
+            )}
+            {previewTile && (
+              <>
+                {previewTile.validRotations.length > 1
+                  ? 'Кликни на тайл для поворота'
+                  : 'Поворот фиксирован'}
+              </>
+            )}
+            {phase === 'placeMeeple' && (
+              <>Кликни на&nbsp; <span style={{ color: '#fff' }}>белый силуэт</span>&nbsp; на поле</>
+            )}
+          </div>
         </div>
       )}
 
@@ -317,4 +319,22 @@ const btnStyle: React.CSSProperties = {
   fontSize: '14px',
   fontWeight: '500',
   transition: 'background 0.2s, transform 0.1s',
+};
+
+// 🌟 Стили кнопок панели действий
+const confirmBtnStyle: React.CSSProperties = {
+  ...btnStyle,
+  width: '100%',
+  height: '100%',
+  background: '#2ecc71',
+  fontSize: '14px',
+  fontWeight: 'bold',
+};
+
+const cancelBtnStyle: React.CSSProperties = {
+  ...btnStyle,
+  width: '100%',
+  background: '#e67e22',
+  fontSize: '14px',
+  fontWeight: 'bold',
 };

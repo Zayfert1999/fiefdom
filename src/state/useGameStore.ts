@@ -4,6 +4,7 @@ import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType, PreviewTile} 
 import { TILE_DEFINITIONS } from '@/core/tileData';
 import {
   getTileSides,
+  rotateFeatures,
   applyTileToBoardAndRM,
   getValidPlacementCells,
   getValidRotations
@@ -34,6 +35,17 @@ export interface LastPlacedTile {
   color: string;  // Цвет игрока
 }
 
+// 🌟 НОВОЕ: Snapshot содержит ВСЁ состояние до confirmPreview
+export interface MoveSnapshot {
+  board: Map<string, PlacedTile>;
+  regionManager: RegionManager;
+  drawnTile: Tile;
+  deck: Tile[];
+
+  previewTile: PreviewTile;
+  previewTileRegionManager: RegionManager;
+}
+
 export interface GameStore {
   deck: Tile[];
   board: Map<string, PlacedTile>;
@@ -50,27 +62,35 @@ export interface GameStore {
   previewRegionManager: RegionManager | null;
   showDeadCells: boolean;
   lastPlacedTiles: Map<string, LastPlacedTile>;
+  moveSnapshot: MoveSnapshot | null;
 
+  //Инициализация игры
   initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
-  drawTile: () => void;
-  placeTile: (x: number, y: number, rotation: 0 | 90 | 180 | 270) => boolean;
-  // Методы управления временным миплом
-  selectMeepleSpot: (featureId: string, x: number, y: number) => void;
-  removePlacedMeeple: () => void;
-  confirmMeeple: () => void;
 
-  toggleRegions: () => void;
-  toggleDeadCells: () => void;
-  setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
-  debugForceEndGame: () => void;
+  //Выдача тайла в начале хода
+  drawTile: () => void;
+
   // Методы управления превью тайла 
   startPreview: (x: number, y: number) => void;
   rotatePreview: () => void;
   confirmPreview: () => void;
   cancelPreview: () => void;
-  
 
-  // 🌟 Вспомогательные функции
+  // Методы управления временным миплом
+  rollbackMove: () => void;
+  selectMeepleSpot: (featureId: string, x: number, y: number) => void;
+  removePlacedMeeple: () => void;
+  confirmMeeple: () => void;
+
+  // Переключалки подсветки регионов и мертвых клеток
+  toggleRegions: () => void;
+  toggleDeadCells: () => void;
+
+  // Дебаг функции
+  setDebugSelectedTile: (coords: { x: number; y: number } | null) => void;
+  debugForceEndGame: () => void;
+
+  // Вспомогательные функции
   processEndTurn: () => void;
   processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
   processEndGameInStore: (nextTurn: number) => void;
@@ -105,6 +125,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   previewTile: null,
   previewRegionManager: null,
   lastPlacedTiles: new Map(),
+  moveSnapshot: null,
 
   // ============================================
   // 🎮 ИНИЦИАЛИЗАЦИЯ ИГРЫ
@@ -202,29 +223,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   // ============================================
-  // 📍 РАЗМЕЩЕНИЕ ТАЙЛА
-  // ============================================
-  placeTile: (x, y, rotation) => {
-    const state = get();
-    if (!state.drawnTile || state.phase !== 'placeTile') return false;
-    
-    const cellKey = `${x},${y}`;
-    if (state.board.has(cellKey)) return false;
-
-    // 🌟 Используем общую утилиту
-    const { newBoard, newRM } = applyTileToBoardAndRM(
-      state.board,
-      state.regionManager,
-      state.drawnTile,
-      x, y, rotation
-    );
-
-    console.log(`✅ [Store] Тайл установлен в (${x}, ${y})`);
-    set({ board: newBoard, regionManager: newRM });
-    return true;
-  },
-
-  // ============================================
   // 👁️ НАЧАЛО ПРИМЕРКИ
   // Вызывается при клике на валидную ячейку
   // ============================================
@@ -245,7 +243,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const rotation = validRotations[0];
 
     // 🌟 Используем общую утилиту
-    const { newRM: previewRM } = applyTileToBoardAndRM(
+    const { newRM: previewTileRM } = applyTileToBoardAndRM(
       state.board,
       state.regionManager,
       state.drawnTile,
@@ -260,7 +258,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         validRotations,
         currentRotationIndex: 0,
       },
-      previewRegionManager: previewRM,
+      previewRegionManager: previewTileRM,
     });
     
     console.log(`👁️ [Store] Примерка начата: (${x}, ${y}), поворот ${rotation}°, валидных поворотов: ${validRotations.length}`);
@@ -286,7 +284,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const newRotation = validRotations[nextIndex];
     
     // 🌟 Используем общую утилиту
-    const { newRM: previewRM } = applyTileToBoardAndRM(
+    const { newRM: previewTileRM } = applyTileToBoardAndRM(
       state.board,
       state.regionManager,
       tile,
@@ -299,7 +297,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         rotation: newRotation,
         currentRotationIndex: nextIndex,
       },
-      previewRegionManager: previewRM,
+      previewRegionManager: previewTileRM,
     });
     
     console.log(`🔄 [Store] Поворот примерки: ${newRotation}° (${nextIndex + 1}/${validRotations.length})`);
@@ -316,32 +314,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
     
-    const { x, y, rotation } = state.previewTile;
+    const { x, y, rotation, tile } = state.previewTile;
     
-    // 🌟 Применяем тайл к доске (используем placeTile, но без проверки фазы)
-    const success = get().placeTile(x, y, rotation);
+    // 🌟 НОВОЕ: Сохраняем snapshot ПОЛНОСТЬЮ (включая preview)
+    const snapshot: MoveSnapshot = {
+      board: new Map(state.board),
+      regionManager: state.regionManager,
+      drawnTile: state.drawnTile!,
+      deck: [...state.deck],
 
-    if (success) {
+      previewTile: { ...state.previewTile },              
+      previewTileRegionManager: state.previewRegionManager.clone(),  
+    };
 
-      // 🌟 Получаем текущего игрока ИЗ state
-      const currentPlayer = state.players[state.currentTurn];
-      
-      // 🌟 Обновляем подсветку ТОЛЬКО для текущего игрока
-      const newLastPlacedTiles = new Map(state.lastPlacedTiles);
-      newLastPlacedTiles.set(currentPlayer.id, {
-        x, y,
-        color: currentPlayer.color,
-      });
+    const rotatedFeatures = rotateFeatures(tile.features, rotation);
+    const newBoard = new Map(state.board);
+    newBoard.set(`${x},${y}`, {
+      templateId: tile.id,
+      x, y, rotation,
+      features: rotatedFeatures,
+      derivedSides: getTileSides({ ...tile, features: rotatedFeatures }),
+    });
 
-      set({
-        previewTile: null,
-        previewRegionManager: null,
-        drawnTile: null,
-        lastPlacedTiles: newLastPlacedTiles,
-        phase: 'placeMeeple',
-      });
-      console.log(`✅ [Store] Примерка подтверждена: (${x}, ${y})`);
-    }
+
+    set({
+      board: newBoard,
+      regionManager: state.previewRegionManager,
+      previewTile: null,
+      previewRegionManager: null,
+      drawnTile: null,
+      phase: 'placeMeeple',
+      moveSnapshot: snapshot,
+    });
+    console.log(`✅ [Store] Примерка подтверждена, тайл установлен: (${x}, ${y})`);
   },
   
   // ============================================
@@ -357,9 +362,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   // ============================================
+  // ↩️ ОТКАТ УСТАНОВКИ ТАЙЛА
+  // Восстанавливает состояние ДО confirmPreview,
+  // ВКЛЮЧАЯ preview-тайл на той же позиции
+  // ============================================
+  rollbackMove: () => {
+    const state = get();
+    
+    if (state.phase !== 'placeMeeple') {
+      console.warn('⚠️ [Store] Откат возможен только в фазе placeMeeple');
+      return;
+    }
+    
+    if (!state.moveSnapshot) {
+      console.warn('⚠️ [Store] Нет snapshot для отката');
+      return;
+    }
+    
+    const { 
+      board, 
+      regionManager, 
+      drawnTile, 
+      deck, 
+
+      previewTile,                    
+      previewTileRegionManager        
+    } = state.moveSnapshot;
+    
+    set({
+      board,
+      regionManager,
+      drawnTile,
+      deck,
+
+      // 🌟 Восстанавливаем preview
+      previewTile,
+      previewRegionManager: previewTileRegionManager,
+      //previewMeepleRegionManager: null,
+      phase: 'placeTile',             // 🌟 Возвращаемся к placeTile
+      moveSnapshot: null,             // 🌟 Очищаем snapshot
+    });
+    
+    console.log(`↩️ [Store] Ход откатён, preview восстановлен на (${previewTile.x}, ${previewTile.y})`);
+  },
+
+  // ============================================
   // 🔶 НОВОЕ: ВЫБОР СПОТА ДЛЯ ВРЕМЕННОГО МИПЛА
   // Ставит временный мипл в board с isTemporary: true
-  // НЕ меняет RegionManager
   // ============================================
   selectMeepleSpot: (featureId, mx, my) => {
     const state = get();
@@ -412,10 +461,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         isTemporary: true,  // 🌟 Флаг временного мипла
       } as PlacedMeeple,
     });
+
+    // 🌟 Создаём previewMeepleRM для визуализации
+    const PreviewMeepleRM = state.regionManager.clone();
+    PreviewMeepleRM.addMeeple(featureKey, player.id);
+    PreviewMeepleRM.addOwner(featureKey, player.id);
     
     set({
       board: newBoard,
       players: newPlayers,
+      previewRegionManager: PreviewMeepleRM,
     });
     
     console.log(`🔶 [Store] Временный мипл поставлен на ${featureId} (${mx}, ${my})`);
@@ -452,6 +507,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       board: newBoard,
       players: newPlayers,
+      previewRegionManager: null,
     });
     
     console.log(`❌ [Store] Временный мипл удалён, мипл возвращён игроку ${player.name}`);
@@ -473,8 +529,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     if (last?.meeple?.isTemporary) {
       const { featureId} = last.meeple;
-      const player = state.players[state.currentTurn];
-      const featureKey: FeatureKey = `${last.x},${last.y}:${featureId}`;
+
       
       // 🌟 Превращаем временный мипл в постоянный
       const newBoard = new Map(state.board);
@@ -483,14 +538,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         meeple: { ...last.meeple, isTemporary: false },
       });
       
-      // 🌟 Теперь меняем RM (добавляем мипла)
-      const newRM = state.regionManager.clone();
-      newRM.addMeeple(featureKey, player.id);
-      newRM.addOwner(featureKey, player.id);
-      
       set({
         board: newBoard,
-        regionManager: newRM,
+        regionManager: state.previewRegionManager!,
+        previewRegionManager: null,
         phase: 'endTurn',
       });
       
@@ -514,9 +565,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
     console.log("🔄 [Store] Начало обработки фазы 'endTurn'.");
     const state = get();
     const nextTurn = (state.currentTurn + 1) % state.players.length;
+    const currentPlayer = state.players[state.currentTurn];
 
     let lastTile: PlacedTile | undefined;
     for (const tile of state.board.values()) lastTile = tile;
+
+    // 🌟 Обновляем подсветку для текущего игрока
+    const newLastPlacedTiles = new Map(state.lastPlacedTiles);
+    if (lastTile) {
+      newLastPlacedTiles.set(currentPlayer.id, {
+        x: lastTile.x,
+        y: lastTile.y,
+        color: currentPlayer.color,
+      });
+      console.log(`🎨 [Store] Подсветка обновлена для игрока ${currentPlayer.name}: (${lastTile.x}, ${lastTile.y})`);
+    }
 
     let completedRegions: CompletedRegion[] = [];
     if (lastTile) {
@@ -534,7 +597,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({
         currentTurn: nextTurn,
         drawnTile: null,
-        phase: 'startTurn'
+        phase: 'startTurn',
+        lastPlacedTiles: newLastPlacedTiles
       });
     }
   },

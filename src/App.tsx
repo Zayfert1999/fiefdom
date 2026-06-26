@@ -1,6 +1,7 @@
 // App.tsx
 import { useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
+import { Lobby } from '@/components/Lobby';
 import { Board } from '@/renderer/Board';
 import { Tile } from '@/renderer/Tile';
 import { DebugPanel } from '@/renderer/DebugPanel';
@@ -10,26 +11,16 @@ import { getValidPlacementCells } from '@/core/tileUtils';
 export default function App() {
   const {
     players, currentTurn, drawnTile, deck, phase,
-    initGame, drawTile, totalTiles,
-    showRegions, toggleRegions, showDeadCells, toggleDeadCells,
+    drawTile, totalTiles,
+    showRegions, showDeadCells,
     previewTile, startPreview, confirmPreview, cancelPreview, rollbackMove,
     confirmMeeple
 
   } = useGameStore();
 
   const board = useGameStore(s => s.board);
-
-  useEffect(() => {
-    if (players.length === 0) {
-      console.log('🎮 [App] Инициализация новой игры...');
-      initGame([
-        { id: 'p1', name: 'Игрок 1', color: '#ff5555' },
-        { id: 'p2', name: 'Игрок 2', color: '#5555ff' },
-      ]);
-    }
-  }, [players.length, initGame]);
  
-    // 🌟 АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
+    // АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
   useEffect(() => {
     if (phase === 'startTurn' && !drawnTile) { // 🌟 Добавлена проверка drawnTile === null
       console.log('🎴 [App] Фаза startTurn → автоматическая выдача тайла');
@@ -70,49 +61,87 @@ const handleBoardClick = (x: number, y: number) => {
 
   const currentPlayer = players[currentTurn];
 
+  // 🌟 НОВОЕ: Показываем лобби если игра не начата
+  if (phase === 'lobby') {
+    return <Lobby />;
+  }
+
   // 🌟 Показываем панель и во время placeTile, и во время placeMeeple
   const showPreviewPanel = (phase === 'placeTile' && drawnTile) || phase === 'placeMeeple';
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
 
-      {/* 🖼️ Верхняя панель (HUD) */}
+    {/* 🖼️ Верхняя панель (HUD) */}
+    <div style={{
+      padding: '12px 20px',
+      background: '#222',
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',  // ✅ Ход слева, индикаторы справа
+      gap: '16px',
+      borderBottom: '1px solid #333',
+    }}>
+      {/* 👤 Ход — слева */}
       <div style={{
-        padding: '12px 20px',
-        background: '#222',
-        color: '#fff',
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
-        borderBottom: '1px solid #333',
-        flexWrap: 'wrap'
+        gap: '8px',
       }}>
-        <span>👤 Ход: <strong>{currentPlayer?.name || '---'}</strong></span>
-        
-        {/* 💀 НОВОЕ: Кнопка toggle мёртвых клеток */}
-        <button
-          onClick={toggleDeadCells}
-          style={{
-            ...btnStyle,
-            background: showDeadCells ? '#e74c3c' : '#555',
-          }}
-          title="Показать клетки, куда нельзя поставить ни один тайл из колоды"
-        >
-          💀 {showDeadCells ? 'Мёртвые: ВКЛ' : 'Мёртвые: ВЫКЛ'}
-        </button>
-        
-        {/* 🌟 Информация о колоде перемещена в панель действий */}
-        <button
-          onClick={toggleRegions}
-          style={{
-            ...btnStyle,
-            background: showRegions ? '#5cb85c' : '#555',
-            marginLeft: 'auto'
-          }}
-        >
-          {showRegions ? '🗺️ Регионы: ВКЛ' : '🗺️ Регионы: ВЫКЛ'}
-        </button>
+        <span style={{ fontSize: '14px', color: '#aaa' }}>Ход:</span>
+        <strong style={{ fontSize: '16px', color: '#fff' }}>
+          {currentPlayer?.name || '---'}
+        </strong>
       </div>
+
+      {/* 🎯 Индикаторы — справа */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '20px',
+      }}>
+        {/* 🗺️ Индикатор регионов */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <div style={{
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: showRegions ? '#5cb85c' : '#555',
+            boxShadow: showRegions ? '0 0 8px #5cb85c' : 'none',
+          }} />
+          <span style={{ fontSize: '13px', color: '#aaa' }}>
+            Регионы: <strong style={{ color: showRegions ? '#5cb85c' : '#666' }}>
+              {showRegions ? 'ВКЛ' : 'ВЫКЛ'}
+            </strong>
+          </span>
+        </div>
+
+        {/* 💀 Индикатор мёртвых клеток */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <div style={{
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: showDeadCells ? '#5cb85c' : '#555',
+            boxShadow: showDeadCells ? '0 0 8px #5cb85c' : 'none',
+          }} />
+          <span style={{ fontSize: '13px', color: '#aaa' }}>
+            Мёртвые: <strong style={{ color: showDeadCells ? '#5cb85c' : '#666' }}>
+              {showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}
+            </strong>
+          </span>
+        </div>
+      </div>
+    </div>
 
       {/* 📊 ПАНЕЛЬ ИГРОКОВ (Левый верхний угол, под хедером) */}
       {players.length > 0 && (
@@ -120,56 +149,108 @@ const handleBoardClick = (x: number, y: number) => {
           position: 'absolute',
           top: '70px',
           left: '20px',
-          background: 'rgba(30, 30, 30, 0.95)',
-          border: '2px solid #4a90e2',
-          borderRadius: '16px',
-          padding: '12px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
           zIndex: 999,
-          backdropFilter: 'blur(8px)',
-          minWidth: '150px',
         }}>
-          <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#fff', textAlign: 'center' }}>Игроки</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {players.map((player, index) => (
+          {players.map((player, index) => {
+            const isActive = currentTurn === index;
+            
+            return (
               <div
                 key={player.id}
                 style={{
                   display: 'flex',
                   alignItems: 'stretch',
-                  background: currentTurn === index ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '6px',
-                  border: currentTurn === index ? '1px solid #4a90e2' : '1px solid transparent',
+                  background: isActive ? 'rgba(30, 30, 30, 0.98)' : 'rgba(30, 30, 30, 0.85)',
+                  borderRadius: '12px',
+                  border: isActive ? `3px solid ${player.color}` : '2px solid rgba(255, 255, 255, 0.1)',
                   overflow: 'hidden',
+                  boxShadow: isActive 
+                    ? `0 0 20px ${player.color}40, 0 8px 32px rgba(0, 0, 0, 0.6)` 
+                    : '0 4px 16px rgba(0, 0, 0, 0.4)',
+                  backdropFilter: 'blur(8px)',
+                  minWidth: '200px',
+                  transition: 'all 0.3s ease',
                 }}
               >
                 {/* 🌟 Цветная полоска слева */}
                 <div 
                   style={{ 
-                    width: '8px', 
+                    width: isActive ? '12px' : '8px', 
                     backgroundColor: player.color,
-                    flexShrink: 0
+                    flexShrink: 0,
+                    transition: 'width 0.3s ease',
                   }} 
                 />
                 
                 {/* Основная информация о игроке */}
                 <div style={{ 
                   display: 'flex',
-                  justifyContent: 'space-between',
+                  justifyContent: 'space-between',  // ✅ Имя слева, статистика справа
                   alignItems: 'center',
-                  padding: '6px 10px',
+                  padding: isActive ? '12px 16px' : '10px 14px',
                   flex: 1,
-                  gap: '12px' // 🌟 Добавлен отступ между именем и статистикой
+                  gap: '16px',
+                  transition: 'padding 0.3s ease',
                 }}>
-                  <span style={{ color: '#fff', fontSize: '16px', fontWeight: '500' }}>{player.name}</span>
-                  <div style={{ display: 'flex', gap: '16px' }}>
-                    <span style={{ color: '#888', fontSize: '14px' }}>🏆 {player.score}</span>
-                    <span style={{ color: '#888', fontSize: '14px' }}>🔶 {player.meepleCount}</span>
+                  {/* 🌟 Левая часть: имя + индикатор хода */}
+                  <div style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                    <span style={{ 
+                      color: '#fff', 
+                      fontSize: isActive ? '18px' : '16px', 
+                      fontWeight: isActive ? '700' : '500',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      {player.name}
+                    </span>
+                  </div>
+                  
+                  {/* 🌟 Правая часть: статистика вертикально */}
+                  <div style={{ 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    alignItems: 'flex-end',  // ✅ Выравнивание по правому краю
+                  }}>
+                    <div style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}>
+                      <span style={{ fontSize: '14px' }}>🏆</span>
+                      <span style={{ 
+                        color: isActive ? '#fff' : '#aaa', 
+                        fontSize: '15px',
+                        fontWeight: isActive ? '600' : '400',
+                      }}>
+                        {player.score}
+                      </span>
+                    </div>
+                    <div style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}>
+                      <span style={{ fontSize: '14px' }}>🔶</span>
+                      <span style={{ 
+                        color: isActive ? '#fff' : '#aaa', 
+                        fontSize: '15px',
+                        fontWeight: isActive ? '600' : '400',
+                      }}>
+                        {player.meepleCount}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 

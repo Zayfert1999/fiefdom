@@ -9,6 +9,7 @@ export const DebugPanel = () => {
   const players = useGameStore(s => s.players);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
   const debugForceEndGame = useGameStore(s => s.debugForceEndGame);
+  const { saveGame, loadGame } = useGameStore();
 
   if (!debugSelectedTile) return null;
 
@@ -32,7 +33,34 @@ export const DebugPanel = () => {
     <div style={panelStyle}>
       <div style={headerStyle}>
         <h3 style={{ margin: 0 }}>🐛 Debug Panel</h3>
-        <button onClick={debugForceEndGame} style={endGameBtnStyle} title="Принудительно завершить игру">🏁</button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {/* 💾 Сохранить */}
+          <button 
+            onClick={saveGame} 
+            style={saveBtnStyle} 
+            title="Сохранить игру"
+          >
+            💾
+          </button>
+          
+          {/* 📂 Загрузить */}
+          <button 
+            onClick={loadGame} 
+            style={loadBtnStyle} 
+            title="Загрузить игру"
+          >
+            📂
+          </button>
+          
+          {/* 🏁 Принудительно завершить */}
+          <button 
+            onClick={debugForceEndGame} 
+            style={endGameBtnStyle} 
+            title="Принудительно завершить игру"
+          >
+            🏁
+          </button>
+        </div>
       </div>
 
       <div style={sectionStyle}>
@@ -55,7 +83,7 @@ export const DebugPanel = () => {
           // 🌟 НОВОЕ: Вычисляем текущее состояние монастыря
           const monasteryState = feature.type === 'monastery' ? calculateMonasteryPoints(board, x, y) : null;
 
-                    // 🌟 Специфичная информация для полей
+          // 🌟 Специфичная информация для полей
           const fieldState = feature.type === 'field' && rootKey 
             ? getAdjacentCitiesForField(board, regionManager, rootKey) 
             : null;
@@ -214,4 +242,26 @@ const btnStyle: React.CSSProperties = {
   fontSize: '12px',
   marginTop: '10px',
   width: '100%',
+};
+
+const saveBtnStyle: React.CSSProperties = {
+  background: '#2ecc71',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '4px',
+  padding: '4px 8px',
+  cursor: 'pointer',
+  fontSize: '14px',
+  transition: 'background 0.2s',
+};
+
+const loadBtnStyle: React.CSSProperties = {
+  background: '#3498db',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '4px',
+  padding: '4px 8px',
+  cursor: 'pointer',
+  fontSize: '14px',
+  transition: 'background 0.2s',
 };

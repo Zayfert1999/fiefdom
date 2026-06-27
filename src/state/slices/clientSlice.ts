@@ -193,14 +193,9 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
 
         const featureKey: FeatureKey = `${last.x},${last.y}:${featureId}`;
 
-        // 🌟 Используем previewRM (он содержит тайл!)
-        if (!state.previewRegionManager) {
-            console.warn('⚠️ [UiSlice] Нет previewRM');
-            return;
-        }
 
         // 🌟 Проверяем, что фича свободна
-        const owners = state.previewRegionManager.getFeatureOwners(featureKey);
+        const owners = state.regionManager.getFeatureOwners(featureKey);
         if (owners.length > 0) {
             console.warn(`⚠️ [Store] Фича ${featureId} уже занята`);
             return;
@@ -230,7 +225,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
         });
 
         // Создаём previewMeepleRM для визуализации
-        const PreviewMeepleRM = state.previewRegionManager.clone();
+        const PreviewMeepleRM = state.regionManager.clone();
         PreviewMeepleRM.addMeeple(featureKey, player.id);
         PreviewMeepleRM.addOwner(featureKey, player.id);
 
@@ -271,16 +266,12 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
         const newPlayers = [...state.players];
         newPlayers[state.currentTurn] = { ...player, meepleCount: player.meepleCount + 1 };
 
-        // Восстанавливаем previewRM из snapshot (с тайлом, без мипла)
-        if (!state.moveSnapshot) {
-            console.warn('⚠️ [Store] Нет snapshot для восстановления previewRM');
-            return;
-        }
+        const newPreviewRM = state.regionManager.clone();
 
         set({
             board: newBoard,
             players: newPlayers,
-            previewRegionManager: state.moveSnapshot.previewTileRegionManager.clone(),
+            previewRegionManager: newPreviewRM,
         });
 
         console.log(`❌ [Store] Временный мипл удалён, мипл возвращён игроку ${player.name}`);

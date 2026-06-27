@@ -24,7 +24,7 @@ const AVAILABLE_COLORS = [
 export interface GameSlice {
     //Лобби
     lobbyPlayers: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[];
-    
+
     //Игра
     deck: Tile[];
     totalTiles: number;
@@ -39,6 +39,7 @@ export interface GameSlice {
     completionAnimations: CompletionAnimation[];
     showDeadCells: boolean;
     lastPlacedTiles: Map<string, LastPlacedTile>;
+
 
 
     //Методы лобби
@@ -66,6 +67,10 @@ export interface GameSlice {
     processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
     processEndGameInStore: (nextTurn: number) => void;
     animateRegionCompletion: (region: CompletedRegion, startDelay?: number) => void;
+
+    //Сериализация
+    saveGame: () => void;
+    loadGame: () => void;
 }
 
 const createDeck = (): Tile[] => {
@@ -298,6 +303,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         set({
             board: newBoard,
+            regionManager: state.previewRegionManager, 
+            previewRegionManager: null,                
             previewTile: null,
             drawnTile: null,
             phase: 'placeMeeple',
@@ -628,5 +635,80 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     toggleDeadCells: () => {
         set((state) => ({ showDeadCells: !state.showDeadCells }));
         console.log(`💀 [Store] Показ мёртвых клеток: ${!get().showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}`);
+    },
+
+    // ============================================
+    // 💾 СОХРАНЕНИЕ ИГРЫ
+    // ============================================
+    saveGame: () => {
+        const state = get();
+
+        // 🌟 Преобразуем Map в Record для JSON
+        const boardRecord = Object.fromEntries(state.board);
+        const lastPlacedRecord = Object.fromEntries(state.lastPlacedTiles);
+
+        const serialized = {
+            board: boardRecord,
+            regionManager: state.regionManager.serialize(),
+            players: state.players,
+            deck: state.deck,
+            currentTurn: state.currentTurn,
+            phase: state.phase,
+            drawnTile: state.drawnTile,
+            totalTiles: state.totalTiles,
+            lastPlacedTiles: lastPlacedRecord,
+            showRegions: state.showRegions,
+            showDeadCells: state.showDeadCells,
+        };
+
+        localStorage.setItem('carcassonne_save', JSON.stringify(serialized));
+        console.log('💾 [GameSlice] Игра сохранена');
+    },
+
+    // ============================================
+    // 📂 ЗАГРУЗКА ИГРЫ
+    // ============================================
+    loadGame: () => {
+        const json = localStorage.getItem('carcassonne_save');
+        if (!json) {
+            console.warn('⚠️ [GameSlice] Нет сохранённой игры');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(json);
+
+            // 🌟 Восстанавливаем Map из Record
+            const board = new Map<string, PlacedTile>(Object.entries(data.board));
+            const lastPlacedTiles = new Map<string, LastPlacedTile>(Object.entries(data.lastPlacedTiles));
+
+            // 🌟 Восстанавливаем RegionManager через static deserialize
+            const regionManager = RegionManager.deserialize(data.regionManager);
+
+            set({
+                board,
+                regionManager,
+                players: data.players,
+                deck: data.deck,
+                currentTurn: data.currentTurn,
+                phase: data.phase as GamePhase,
+                drawnTile: data.drawnTile,
+                totalTiles: data.totalTiles,
+                lastPlacedTiles,
+                showRegions: data.showRegions,
+                showDeadCells: data.showDeadCells,
+
+                // 🌟 Сброс клиентского (UI) состояния
+                previewTile: null,
+                previewRegionManager: null,
+                moveSnapshot: null,
+                completionAnimations: [],
+            });
+
+            console.log('📂 [GameSlice] Игра загружена');
+        } catch (e) {
+            console.error('❌ [GameSlice] Ошибка десериализации:', e);
+            localStorage.removeItem('carcassonne_save'); // Защита от битого файла
+        }
     },
 });

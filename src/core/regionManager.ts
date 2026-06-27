@@ -1,5 +1,6 @@
 // core/regionManager.ts
 import type { FeatureType } from './types';
+import type { SerializedRegionManager, SerializedRegionMetadata, } from './serialization.ts';
 
 export type FeatureKey = string;
 
@@ -166,5 +167,71 @@ export class RegionManager {
       ])
     );
     return copy;
+  }
+
+  // ============================================
+  // СЕРИАЛИЗАЦИЯ
+  // Преобразует Map/Set в Record/Array для JSON
+  // ============================================
+  serialize(): SerializedRegionManager {
+    const parent: Record<string, string> = {};
+    this.parent.forEach((value, key) => {
+      parent[key] = value;
+    });
+
+    const metadata: Record<string, SerializedRegionMetadata> = {};
+    this.metadata.forEach((meta, key) => {
+      const meepleCounts: Record<string, number> = {};
+      meta.meepleCounts.forEach((count, playerId) => {
+        meepleCounts[playerId] = count;
+      });
+
+      metadata[key] = {
+        type: meta.type,
+        owners: Array.from(meta.owners),
+        segments: meta.segments,
+        hasShield: meta.hasShield,
+        featureKeys: Array.from(meta.featureKeys),
+        meepleCounts,
+        isComplete: meta.isComplete,
+        points: meta.points,
+      };
+    });
+
+    console.log(`💾 [RegionManager] Сериализовано: ${Object.keys(parent).length} фич, ${Object.keys(metadata).length} регионов`);
+    return { parent, metadata };
+  }
+
+  // ============================================
+  // ДЕСЕРИАЛИЗАЦИЯ
+  // Восстанавливает Map/Set из Record/Array
+  // ============================================
+  static deserialize(data: SerializedRegionManager): RegionManager {
+    const rm = new RegionManager();
+
+    for (const [key, value] of Object.entries(data.parent) as Array<[string, string]>) {
+      rm.parent.set(key, value);
+    }
+
+    for (const [key, serializedMeta] of Object.entries(data.metadata) as Array<[string, SerializedRegionMetadata]>) {
+      const meepleCounts = new Map<string, number>();
+      for (const [playerId, count] of Object.entries(serializedMeta.meepleCounts) as Array<[string, number]>) {
+        meepleCounts.set(playerId, count);
+      }
+
+      rm.metadata.set(key, {
+        type: serializedMeta.type,
+        owners: new Set(serializedMeta.owners),
+        segments: serializedMeta.segments,
+        hasShield: serializedMeta.hasShield,
+        featureKeys: new Set(serializedMeta.featureKeys),
+        meepleCounts,
+        isComplete: serializedMeta.isComplete,
+        points: serializedMeta.points,
+      });
+    }
+
+    console.log(`📂 [RegionManager] Десериализовано: ${rm.parent.size} фич, ${rm.metadata.size} регионов`);
+    return rm;
   }
 }

@@ -7,6 +7,7 @@ import { Tile } from '@/renderer/Tile';
 import { DebugPanel } from '@/renderer/DebugPanel';
 import { GameOverScreen } from '@/renderer/GameOverScreen';
 import { getValidPlacementCells } from '@/core/tileUtils';
+import { useHotkeys } from '@/hooks/useHotkeys';
 
 export default function App() {
   const {
@@ -19,8 +20,8 @@ export default function App() {
   } = useGameStore();
 
   const board = useGameStore(s => s.board);
- 
-    // АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
+
+  // АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
   useEffect(() => {
     if (phase === 'startTurn' && !drawnTile) { // 🌟 Добавлена проверка drawnTile === null
       console.log('🎴 [App] Фаза startTurn → автоматическая выдача тайла');
@@ -31,32 +32,91 @@ export default function App() {
     }
   }, [phase, drawnTile, drawTile]); // 🌟 Добавлена зависимость drawnTile
 
+  // ============================================
+  // 🔶 Регистрация горячих клавиш
+  // ============================================
+  useHotkeys([
+    // R — поворот preview
+    {
+      key: 'r',
+      action: () => useGameStore.getState().rotatePreview(),
+      description: 'Повернуть тайл',
+      enabled: phase === 'placeTile' && previewTile !== null,
+    },
+
+    // Enter / Space — подтвердить
+    {
+      key: 'Enter',
+      action: () => {
+        const state = useGameStore.getState();
+        if (state.phase === 'placeTile' && state.previewTile) {
+          state.confirmPreview();
+        } else if (state.phase === 'placeMeeple') {
+          state.confirmMeeple();
+        }
+      },
+      description: 'Подтвердить',
+      enabled: (phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
+    },
+    {
+      key: ' ',
+      action: () => {
+        const state = useGameStore.getState();
+        if (state.phase === 'placeTile' && state.previewTile) {
+          state.confirmPreview();
+        } else if (state.phase === 'placeMeeple') {
+          state.confirmMeeple();
+        }
+      },
+      description: 'Подтвердить',
+      enabled: (phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
+    },
+
+    // 'z' — отмена
+    {
+      key: 'z',
+      action: () => {
+        const state = useGameStore.getState();
+        if (state.phase === 'placeTile' && state.previewTile) {
+          // Отменяем примерку тайла
+          state.cancelPreview();
+        } else if (state.phase === 'placeMeeple') {
+          // Полный откат хода (включая удаление временного мипла)
+          state.rollbackMove();
+        }
+      },
+      description: 'Отменить / Откатить',
+      enabled: (phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
+    },
+    
+  ]);
+
   // 🟢 Расчёт валидных клеток
   const validCells = useMemo(() => {
     if (!drawnTile) return new Set<string>();
     return getValidPlacementCells(drawnTile, board);
   }, [drawnTile, board]);
 
-const handleBoardClick = (x: number, y: number) => {
-  if (phase === 'placeTile' && drawnTile) {
-    const cellKey = `${x},${y}`;
-    if (validCells.has(cellKey)) {
-      // 🌟 Если уже есть previewTile на этой позиции — ничего не делаем
-      if (previewTile && previewTile.x === x && previewTile.y === y) {
-        return;
+  const handleBoardClick = (x: number, y: number) => {
+    if (phase === 'placeTile' && drawnTile) {
+      const cellKey = `${x},${y}`;
+      if (validCells.has(cellKey)) {
+        // 🌟 Если уже есть previewTile на этой позиции — ничего не делаем
+        if (previewTile && previewTile.x === x && previewTile.y === y) {
+          return;
+        }
+
+        // 🌟 Если есть previewTile на другой позиции — отменяем и начинаем новую
+        if (previewTile) {
+          console.log(`🔄 [App] Перемещение примерки: (${previewTile.x},${previewTile.y}) → (${x},${y})`);
+          cancelPreview();
+        }
+
+        console.log(`👁️ [App] Начало примерки в (${x}, ${y})`);
+        startPreview(x, y);
       }
-      
-      // 🌟 Если есть previewTile на другой позиции — отменяем и начинаем новую
-      if (previewTile) {
-        console.log(`🔄 [App] Перемещение примерки: (${previewTile.x},${previewTile.y}) → (${x},${y})`);
-        cancelPreview();
-      }
-      
-      console.log(`👁️ [App] Начало примерки в (${x}, ${y})`);
-      startPreview(x, y);
     }
-  }
-};
+  };
 
 
   const currentPlayer = players[currentTurn];
@@ -72,76 +132,76 @@ const handleBoardClick = (x: number, y: number) => {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
 
-    {/* 🖼️ Верхняя панель (HUD) */}
-    <div style={{
-      padding: '12px 20px',
-      background: '#222',
-      color: '#fff',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',  // ✅ Ход слева, индикаторы справа
-      gap: '16px',
-      borderBottom: '1px solid #333',
-    }}>
-      {/* 👤 Ход — слева */}
+      {/* 🖼️ Верхняя панель (HUD) */}
       <div style={{
+        padding: '12px 20px',
+        background: '#222',
+        color: '#fff',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        justifyContent: 'space-between',  // ✅ Ход слева, индикаторы справа
+        gap: '16px',
+        borderBottom: '1px solid #333',
       }}>
-        <span style={{ fontSize: '14px', color: '#aaa' }}>Ход:</span>
-        <strong style={{ fontSize: '16px', color: '#fff' }}>
-          {currentPlayer?.name || '---'}
-        </strong>
-      </div>
-
-      {/* 🎯 Индикаторы — справа */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '20px',
-      }}>
-        {/* 🗺️ Индикатор регионов */}
+        {/* 👤 Ход — слева */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
         }}>
-          <div style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: showRegions ? '#5cb85c' : '#555',
-            boxShadow: showRegions ? '0 0 8px #5cb85c' : 'none',
-          }} />
-          <span style={{ fontSize: '13px', color: '#aaa' }}>
-            Регионы: <strong style={{ color: showRegions ? '#5cb85c' : '#666' }}>
-              {showRegions ? 'ВКЛ' : 'ВЫКЛ'}
-            </strong>
-          </span>
+          <span style={{ fontSize: '14px', color: '#aaa' }}>Ход:</span>
+          <strong style={{ fontSize: '16px', color: '#fff' }}>
+            {currentPlayer?.name || '---'}
+          </strong>
         </div>
 
-        {/* 💀 Индикатор мёртвых клеток */}
+        {/* 🎯 Индикаторы — справа */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '20px',
         }}>
+          {/* 🗺️ Индикатор регионов */}
           <div style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: showDeadCells ? '#5cb85c' : '#555',
-            boxShadow: showDeadCells ? '0 0 8px #5cb85c' : 'none',
-          }} />
-          <span style={{ fontSize: '13px', color: '#aaa' }}>
-            Мёртвые: <strong style={{ color: showDeadCells ? '#5cb85c' : '#666' }}>
-              {showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}
-            </strong>
-          </span>
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: showRegions ? '#5cb85c' : '#555',
+              boxShadow: showRegions ? '0 0 8px #5cb85c' : 'none',
+            }} />
+            <span style={{ fontSize: '13px', color: '#aaa' }}>
+              Регионы: <strong style={{ color: showRegions ? '#5cb85c' : '#666' }}>
+                {showRegions ? 'ВКЛ' : 'ВЫКЛ'}
+              </strong>
+            </span>
+          </div>
+
+          {/* 💀 Индикатор мёртвых клеток */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: showDeadCells ? '#5cb85c' : '#555',
+              boxShadow: showDeadCells ? '0 0 8px #5cb85c' : 'none',
+            }} />
+            <span style={{ fontSize: '13px', color: '#aaa' }}>
+              Мёртвые: <strong style={{ color: showDeadCells ? '#5cb85c' : '#666' }}>
+                {showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}
+              </strong>
+            </span>
+          </div>
         </div>
       </div>
-    </div>
 
       {/* 📊 ПАНЕЛЬ ИГРОКОВ (Левый верхний угол, под хедером) */}
       {players.length > 0 && (
@@ -156,7 +216,7 @@ const handleBoardClick = (x: number, y: number) => {
         }}>
           {players.map((player, index) => {
             const isActive = currentTurn === index;
-            
+
             return (
               <div
                 key={player.id}
@@ -167,8 +227,8 @@ const handleBoardClick = (x: number, y: number) => {
                   borderRadius: '12px',
                   border: isActive ? `3px solid ${player.color}` : '2px solid rgba(255, 255, 255, 0.1)',
                   overflow: 'hidden',
-                  boxShadow: isActive 
-                    ? `0 0 20px ${player.color}40, 0 8px 32px rgba(0, 0, 0, 0.6)` 
+                  boxShadow: isActive
+                    ? `0 0 20px ${player.color}40, 0 8px 32px rgba(0, 0, 0, 0.6)`
                     : '0 4px 16px rgba(0, 0, 0, 0.4)',
                   backdropFilter: 'blur(8px)',
                   minWidth: '200px',
@@ -176,17 +236,17 @@ const handleBoardClick = (x: number, y: number) => {
                 }}
               >
                 {/* 🌟 Цветная полоска слева */}
-                <div 
-                  style={{ 
-                    width: isActive ? '12px' : '8px', 
+                <div
+                  style={{
+                    width: isActive ? '12px' : '8px',
                     backgroundColor: player.color,
                     flexShrink: 0,
                     transition: 'width 0.3s ease',
-                  }} 
+                  }}
                 />
-                
+
                 {/* Основная информация о игроке */}
-                <div style={{ 
+                <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',  // ✅ Имя слева, статистика справа
                   alignItems: 'center',
@@ -196,50 +256,50 @@ const handleBoardClick = (x: number, y: number) => {
                   transition: 'padding 0.3s ease',
                 }}>
                   {/* 🌟 Левая часть: имя + индикатор хода */}
-                  <div style={{ 
+                  <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                   }}>
-                    <span style={{ 
-                      color: '#fff', 
-                      fontSize: isActive ? '18px' : '16px', 
+                    <span style={{
+                      color: '#fff',
+                      fontSize: isActive ? '18px' : '16px',
                       fontWeight: isActive ? '700' : '500',
                       transition: 'all 0.3s ease',
                     }}>
                       {player.name}
                     </span>
                   </div>
-                  
+
                   {/* 🌟 Правая часть: статистика вертикально */}
-                  <div style={{ 
+                  <div style={{
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '2px',
                     alignItems: 'flex-end',  // ✅ Выравнивание по правому краю
                   }}>
-                    <div style={{ 
+                    <div style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                     }}>
                       <span style={{ fontSize: '14px' }}>🏆</span>
-                      <span style={{ 
-                        color: isActive ? '#fff' : '#aaa', 
+                      <span style={{
+                        color: isActive ? '#fff' : '#aaa',
                         fontSize: '15px',
                         fontWeight: isActive ? '600' : '400',
                       }}>
                         {player.score}
                       </span>
                     </div>
-                    <div style={{ 
+                    <div style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                     }}>
                       <span style={{ fontSize: '14px' }}>🔶</span>
-                      <span style={{ 
-                        color: isActive ? '#fff' : '#aaa', 
+                      <span style={{
+                        color: isActive ? '#fff' : '#aaa',
                         fontSize: '15px',
                         fontWeight: isActive ? '600' : '400',
                       }}>
@@ -255,11 +315,11 @@ const handleBoardClick = (x: number, y: number) => {
       )}
 
       {/* 🗺️ Игровое поле */}
-      <Board 
+      <Board
         onGridClick={handleBoardClick}
         validCells={validCells}
       />
-      
+
 
       {/* 🤲 ПАНЕЛЬ ДЕЙСТВИЙ (Правый нижний угол) — теперь с информацией о колоде и превью тайла */}
       {showPreviewPanel && (
@@ -267,7 +327,7 @@ const handleBoardClick = (x: number, y: number) => {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          width: '300px',                  
+          width: '300px',
           height: '300px',
           background: 'rgba(30, 30, 30, 0.95)',
           border: '2px solid #4a90e2',
@@ -280,10 +340,10 @@ const handleBoardClick = (x: number, y: number) => {
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
           zIndex: 1000,
           backdropFilter: 'blur(8px)'
-          
+
         }}>
           {/* 📦 Информация о колоде*/}
-          <div style={{ 
+          <div style={{
             color: '#fff',
             fontSize: '16px',
             fontWeight: 'bold',
@@ -294,7 +354,7 @@ const handleBoardClick = (x: number, y: number) => {
           }}>
             📦 Колода: {`${deck.length} / ${totalTiles}`}
           </div>
-          
+
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -326,11 +386,13 @@ const handleBoardClick = (x: number, y: number) => {
             {/* 👁️ Примерка тайла*/}
             {previewTile && (
               <>
-                <button onClick={confirmPreview} style={confirmBtnStyle}>
+                <button onClick={confirmPreview} style={confirmBtnStyle} 
+                  title="Подтвердить установку тайла на эту позицию (Enter)">
                   ✅ Подтвердить
                 </button>
 
-                <button onClick={cancelPreview} style={cancelBtnStyle}>
+                <button onClick={cancelPreview} style={cancelBtnStyle}
+                  title="Отменить примерку и вернуть тайл в руку (Z)">
                   ↩️ Вернуться
                 </button>
               </>
@@ -338,25 +400,27 @@ const handleBoardClick = (x: number, y: number) => {
 
             {/* 🔶 Кнопка подтверждения мипла (только в фазе placeMeeple) */}
             {phase === 'placeMeeple' && (
-              <>              
-                <button onClick={confirmMeeple} style={confirmBtnStyle}>
+              <>
+                <button onClick={confirmMeeple} style={confirmBtnStyle}
+                  title="Подтвердить установку и передать очередь следующему игроку (Enter)">
                   ✅ Подтвердить
                 </button>
 
                 {/* 🌟 НОВОЕ: Кнопка отката */}
-                <button onClick={rollbackMove} style={cancelBtnStyle}>
+                <button onClick={rollbackMove} style={cancelBtnStyle}
+                  title="Выбрать другую позицию тайла (Z)">
                   ↩️ Вернуться
                 </button>
               </>
             )}
           </div>
-              {/* 🌟 ПОДСКАЗКА — всегда внизу, фиксированная высота */}
+          {/* 🌟 ПОДСКАЗКА — всегда внизу, фиксированная высота */}
           <div style={{
             color: '#888',
             fontSize: '12px',
             textAlign: 'center',
-            marginTop: 'auto',              
-            height: '40px',                  
+            marginTop: 'auto',
+            height: '40px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -370,7 +434,7 @@ const handleBoardClick = (x: number, y: number) => {
             {previewTile && (
               <>
                 {previewTile.validRotations.length > 1
-                  ? 'Кликни на тайл для поворота'
+                  ? 'Кликни на тайл для поворота (R)'
                   : 'Поворот фиксирован'}
               </>
             )}

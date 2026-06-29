@@ -1,6 +1,5 @@
 // utils/cloneFeatureGeometry.ts
-
-const TILE_SIZE = 100;
+import {TILE_SIZE} from '@/core/constants'
 
 export interface FeatureGeometry {
   tileX: number;

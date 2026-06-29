@@ -6,11 +6,11 @@ import { RegionManager, type FeatureKey } from '@/core/regionManager';
 import { findCompletedRegionsOnTile, calculateRegionPoints, type CompletedRegion } from '@/core/scoring';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
-
+import {ANIMATION_DURATION} from '@/core/constants'
 // 🌟 Длительность анимации одного региона
-const ANIMATION_DURATION = 5000;
+
 // 🌟 Задержка между анимациями
-const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION / 2;
+const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION;
 
 // 🌟 Палитра цветов
 const AVAILABLE_COLORS = [

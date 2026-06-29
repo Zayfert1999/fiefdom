@@ -4,8 +4,8 @@ import { useGameStore } from '@/state/useGameStore';
 import { findDeadCells } from '@/core/tileUtils';
 import { rotateFeatures, getTileSides } from '@/core/tileUtils';
 import type { PlacedTile } from '@/core/types';
+import {TILE_SIZE} from '@/core/constants'
 
-const TILE_SIZE = 100;
 
 interface CellsOverlayProps {
   onGridClick: (x: number, y: number) => void;

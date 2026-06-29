@@ -1,8 +1,7 @@
 // renderer/MeepleLayer.tsx
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
-
-const TILE_SIZE = 100;
+import {TILE_SIZE} from '@/core/constants'
 
 // 🌟 Простая функция затемнения цвета (прямо здесь, без отдельного файла)
 const darken = (hex: string, amount = 0.4): string => {

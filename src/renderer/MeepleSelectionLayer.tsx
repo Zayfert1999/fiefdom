@@ -4,8 +4,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
 import { TILE_DEFINITIONS } from '@/core/tileData';
 import type { TileFeature } from '@/core/types';
-
-const TILE_SIZE = 100;
+import {TILE_SIZE} from '@/core/constants'
 
 /**
  * 🌟 Глобальный слой для спотов размещения миплов.

@@ -6,20 +6,12 @@ import { RegionManager, type FeatureKey } from '@/core/regionManager';
 import { findCompletedRegionsOnTile, calculateRegionPoints, type CompletedRegion } from '@/core/scoring';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
-import {ANIMATION_DURATION} from '@/core/constants'
-// 🌟 Длительность анимации одного региона
+import { ANIMATION_DURATION, AVAILABLE_COLORS } from '@/core/constants'
 
 // 🌟 Задержка между анимациями
 const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION;
 
-// 🌟 Палитра цветов
-const AVAILABLE_COLORS = [
-    '#ff5555', // Красный
-    '#5555ff', // Синий
-    '#55ff55', // Зелёный
-    '#ffff55', // Жёлтый
-    '#ff55ff', // Фиолетовый
-];
+
 
 export interface GameSlice {
     //Лобби
@@ -64,6 +56,7 @@ export interface GameSlice {
 
     // Вспомогательные функции
     processEndTurn: () => void;
+    finishEndTurn: () => void;
     processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
     processEndGameInStore: (nextTurn: number) => void;
     animateRegionCompletion: (region: CompletedRegion, startDelay?: number) => void;
@@ -303,8 +296,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         set({
             board: newBoard,
-            regionManager: state.previewRegionManager, 
-            previewRegionManager: null,                
+            regionManager: state.previewRegionManager,
+            previewRegionManager: null,
             previewTile: null,
             drawnTile: null,
             phase: 'placeMeeple',
@@ -362,9 +355,48 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     processEndTurn: () => {
         console.log("🔄 [Store] Начало обработки фазы 'endTurn'.");
         const state = get();
+
+        let lastTile: PlacedTile | undefined;
+        for (const tile of state.board.values()) lastTile = tile;
+
+        let completedRegions: CompletedRegion[] = [];
+        if (lastTile) {
+            completedRegions = findCompletedRegionsOnTile(state.board, state.regionManager, lastTile);
+        }
+
+        if (completedRegions.length > 0) {
+            get().processCompletedRegionsInStore(completedRegions);
+
+            // ⏱️ Вычисляем максимальное время ожидания:
+            // Последняя анимация: (n-1) * DELAY + ANIMATION_DURATION
+            // + запас на возврат камеры (400ms) + запас на CSS transition (200ms)
+            const lastAnimStart = (completedRegions.length - 1) * DELAY_BETWEEN_ANIMATIONS;
+            const lastAnimEnd = lastAnimStart + ANIMATION_DURATION;
+            const cameraReturnBuffer = 600; // возврат камеры (300ms) + запас
+
+            const maxWaitTime = lastAnimEnd + cameraReturnBuffer;
+
+            console.log(`⏱️ [Store] Передача хода через ${maxWaitTime}мс`);
+            console.log(`   Последняя анимация: старт=${lastAnimStart}мс, конец=${lastAnimEnd}мс`);
+
+            setTimeout(() => {
+                get().finishEndTurn();
+            }, maxWaitTime);
+        } else {
+            // ✅ Нет регионов → сразу передаём ход
+            console.log(`✅ [Store] Нет регионов → немедленная передача хода`);
+            get().finishEndTurn();
+        }
+
+    },
+
+    // ============================================
+    // 🌟 НОВОЕ: Завершение хода
+    // ============================================
+    finishEndTurn: () => {
+        const state = get();
         const nextTurn = (state.currentTurn + 1) % state.players.length;
         const currentPlayer = state.players[state.currentTurn];
-
         let lastTile: PlacedTile | undefined;
         for (const tile of state.board.values()) lastTile = tile;
 
@@ -379,26 +411,22 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             console.log(`🎨 [Store] Подсветка обновлена для игрока ${currentPlayer.name}: (${lastTile.x}, ${lastTile.y})`);
         }
 
-        let completedRegions: CompletedRegion[] = [];
-        if (lastTile) {
-            completedRegions = findCompletedRegionsOnTile(state.board, state.regionManager, lastTile);
-        }
+        console.log(`🏁 [Store] Передача хода: ${state.currentTurn} → ${nextTurn}`);
 
-        if (completedRegions.length > 0) {
-            get().processCompletedRegionsInStore(completedRegions);
-        }
-
+        // Проверка конца игры
         if (state.deck.length === 0) {
             console.log('🏁 [Store] Колода пуста! Переход к концу игры.');
             get().processEndGameInStore(nextTurn);
-        } else {
-            set({
-                currentTurn: nextTurn,
-                drawnTile: null,
-                phase: 'startTurn',
-                lastPlacedTiles: newLastPlacedTiles
-            });
+            return;
         }
+
+        // 🌟 Передаём ход следующему игроку
+        set({
+            currentTurn: nextTurn,
+            drawnTile: null,
+            phase: 'startTurn',
+            lastPlacedTiles: newLastPlacedTiles
+        });
     },
 
     // ============================================

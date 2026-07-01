@@ -11,7 +11,7 @@ import { useHotkeys } from '@/hooks/useHotkeys';
 
 export default function App() {
   const {
-    players, currentTurn, drawnTile, deck, phase,
+    players, currentTurn, drawnTile, deck, phase, board,
     drawTile, totalTiles,
     showRegions, showDeadCells,
     previewTile, startPreview, confirmPreview, cancelPreview, rollbackMove,
@@ -19,7 +19,6 @@ export default function App() {
 
   } = useGameStore();
 
-  const board = useGameStore(s => s.board);
 
   // АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
   useEffect(() => {
@@ -35,13 +34,15 @@ export default function App() {
   // ============================================
   // 🔶 Регистрация горячих клавиш
   // ============================================
+  const isGameLocked = phase === 'endTurn';
+
   useHotkeys([
     // R — поворот preview
     {
       key: 'r',
       action: () => useGameStore.getState().rotatePreview(),
       description: 'Повернуть тайл',
-      enabled: phase === 'placeTile' && previewTile !== null,
+      enabled: !isGameLocked && phase === 'placeTile' && previewTile !== null,
     },
 
     // Enter / Space — подтвердить
@@ -56,7 +57,7 @@ export default function App() {
         }
       },
       description: 'Подтвердить',
-      enabled: (phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
+      enabled: (!isGameLocked && phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
     },
     {
       key: ' ',
@@ -69,7 +70,7 @@ export default function App() {
         }
       },
       description: 'Подтвердить',
-      enabled: (phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
+      enabled: (!isGameLocked && phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
     },
 
     // 'z' — отмена
@@ -86,7 +87,7 @@ export default function App() {
         }
       },
       description: 'Отменить / Откатить',
-      enabled: (phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
+      enabled: (!isGameLocked && phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
     },
     
   ]);
@@ -363,6 +364,9 @@ export default function App() {
             width: '100%',
             height: '100%',
             justifyContent: 'center',
+            opacity: isGameLocked ? 0.5 : 1,  // 🌟
+            pointerEvents: isGameLocked ? 'none' : 'auto',  // 🌟
+            transition: 'opacity 0.3s',
           }}>
             {/* 🎴 Тайл в руке (без preview) */}
             {phase === 'placeTile' && drawnTile && !previewTile && (

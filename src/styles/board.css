@@ -1,0 +1,31 @@
+/* ============================================
+   🎨 БАЗОВЫЕ СТИЛИ ДОСКИ
+   ============================================ */
+
+/* SVG-контейнер доски */
+.board-svg {
+  width: 100vw;
+  height: 100vh;
+  background: #1a1a1a;
+  user-select: none;
+  display: block;
+  cursor: grab;
+}
+
+/* Курсор при перетаскивании */
+.board-svg.dragging {
+  cursor: grabbing;
+}
+
+/* Сетка */
+.grid-line {
+  stroke: #2a2a2a;
+  stroke-width: 1;
+}
+
+/* Осевые линии */
+.axis-line {
+  stroke: #444;
+  stroke-width: 2;
+}
+

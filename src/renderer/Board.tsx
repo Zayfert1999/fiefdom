@@ -1,15 +1,14 @@
 // renderer/Board.tsx
-import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from './Tile';
-import { rotateFeatures } from '@/core/tileUtils';
 import { RegionOverlay } from './RegionOverlay';
 import { MeepleSelectionLayer } from './MeepleSelectionLayer';
 import { MeepleLayer } from './MeepleLayer';
 import { CompletionOverlay } from './CompletionOverlay';
 import { CellsOverlay } from './CellsOverlay';
-
-const TILE_SIZE = 100;
+import { useBoardCamera } from '@/hooks/useBoardCamera';
+import { useRegionPatterns } from '@/hooks/useRegionPatterns';
+import { TILE_SIZE, WORLD_BOUNDS } from '@/core/constants'
 
 type BoardProps = {
   onGridClick: (x: number, y: number) => void;
@@ -18,56 +17,35 @@ type BoardProps = {
 
 export const Board = ({ onGridClick, validCells }: BoardProps) => {
   const board = useGameStore(s => s.board);
-  const regionManager = useGameStore(s => s.regionManager);
-  const players = useGameStore(s => s.players);
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
-
-  // 🌟 НОВОЕ: состояние примерки
   const previewTile = useGameStore(s => s.previewTile);
   const previewRegionManager = useGameStore(s => s.previewRegionManager);
   const rotatePreview = useGameStore(s => s.rotatePreview);
+  const lastPlacedTiles = useGameStore(s => s.lastPlacedTiles);
+  const phase = useGameStore(s => s.phase);
+    
 
-  // 🌟 ДИНАМИЧЕСКИЙ VIEWBOX
-  const viewBox = useMemo(() => {
-    if (board.size === 0) return '-150 -150 300 300';
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
+  /* ============================================
+  * 📷 КАМЕРА
+  * ============================================ */
+  const {
+    camera,
+    transform,
+    svgRef,
+  
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    screenToWorld,
+  } = useBoardCamera();
 
-    for (const tile of board.values()) {
-      if (tile.x < minX) minX = tile.x;
-      if (tile.x > maxX) maxX = tile.x;
-      if (tile.y < minY) minY = tile.y;
-      if (tile.y > maxY) maxY = tile.y;
-    }
 
-    // 🌟 Учитываем previewTile в границах
-    if (previewTile) {
-      if (previewTile.x < minX) minX = previewTile.x;
-      if (previewTile.x > maxX) maxX = previewTile.x;
-      if (previewTile.y < minY) minY = previewTile.y;
-      if (previewTile.y > maxY) maxY = previewTile.y;
-    }
-
-    const padding = 2;
-    const x = (minX - padding) * TILE_SIZE;
-    const y = (minY - padding) * TILE_SIZE;
-    const width = (maxX - minX + 1 + padding * 2) * TILE_SIZE;
-    const height = (maxY - minY + 1 + padding * 2) * TILE_SIZE;
-
-    return `${x} ${y} ${width} ${height}`;
-  }, [board, previewTile]);
-
+  // ============================================
+  // 🖱️ Обработчики кликов
+  // ============================================
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return;
-    const svgPoint = svg.createSVGPoint();
-    svgPoint.x = e.clientX;
-    svgPoint.y = e.clientY;
-    const pointInViewBox = svgPoint.matrixTransform(ctm.inverse());
-    const gridX = Math.floor(pointInViewBox.x / TILE_SIZE);
-    const gridY = Math.floor(pointInViewBox.y / TILE_SIZE);
+    const { x: gridX, y: gridY } = screenToWorld(e.clientX, e.clientY);
     onGridClick(gridX, gridY);
   };
 
@@ -75,98 +53,45 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     if (e.ctrlKey || e.metaKey) {
       e.stopPropagation();
       setDebugSelectedTile({ x, y });
-      console.log(`🐛 [Board] Вызван дебаг для тайла (${x}, ${y})`);
+      console.log(`🐛 [Board] Дебаг для тайла (${x}, ${y})`);
     }
   };
 
   const handleSvgMainClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (e.ctrlKey || e.metaKey) {
       e.stopPropagation();
-      const svg = e.currentTarget;
-      const ctm = svg.getScreenCTM();
-      if (!ctm) return;
-      const svgPoint = svg.createSVGPoint();
-      svgPoint.x = e.clientX;
-      svgPoint.y = e.clientY;
-      const pointInViewBox = svgPoint.matrixTransform(ctm.inverse());
-      const gridX = Math.floor(pointInViewBox.x / TILE_SIZE);
-      const gridY = Math.floor(pointInViewBox.y / TILE_SIZE);
+      const { x: gridX, y: gridY } = screenToWorld(e.clientX, e.clientY);
       setDebugSelectedTile({ x: gridX, y: gridY });
-      console.log(`🐛 [Board] Вызван дебаг для тайла (${gridX}, ${gridY}) по клику на SVG.`);
     } else {
       handleSvgClick(e);
     }
   };
-  // Получаем lastPlacedTiles из store
-  const lastPlacedTiles = useGameStore(s => s.lastPlacedTiles);
 
-  // 🌟 НОВОЕ: обработчик клика на preview-тайл (поворот)
   const handlePreviewClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     console.log(`🔄 [Board] Клик на preview-тайл → поворот`);
     rotatePreview();
   };
 
-  // 🌟 Собираем уникальные комбинации цветов для глобальных паттернов
-  const uniqueColorCombinations = useMemo(() => {
-    const combinations = new Set<string>();
-
-    // 🌟 Вспомогательная функция: обработка одной фичи
-    const processFeature = (
-      x: number,
-      y: number,
-      featureId: string,
-      rm: typeof regionManager
-    ) => {
-      const featureKey = `${x},${y}:${featureId}`;
-      const owners = rm.getFeatureOwners(featureKey);
-
-      if (owners.length > 0) {
-        const meta = rm.getMetadata(featureKey);
-        if (!meta) return;
-
-        const maxCount = Math.max(...owners.map(id => meta.meepleCounts.get(id) || 0));
-        const dominantOwners = owners.filter(id => (meta.meepleCounts.get(id) || 0) === maxCount);
-
-        if (dominantOwners.length === 1) {
-          const player = players.find(p => p.id === dominantOwners[0]);
-          if (player) combinations.add(player.color);
-        } else {
-          const colors = dominantOwners
-            .map(id => players.find(p => p.id === id)?.color || '#ffffff')
-            .sort()
-            .join('|');
-          combinations.add(colors);
-        }
-      }
-    };
-
-    // 🌟 Используем previewRegionManager если есть (он содержит объединённые регионы)
-    const activeRM = previewRegionManager || regionManager;
-
-    // 🌟 ШАГ 1: Обычные тайлы из board
-    for (const tile of board.values()) {
-      for (const feature of tile.features) {
-        processFeature(tile.x, tile.y, feature.id, activeRM);
-      }
-    }
-
-    // 🌟 ШАГ 2: Preview-тайл (если есть)
-    if (previewTile && previewRegionManager) {
-      const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
-      for (const feature of rotatedFeatures) {
-        processFeature(previewTile.x, previewTile.y, feature.id, previewRegionManager);
-      }
-    }
-
-    return Array.from(combinations);
-  }, [board, regionManager, previewRegionManager, previewTile, players]);
+ const uniqueColorCombinations = useRegionPatterns();
+ const isBoardLocked = phase === 'endTurn';
 
   return (
     <svg
-      viewBox={viewBox}
+      ref={svgRef}
+      width="100vw"
+      height="100vh"
       onClick={handleSvgMainClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       className="board-svg"
+      style={{
+        cursor: camera.isDragging ? 'grabbing' : 'default',
+        userSelect: 'none',
+        pointerEvents: isBoardLocked ? 'none' : 'auto',
+      }}
     >
       <defs>
         <pattern id="grid" width={TILE_SIZE} height={TILE_SIZE} patternUnits="userSpaceOnUse">
@@ -180,8 +105,6 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
           const patternWidth = segmentWidth * 2 * colors.length;
           const patternId = `hatch-${combo.replace(/#/g, '').replace(/\|/g, '-')}`;
 
-          // 🌟 Константа скорости: 10px в секунду
-          // Чем шире паттерн, тем дольше анимация → визуально одинаковая скорость
           const SPEED_PX_PER_SEC = 1;
           const duration = patternWidth / SPEED_PX_PER_SEC;
 
@@ -204,8 +127,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
                   fill={color}
                 />
               ))}
-              
-              {/* 🌟 АНИМАЦИЯ: длительность пропорциональна ширине паттерна */}
+
               <animate
                 attributeName="x"
                 from="0"
@@ -218,109 +140,134 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
         })}
       </defs>
 
-      {/* Фон */}
-      <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#grid)" pointerEvents="none" />
-      <line x1="-10000" y1="0" x2="10000" y2="0" className="axis-line" pointerEvents="none" />
-      <line x1="0" y1="-10000" x2="0" y2="10000" className="axis-line" pointerEvents="none" />
-      
-      {/* 🟢💀 СЛОЙ 1: СЛОЙ КЛЕТОК (ВАЛИДНЫЕ И МЕРТВЫЕ) */}
-      <CellsOverlay onGridClick={onGridClick} validCells={validCells} />
+      {/* 🌟 ГРУППА С КАМЕРОЙ — всё содержимое доски */}
+      <g
+        className={`board-camera-group ${camera.isDragging ? 'dragging' : ''}`}
+        transform={transform}
+      >
+        {/* СЛОЙ 0: ФОН */}
+        <rect
+          x={WORLD_BOUNDS.minX * TILE_SIZE}
+          y={WORLD_BOUNDS.minY * TILE_SIZE}
+          width={(WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX + 1) * TILE_SIZE}
+          height={(WORLD_BOUNDS.maxY - WORLD_BOUNDS.minY + 1) * TILE_SIZE}
+          fill="url(#grid)"
+          stroke="#ff0000"
+          strokeWidth="4"
+          strokeDasharray="20 10"
+          strokeOpacity="0.3"
+          pointerEvents="none"
+        />
+        <line 
+          x1={WORLD_BOUNDS.minX * TILE_SIZE}
+          y1="0" 
+          x2={(WORLD_BOUNDS.maxX + 1)  * TILE_SIZE}
+          y2="0" 
+          className="axis-line" 
+          pointerEvents="none" 
+        />
+        <line 
+          x1="0" 
+          y1={WORLD_BOUNDS.minY * TILE_SIZE}
+          x2="0" 
+          y2={(WORLD_BOUNDS.maxY + 1) * TILE_SIZE}
+          className="axis-line" 
+          pointerEvents="none" 
+        />
 
-      {/* 🎨 СЛОЙ 2: ТАЙЛЫ (только графика) */}
-      {Array.from(board.values()).map((t) => {
-        const key = `${t.x},${t.y}`;
-        const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
+        {/* 🟢💀 СЛОЙ 1: СЛОЙ КЛЕТОК (ВАЛИДНЫЕ И МЕРТВЫЕ) */}
+        <CellsOverlay onGridClick={onGridClick} validCells={validCells} />
 
-        return (
+        {/* 🎨 СЛОЙ 2: ТАЙЛЫ (только графика) */}
+        {Array.from(board.values()).map((t) => {
+          const key = `${t.x},${t.y}`;
+          const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
+
+          return (
+            <g
+              key={key}
+              transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE})`}
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y);
+              }}
+              style={{ cursor: 'pointer', overflow: 'visible' }}
+            >
+              {isDebugSelected && (
+                <rect className="debug-selected" x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} />
+              )}
+
+              <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
+                <Tile
+                  id={t.templateId as any}
+                  size={TILE_SIZE}
+                />
+              </g>
+            </g>
+          );
+        })}
+
+        {/* 🌟 СЛОЙ 3: ПРИМЕРКА ТАЙЛА */}
+        {previewTile && (
           <g
-            key={key}
-            transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE})`}
-            onClick={(e) => {
-              if (e.ctrlKey || e.metaKey) handleDebugClick(e, t.x, t.y);
-            }}
+            className="preview-tile"
+            transform={`translate(${previewTile.x * TILE_SIZE}, ${previewTile.y * TILE_SIZE})`}
+            onClick={handlePreviewClick}
             style={{ cursor: 'pointer', overflow: 'visible' }}
           >
-            {isDebugSelected && (
-              <rect className="debug-selected" x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} />
-            )}
-
-            <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
-              {/* 🌟 Tile принимает только id и size — миплы и споты в отдельных слоях */}
+            <g transform={`rotate(${previewTile.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
               <Tile
-                id={t.templateId as any}
+                id={previewTile.tile.id as any}
                 size={TILE_SIZE}
               />
             </g>
-          </g>
-        );
-      })}
 
-      {/* 🌟 СЛОЙ 3: ПРИМЕРКА ТАЙЛА */}
-      {previewTile && (
-        <g
-          className="preview-tile"
-          transform={`translate(${previewTile.x * TILE_SIZE}, ${previewTile.y * TILE_SIZE})`}
-          onClick={handlePreviewClick}
-          style={{ cursor: 'pointer', overflow: 'visible' }}
-        >
-          {/* Поворот содержимого */}
-          <g transform={`rotate(${previewTile.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
-            <Tile
-              id={previewTile.tile.id as any}
-              size={TILE_SIZE}
+            <rect
+              className="preview-tile-overlay"
+              x={0}
+              y={0}
+              width={TILE_SIZE}
+              height={TILE_SIZE}
             />
           </g>
-          
-          {/* Полупрозрачный оверлей с пунктирной рамкой */}
-          <rect
-            className="preview-tile-overlay"
-            x={0}
-            y={0}
-            width={TILE_SIZE}
-            height={TILE_SIZE}
-          />
-        </g>
-      )}
+        )}
 
-      {/* 🎨 СЛОЙ 4: ПОДСВЕТКА РЕГИОНОВ */}
-      <RegionOverlay regionManagerOverride={previewRegionManager || undefined} />
-      <CompletionOverlay />
+        {/* 🎨 СЛОЙ 4: ПОДСВЕТКА РЕГИОНОВ */}
+        <RegionOverlay regionManagerOverride={previewRegionManager || undefined} />
+        <CompletionOverlay />
 
-      {/* 🌟 СЛОЙ 5 — ПОДСВЕТКА ПОСЛЕДНИХ ТАЙЛОВ ВСЕХ ИГРОКОВ */}
-      {Array.from(lastPlacedTiles.entries()).map(([playerId, tile]) => (
-        <g
-          key={`last-${playerId}`}
-          className="last-placed-tile"
-          transform={`translate(${tile.x * TILE_SIZE}, ${tile.y * TILE_SIZE})`}
-          pointerEvents="none"
-        >
+        {/* 🌟 СЛОЙ 5 — ПОДСВЕТКА ПОСЛЕДНИХ ТАЙЛОВ ВСЕХ ИГРОКОВ */}
+        {Array.from(lastPlacedTiles.entries()).map(([playerId, tile]) => (
+          <g
+            key={`last-${playerId}`}
+            className="last-placed-tile"
+            transform={`translate(${tile.x * TILE_SIZE}, ${tile.y * TILE_SIZE})`}
+            pointerEvents="none"
+          >
+            <rect
+              className="last-placed-tile-glow"
+              x={4}
+              y={4}
+              width={TILE_SIZE - 8}
+              height={TILE_SIZE - 8}
+              style={{ stroke: tile.color }}
+            />
+            <rect
+              className="last-placed-tile-border"
+              x={1.5}
+              y={1.5}
+              width={TILE_SIZE - 3}
+              height={TILE_SIZE - 3}
+              style={{ stroke: tile.color }}
+            />
+          </g>
+        ))}
 
-          {/* 🌟 Слой внутреннего свечения (размытый, широкий) */}
-          <rect
-            className="last-placed-tile-glow"
-            x={4}
-            y={4}
-            width={TILE_SIZE - 8}
-            height={TILE_SIZE - 8}
-            style={{ stroke: tile.color }}
-          />
-          {/* Рамка цвета игрока */}
-          <rect
-            className="last-placed-tile-border"
-            x={1.5}
-            y={1.5}
-            width={TILE_SIZE - 3}
-            height={TILE_SIZE - 3}
-            style={{ stroke: tile.color }}
-          />
-        </g>
-      ))}
+        {/* 🎨 СЛОЙ 6: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ */}
+        <MeepleSelectionLayer />
 
-      {/* 🎨 СЛОЙ 6: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ */}
-      <MeepleSelectionLayer />
-
-      {/* 🎨 СЛОЙ 7: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
-      <MeepleLayer />
+        {/* 🎨 СЛОЙ 7: РАЗМЕЩЁННЫЕ МИПЛЫ ПОВЕРХ ВСЕГО */}
+        <MeepleLayer />
+      </g>
     </svg>
   );
 };

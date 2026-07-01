@@ -1,0 +1,5 @@
+/* 2. Базовые стили */
+@import './styles/board.css';
+@import './styles/camera.css';
+
+@import './styles/game.css';

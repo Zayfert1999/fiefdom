@@ -1,0 +1,49 @@
+/* ============================================
+   🎨 ПОДСВЕТКА РЕГИОНОВ
+   ============================================ */
+
+/* 🌟 Контейнер подсветки */
+.region-overlay {
+  pointer-events: none;
+}
+
+/* 🌟 Прямоугольник с паттерном — базовое состояние (невидим) */
+.region-fill {
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+}
+
+/* 🌟 Активное состояние — плавно появляется */
+.region-overlay.active .region-fill {
+  opacity: 0.7;
+}
+
+/* ============================================
+   ✨ COMPLETION OVERLAY — подсветка завершённых регионов
+   ============================================ */
+
+/* 🌟 Контейнер обводки — не перехватывает клики */
+.completion-overlay {
+  pointer-events: none;
+}
+
+/* 🌟 Группа с пульсацией */
+.completion-highlight {
+  animation: completion-pulse 1s ease-in-out infinite;
+}
+
+/* 🌟 Сам rect обводки */
+.completion-rect {
+  fill: #FFD700;
+  filter: drop-shadow(0 0 16px #FFD700);
+}
+
+/* 🌟 Пульсация: от полной непрозрачности к полупрозрачной */
+@keyframes completion-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

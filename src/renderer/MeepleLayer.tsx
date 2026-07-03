@@ -19,6 +19,7 @@ const darken = (hex: string, amount = 0.4): string => {
 export const MeepleLayer = () => {
   const board = useGameStore(s => s.board);
   const removePlacedMeeple = useGameStore(s => s.removePlacedMeeple);
+  const currentPlayer = useGameStore(s => s.players[s.currentTurn]);
 
   return (
     <g className="meeple-layer" style={{ overflow: 'visible' }}>
@@ -80,7 +81,7 @@ export const MeepleLayer = () => {
                 <g 
                     className="points-popup" 
                     transform={`translate(${t.meeple.x}, ${t.meeple.y}) rotate(${-t.rotation}, 0, 0)`}
-                    style={{ overflow: 'visible' }}
+                    style={{ '--player-color': currentPlayer?.color, overflow: 'visible' } as React.CSSProperties}
                 >
                     <text
                     x="0"

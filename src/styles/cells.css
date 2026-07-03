@@ -1,0 +1,101 @@
+/* Контейнер оверлея */
+.cells-overlay {
+  pointer-events: none;
+}
+
+/* ============================================
+   🟢 ВАЛИДНЫЕ КЛЕТКИ
+   ============================================ */
+
+/* Контейнер валидной клетки */
+.valid-cell-container {
+  cursor: pointer;
+}
+
+.valid-cell {
+  fill: rgba(255, 255, 255, 0.15);
+  stroke: white;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  stroke-opacity: 0.6;
+}
+
+/* Крестик "+" в центре валидной клетки */
+.valid-cell-plus {
+  stroke: white;
+  stroke-width: 3;
+  stroke-linecap: round;
+  pointer-events: none;
+  opacity: 0.9;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease-in-out;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* 🌟 HOVER-ЭФФЕКТЫ */
+.valid-cell-container:hover .valid-cell {
+  fill: rgba(255, 255, 255, 0.3);
+  stroke: white;
+  stroke-width: 3;
+}
+
+.valid-cell-container:hover .valid-cell-plus {
+  stroke-width: 4;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+  transform: scale(1.2);
+}
+
+/* ============================================
+   🟡 КОНФЛИКТНЫЕ КЛЕТКИ
+   ============================================ */
+
+/* Контейнер конфликтной клетки */
+.conflicted-cell-container {
+  cursor: pointer;
+}
+
+.conflicted-cell-container:hover .valid-cell{
+  fill: rgba(255, 255, 255, 0.3);
+  stroke: white;
+  stroke-width: 3;
+}
+
+.conflicted-cell-container:hover .dead-cell-cross{
+  stroke: white;
+  stroke-width: 4;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+  transform: scale(1.2) rotate(90deg);
+}
+
+/* ============================================
+   💀 МЁРТВЫЕ КЛЕТКИ
+   ============================================ */
+
+/* Контейнер мёртвой клетки */
+.dead-cell-container {
+  pointer-events: none;
+}
+
+/* 🌟 Пунктирная красная рамка */
+.dead-cell {
+  fill: rgba(231, 76, 60, 0.15);
+  stroke: #e74c3c;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  stroke-opacity: 0.6;
+}
+
+/* 🌟 Крестик в центре */
+.dead-cell-cross {
+  stroke: #e74c3c;
+  stroke-width: 3;
+  stroke-linecap: round;
+  pointer-events: none;
+  opacity: 0.9;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease-in-out;
+  transform-origin: center;
+  transform-box: fill-box;
+  transform: rotate(45deg);
+}

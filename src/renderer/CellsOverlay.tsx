@@ -204,7 +204,7 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
           <g
             key={`valid-${key}`}
             className="valid-cell-container"
-            style={{ pointerEvents: 'auto' }}  // 🌟 Разрешаем клики
+            style={{ pointerEvents: 'auto' }}
             onClick={(e) => {
               e.stopPropagation();
               onGridClick(x, y);

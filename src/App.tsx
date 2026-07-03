@@ -334,10 +334,16 @@ export default function App() {
                       gap: '6px',
                     }}>
                       <span style={{ fontSize: '14px' }}>🏆</span>
-                      <span style={{
-                        color: isActive ? '#fff' : '#aaa',
-                        fontSize: '15px',
-                        fontWeight: isActive ? '600' : '400',
+                      <span 
+                        key={player.score}
+                        className="player-score-pop"
+                        style={{
+                          color: isActive ? '#fff' : '#aaa',
+                          fontSize: '15px',
+                          fontWeight: isActive ? '600' : '400',
+                          display: 'inline-block',  // 🌟 ВАЖНО для transform
+                          minWidth: '16px',         // 🌟 Фиксированная ширина, чтобы не прыгала раскладка
+                          textAlign: 'center',
                       }}>
                         {player.score}
                       </span>
@@ -348,10 +354,16 @@ export default function App() {
                       gap: '6px',
                     }}>
                       <span style={{ fontSize: '14px' }}>🔶</span>
-                      <span style={{
-                        color: isActive ? '#fff' : '#aaa',
-                        fontSize: '15px',
-                        fontWeight: isActive ? '600' : '400',
+                      <span 
+                        key={player.meepleCount}
+                        className="meeple-count-pop"
+                        style={{
+                          color: isActive ? '#fff' : '#aaa',
+                          fontSize: '15px',
+                          fontWeight: isActive ? '600' : '400',
+                          display: 'inline-block',  // 🌟 ВАЖНО для transform
+                          minWidth: '16px',         // 🌟 Фиксированная ширина, чтобы не прыгала раскладка
+                          textAlign: 'center',
                       }}>
                         {player.meepleCount}
                       </span>

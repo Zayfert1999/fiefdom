@@ -5,6 +5,7 @@ import { useCamera } from './useCamera';
 import { useHotkeys } from './useHotkeys';
 import { CAMERA_CONFIG} from '@/core/constants';
 import type { CompletedRegion } from '@/core/scoring';
+import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 
 // 🌟 Хелпер: геометрический центр региона
 const getRegionCenter = (region: CompletedRegion): { x: number; y: number } => {
@@ -161,19 +162,18 @@ export const useBoardCamera = () => {
   const isGameLocked = phase === 'endTurn';
   
   useHotkeys([
-    { key: '+', action: zoomIn, description: 'Приблизить камеру', enabled: !isGameLocked },
-    { key: '=', action: zoomIn, description: 'Приблизить камеру', enabled: !isGameLocked },
-    { key: '-', action: zoomOut, description: 'Отдалить камеру', enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.ZOOM_IN, action: zoomIn, enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.ZOOM_IN_ALT, action: zoomIn, enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.ZOOM_OUT,  action: zoomOut, enabled: !isGameLocked },
     {
-      key: '0',
+      ...HOTKEY_DEFINITIONS.RESET_CAMERA, 
       action: () => resetAndCenter(board),
-      description: 'Сбросить камеру и центрировать',
       enabled: !isGameLocked
     },
-    { key: 'ArrowUp', action: () => pan(0, 100), description: 'Камера вверх', enabled: !isGameLocked },
-    { key: 'ArrowDown', action: () => pan(0, -100), description: 'Камера вниз', enabled: !isGameLocked },
-    { key: 'ArrowLeft', action: () => pan(100, 0), description: 'Камера влево', enabled: !isGameLocked },
-    { key: 'ArrowRight', action: () => pan(-100, 0), description: 'Камера вправо', enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.PAN_UP, action: () => pan(0, 100), enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.PAN_DOWN,  action: () => pan(0, -100), enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.PAN_LEFT, action: () => pan(100, 0), enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.PAN_RIGHT, action: () => pan(-100, 0), enabled: !isGameLocked },
   ]);
 
   // ============================================

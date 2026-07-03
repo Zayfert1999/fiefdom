@@ -7,7 +7,10 @@ import { Tile } from '@/renderer/Tile';
 import { DebugPanel } from '@/renderer/DebugPanel';
 import { GameOverScreen } from '@/renderer/GameOverScreen';
 import { getValidPlacementCells } from '@/core/tileUtils';
+import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
+import { HotkeysModal } from '@/components/hotKeysModal';
+import { useHotkeysModal } from '@/hooks/useHotkeysModal';
 
 export default function App() {
   const {
@@ -19,6 +22,7 @@ export default function App() {
 
   } = useGameStore();
 
+  const hotkeysModal = useHotkeysModal();
 
   // АВТОВЫДАЧА ТАЙЛА: при входе в фазу 'startTurn' автоматически берём тайл
   useEffect(() => {
@@ -37,17 +41,13 @@ export default function App() {
   const isGameLocked = phase === 'endTurn';
 
   useHotkeys([
-    // R — поворот preview
     {
-      key: 'r',
+      ...HOTKEY_DEFINITIONS.ROTATE_TILE,
       action: () => useGameStore.getState().rotatePreview(),
-      description: 'Повернуть тайл',
       enabled: !isGameLocked && phase === 'placeTile' && previewTile !== null,
     },
-
-    // Enter / Space — подтвердить
     {
-      key: 'Enter',
+      ...HOTKEY_DEFINITIONS.CONFIRM,
       action: () => {
         const state = useGameStore.getState();
         if (state.phase === 'placeTile' && state.previewTile) {
@@ -56,11 +56,10 @@ export default function App() {
           state.confirmMeeple();
         }
       },
-      description: 'Подтвердить',
       enabled: (!isGameLocked && phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
     },
     {
-      key: ' ',
+      ...HOTKEY_DEFINITIONS.CONFIRM_ALT,
       action: () => {
         const state = useGameStore.getState();
         if (state.phase === 'placeTile' && state.previewTile) {
@@ -69,13 +68,10 @@ export default function App() {
           state.confirmMeeple();
         }
       },
-      description: 'Подтвердить',
       enabled: (!isGameLocked && phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
     },
-
-    // 'z' — отмена
     {
-      key: 'z',
+      ...HOTKEY_DEFINITIONS.CANCEL,
       action: () => {
         const state = useGameStore.getState();
         if (state.phase === 'placeTile' && state.previewTile) {
@@ -86,10 +82,12 @@ export default function App() {
           state.rollbackMove();
         }
       },
-      description: 'Отменить / Откатить',
       enabled: (!isGameLocked && phase === 'placeTile' && previewTile !== null) || phase === 'placeMeeple',
     },
-    
+    {
+      ...HOTKEY_DEFINITIONS.SHOW_HOTKEYS,
+      action: hotkeysModal.toggle,
+    },
   ]);
 
   // 🟢 Расчёт валидных клеток
@@ -201,8 +199,59 @@ export default function App() {
               </strong>
             </span>
           </div>
+
+          {/* 🌟 НОВОЕ: Разделитель */}
+          <div style={{
+            width: '1px',
+            height: '20px',
+            background: '#444',
+          }} />
+
+          {/* ❓ Кнопка подсказки по хоткеям */}
+          <button
+            onClick={hotkeysModal.open}
+            title="Горячие клавиши (F1)"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '1px solid #444',
+              background: '#2a2a2a',
+              color: '#aaa',
+              fontSize: '16px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              padding: 0,
+              lineHeight: 1,
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#4a90e2';
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.borderColor = '#4a90e2';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#2a2a2a';
+              e.currentTarget.style.color = '#aaa';
+              e.currentTarget.style.borderColor = '#444';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            ?
+          </button>
         </div>
       </div>
+
+      {/* 🌟 НОВОЕ: Модальное окно хоткеев */}
+      <HotkeysModal
+        isOpen={hotkeysModal.isOpen}
+        onClose={hotkeysModal.close}
+      />
 
       {/* 📊 ПАНЕЛЬ ИГРОКОВ (Левый верхний угол, под хедером) */}
       {players.length > 0 && (

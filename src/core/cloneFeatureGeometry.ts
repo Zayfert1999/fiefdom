@@ -1,5 +1,5 @@
 // utils/cloneFeatureGeometry.ts
-import {TILE_SIZE} from '@/core/constants'
+import { TILE_SIZE } from '@/core/constants';
 
 export interface FeatureGeometry {
   tileX: number;
@@ -9,48 +9,30 @@ export interface FeatureGeometry {
 }
 
 /**
- * 🌟 Клонирует геометрию SVG-элемента фичи в указанный clipPath.
- * Используется в RegionOverlay и CompletionOverlay.
+ * 🌟 Клонирует ТОЛЬКО геометрию SVG-элементов фич.
+ * Стили применяются через CSS на родителе или через CSS-классы.
  * 
- * @param clipPathEl Элемент <clipPath>, в который клонируется геометрия
+ * @param containerEl Контейнер для клонированных элементов
  * @param features Массив фич с координатами и ID
- * @param options Настройки клонирования
  */
 export function cloneFeatureGeometry(
-  clipPathEl: SVGClipPathElement,
-  features: FeatureGeometry[],
-  options: {
-    fill?: string;        // Цвет заливки (по умолчанию 'white')
-    stroke?: string;      // Цвет обводки (по умолчанию 'none')
-    strokeWidth?: number; // Толщина обводки (по умолчанию 0)
-    keepFill?: boolean;   // Сохранить исходный fill (по умолчанию false)
-    keepStroke?: boolean; // Сохранить исходный stroke (по умолчанию false)
-  } = {}
+  containerEl: SVGClipPathElement | SVGGElement,
+  features: FeatureGeometry[]
 ): { cloned: number; failed: number } {
-  const {
-    fill = 'white',
-    stroke = 'none',
-    strokeWidth = 0,
-    keepFill = false,
-    keepStroke = false,
-  } = options;
-
-  clipPathEl.innerHTML = '';
+  containerEl.innerHTML = '';
   let cloned = 0;
   let failed = 0;
 
   for (const { tileX, tileY, rotation, featureId } of features) {
-    // 🌟 Ищем тайл в DOM по transform
     const tileSelector = `g[transform*="translate(${tileX * TILE_SIZE}, ${tileY * TILE_SIZE})"]`;
     const tileEl = document.querySelector(tileSelector);
-    
+
     if (!tileEl) {
       console.warn(`⚠️ [Clone] Тайл не найден: (${tileX}, ${tileY})`);
       failed++;
       continue;
     }
 
-    // 🌟 Ищем фичу по data-name
     const featureEl = tileEl.querySelector(`[data-name="${featureId}"]`);
     if (!featureEl) {
       console.warn(`⚠️ [Clone] Фича не найдена: [data-name="${featureId}"] в тайле (${tileX}, ${tileY})`);
@@ -60,19 +42,11 @@ export function cloneFeatureGeometry(
 
     const clone = featureEl.cloneNode(true) as SVGElement;
 
-    // 🌟 Оставляем только геометрические атрибуты + опционально fill/stroke
+    // 🌟 Оставляем ТОЛЬКО геометрические атрибуты
     const allowedAttrs = new Set([
       'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'points',
       'x1', 'y1', 'x2', 'y2',
     ]);
-    
-    if (keepFill) allowedAttrs.add('fill');
-    if (keepStroke) {
-      allowedAttrs.add('stroke');
-      allowedAttrs.add('stroke-width');
-      allowedAttrs.add('stroke-linecap');
-      allowedAttrs.add('stroke-linejoin');
-    }
 
     const attrsToRemove: string[] = [];
     for (const attr of Array.from(clone.attributes)) {
@@ -84,34 +58,19 @@ export function cloneFeatureGeometry(
       clone.removeAttribute(attr);
     }
 
-    // 🌟 Применяем стили из options
-    if (!keepFill) clone.setAttribute('fill', fill);
-    if (!keepStroke) {
-      clone.setAttribute('stroke', stroke);
-      if (strokeWidth > 0) {
-        clone.setAttribute('stroke-width', String(strokeWidth));
-      }
-    }
-
-    clone.removeAttribute('class');
-    clone.removeAttribute('data-name');
-    clone.removeAttribute('opacity');
-
+    // 🌟 Устанавливаем ТОЛЬКО transform
     clone.setAttribute(
       'transform',
       `translate(${tileX * TILE_SIZE}, ${tileY * TILE_SIZE}) rotate(${rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`
     );
 
-    clipPathEl.appendChild(clone);
+    containerEl.appendChild(clone);
     cloned++;
   }
 
   return { cloned, failed };
 }
 
-/**
- * 🌟 Вычисляет bounding box для массива фич
- */
 export function calculateBoundingBox(features: FeatureGeometry[]): {
   minX: number;
   minY: number;
@@ -135,15 +94,10 @@ export function calculateBoundingBox(features: FeatureGeometry[]): {
   }
 
   return {
-    minX,
-    minY,
-    maxX,
-    maxY,
+    minX, minY, maxX, maxY,
     centerX: (minX + maxX) / 2,
     centerY: (minY + maxY) / 2,
     width: maxX - minX,
     height: maxY - minY,
   };
 }
-
-export { TILE_SIZE };

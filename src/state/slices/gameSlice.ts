@@ -6,11 +6,7 @@ import { RegionManager, type FeatureKey } from '@/core/regionManager';
 import { findCompletedRegionsOnTile, calculateRegionPoints, type CompletedRegion } from '@/core/scoring';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
-import { ANIMATION_DURATION, AVAILABLE_COLORS } from '@/core/constants'
-
-// 🌟 Задержка между анимациями
-const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION;
-
+import { ANIMATION_DURATION, DELAY_BETWEEN_ANIMATIONS, AVAILABLE_COLORS } from '@/core/constants'
 
 
 export interface GameSlice {
@@ -39,6 +35,7 @@ export interface GameSlice {
     removePlayer: (id: string) => void;
     renamePlayer: (id: string, newName: string) => void;
     startGame: () => void;
+    exitToLobby: () => void; 
 
     //Инициализация игры
     initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
@@ -161,6 +158,32 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
         get().initGame(state.lobbyPlayers);
         set({ phase: 'startTurn' });
         console.log(`🎮 [Store] Игра начата с ${state.lobbyPlayers.length} игроками`);
+    },
+
+    exitToLobby: () => {
+        console.log('🚪 [Store] Выход в лобби');
+        
+        // Сбрасываем всё игровое состояние
+        set({
+            lobbyPlayers: [
+                { id: 'p1', name: 'Игрок 1', color: '#ff5555' },
+                { id: 'p2', name: 'Игрок 2', color: '#5555ff' },
+            ],
+            deck: [],
+            totalTiles: 0,
+            board: new Map(),
+            players: [],
+            currentTurn: 0,
+            drawnTile: null,
+            phase: 'lobby',
+            regionManager: new RegionManager(),
+            showRegions: true,
+            showDeadCells: true,
+            visibleFeatureTypes: ['field'],
+            debugSelectedTile: null,
+            completionAnimations: [],
+            lastPlacedTiles: new Map(),
+        });
     },
 
     // ============================================

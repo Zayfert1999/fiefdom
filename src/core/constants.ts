@@ -13,6 +13,8 @@ export const WORLD_BOUNDS = {
 
 // Длительность анимации одного региона
 export const ANIMATION_DURATION = 3000;
+// Задержка между анимациями
+export const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION;
 
 //Настройки камеры
 export const CAMERA_CONFIG = {

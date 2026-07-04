@@ -1,16 +1,19 @@
 // renderer/GameOverScreen.tsx
+import { useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 
 export const GameOverScreen = () => {
   const players = useGameStore(s => s.players);
-  const initGame = useGameStore(s => s.initGame);
+  const exitToLobby = useGameStore(s => s.exitToLobby); 
 
-  // 🌟 Сортируем игроков по очкам (от большего к меньшему)
+  // 🌟 Состояние свёрнутости
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // 🌟 Сортируем игроков по очкам
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
   const winner = sortedPlayers[0];
   const isDraw = sortedPlayers.length > 1 && sortedPlayers[0].score === sortedPlayers[1].score;
 
-  // 🌟 Информация о категориях
   const categories = [
     { key: 'road' as const, emoji: '🛣️', label: 'Дороги' },
     { key: 'city' as const, emoji: '🏰', label: 'Города' },
@@ -18,29 +21,85 @@ export const GameOverScreen = () => {
     { key: 'monastery' as const, emoji: '⛪', label: 'Монастыри' },
   ];
 
-  const handleNewGame = () => {
-    // 🌟 Запрашиваем имена игроков (можно заменить на форму)
-    const playerCount = parseInt(prompt('Количество игроков (2-5):', '2') || '2');
-    if (playerCount < 2 || playerCount > 5) {
-      alert('Количество игроков должно быть от 2 до 5');
-      return;
+  // 🌟 Обработчик выхода в лобби
+  const handleExitToLobby = () => {
+    if (window.confirm('Выйти в лобби? Результаты текущей игры будут потеряны.')) {
+      exitToLobby();
     }
-
-    const newPlayers = Array.from({ length: playerCount }, (_, i) => ({
-      id: `player-${i}`,
-      name: `Игрок ${i + 1}`,
-      color: ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'][i],
-    }));
-
-    initGame(newPlayers);
   };
 
+  // ============================================
+  // 📦 СВЁРНУТАЯ ПЛАШКА
+  // ============================================
+  if (isCollapsed) {
+    // Формируем строку с победителем
+    const winnerNames = isDraw
+      ? sortedPlayers.filter(p => p.score === winner.score).map(p => p.name).join(', ')
+      : winner.name;
+
+    const drawWinnersCount = isDraw
+      ? sortedPlayers.filter(p => p.score === winner.score).length
+      : 0;
+
+    return (
+      <div style={collapsedContainerStyle}>
+        {/* 🏆 Краткая информация */}
+        <div style={collapsedInfoStyle}>
+          <span style={{ fontSize: '24px', marginRight: '8px' }}>
+            {isDraw ? '🤝' : '👑'}
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+            <span style={collapsedLabelStyle}>
+              {isDraw ? `Ничья (${drawWinnersCount})` : 'Победитель'}
+            </span>
+            <span style={collapsedWinnerStyle} title={winnerNames}>
+              {winnerNames}
+            </span>
+          </div>
+          <div style={collapsedScoreStyle}>
+            {winner.score}
+            <span style={{ fontSize: '12px', color: '#aaa', marginLeft: '4px' }}>очк.</span>
+          </div>
+        </div>
+
+        {/* 🎛️ Кнопки */}
+        <div style={collapsedActionsStyle}>
+          <button
+            onClick={() => setIsCollapsed(false)}
+            style={collapsedExpandBtnStyle}
+            title="Развернуть полную статистику"
+          >
+            📊 Статистика
+          </button>
+          {/* Выйти в лобби */}
+          <button
+            onClick={handleExitToLobby}
+            style={collapsedExitBtnStyle}
+            title="Вернуться в лобби"
+          >
+            🚪 Выйти
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================
+  // 🎬 РАЗВЁРНУТЫЙ ЭКРАН
+  // ============================================
   return (
     <div style={overlayStyle}>
       <div style={containerStyle}>
-        {/* 🏆 Заголовок */}
+        {/* 🏆 Заголовок с кнопкой сворачивания */}
         <div style={headerStyle}>
           <h1 style={titleStyle}>🏁 Игра окончена!</h1>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            style={collapseBtnStyle}
+            title="Свернуть и осмотреть доску"
+          >
+            ✕ Свернуть
+          </button>
         </div>
 
         {/* 👑 Победитель */}
@@ -84,10 +143,10 @@ export const GameOverScreen = () => {
               {sortedPlayers.map((player, idx) => {
                 const isWinner = idx === 0 && !isDraw;
                 const isDrawWinner = isDraw && player.score === winner.score;
-                
+
                 return (
-                  <tr 
-                    key={player.id} 
+                  <tr
+                    key={player.id}
                     style={{
                       ...trStyle,
                       background: isWinner || isDrawWinner ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
@@ -114,16 +173,18 @@ export const GameOverScreen = () => {
           </table>
         </div>
 
-        {/* 🎮 Кнопка новой игры */}
-        <button onClick={handleNewGame} style={newGameBtnStyle}>
-          🎮 Новая игра
+        {/* 🌟 НОВОЕ: Кнопка выхода в лобби */}
+        <button onClick={handleExitToLobby} style={exitBtnStyle}>
+          🚪 Выйти в лобби
         </button>
       </div>
     </div>
   );
 };
 
-// 🎨 Стили
+// ============================================
+// 🎨 СТИЛИ РАЗВЁРНУТОГО ЭКРАНА
+// ============================================
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   top: 0,
@@ -148,11 +209,13 @@ const containerStyle: React.CSSProperties = {
   overflowY: 'auto',
   boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
   border: '2px solid rgba(255, 255, 255, 0.1)',
+  position: 'relative',
 };
 
 const headerStyle: React.CSSProperties = {
   textAlign: 'center',
   marginBottom: '30px',
+  position: 'relative',
 };
 
 const titleStyle: React.CSSProperties = {
@@ -160,6 +223,22 @@ const titleStyle: React.CSSProperties = {
   fontSize: '36px',
   margin: 0,
   textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
+};
+
+// 🌟 Кнопка сворачивания в правом верхнем углу
+const collapseBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  background: 'rgba(255, 255, 255, 0.1)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  color: '#fff',
+  padding: '6px 14px',
+  borderRadius: '8px',
+  fontSize: '13px',
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  backdropFilter: 'blur(8px)',
 };
 
 const winnerSectionStyle: React.CSSProperties = {
@@ -260,10 +339,11 @@ const totalTdStyle: React.CSSProperties = {
   fontSize: '20px',
 };
 
-const newGameBtnStyle: React.CSSProperties = {
+
+const exitBtnStyle: React.CSSProperties = {
   width: '100%',
   padding: '16px',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',  // 🔴 Красный градиент
   color: '#fff',
   border: 'none',
   borderRadius: '8px',
@@ -271,5 +351,95 @@ const newGameBtnStyle: React.CSSProperties = {
   fontWeight: 'bold',
   cursor: 'pointer',
   transition: 'transform 0.2s, box-shadow 0.2s',
-  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+  boxShadow: '0 4px 15px rgba(231, 76, 60, 0.4)',
+};
+
+// ============================================
+// 📦 СТИЛИ СВЁРНУТОЙ ПЛАШКИ
+// ============================================
+const collapsedContainerStyle: React.CSSProperties = {
+  position: 'fixed',
+  top: '70px',           // Под HUD (примерно 50-60px высоты)
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+  border: '2px solid rgba(255, 215, 0, 0.4)',
+  borderRadius: '12px',
+  padding: '12px 16px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '16px',
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+  zIndex: 2000,
+  animation: 'slideDown 0.3s ease-out',
+  backdropFilter: 'blur(12px)',
+  maxWidth: '90vw',
+};
+
+const collapsedInfoStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  flex: 1,
+  minWidth: 0,
+};
+
+const collapsedLabelStyle: React.CSSProperties = {
+  color: '#ffd700',
+  fontSize: '11px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  fontWeight: 'bold',
+};
+
+const collapsedWinnerStyle: React.CSSProperties = {
+  color: '#fff',
+  fontSize: '16px',
+  fontWeight: 'bold',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  maxWidth: '200px',
+};
+
+const collapsedScoreStyle: React.CSSProperties = {
+  color: '#ffd700',
+  fontSize: '20px',
+  fontWeight: 'bold',
+  padding: '4px 12px',
+  background: 'rgba(255, 215, 0, 0.15)',
+  borderRadius: '6px',
+  border: '1px solid rgba(255, 215, 0, 0.3)',
+  whiteSpace: 'nowrap',
+};
+
+const collapsedActionsStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+};
+
+const collapsedExpandBtnStyle: React.CSSProperties = {
+  background: 'rgba(255, 255, 255, 0.1)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  color: '#fff',
+  padding: '8px 12px',
+  borderRadius: '6px',
+  fontSize: '13px',
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  whiteSpace: 'nowrap',
+};
+
+const collapsedExitBtnStyle: React.CSSProperties = {
+  background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+  border: 'none',
+  color: '#fff',
+  padding: '8px 14px',
+  borderRadius: '6px',
+  fontSize: '13px',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  boxShadow: '0 2px 8px rgba(231, 76, 60, 0.3)',
+  whiteSpace: 'nowrap',
 };

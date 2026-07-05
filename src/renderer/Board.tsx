@@ -6,6 +6,7 @@ import { MeepleSelectionLayer } from './MeepleSelectionLayer';
 import { MeepleLayer } from './MeepleLayer';
 import { CompletionOverlay } from './CompletionOverlay';
 import { CellsOverlay } from './CellsOverlay';
+import { DebugOverlay } from './DebugOverlay';
 import { useBoardCamera } from '@/hooks/useBoardCamera';
 import { useRegionPatterns } from '@/hooks/useRegionPatterns';
 import { TILE_SIZE, WORLD_BOUNDS } from '@/core/constants'
@@ -17,14 +18,13 @@ type BoardProps = {
 
 export const Board = ({ onGridClick, validCells }: BoardProps) => {
   const board = useGameStore(s => s.board);
-  const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
   const previewTile = useGameStore(s => s.previewTile);
   const previewRegionManager = useGameStore(s => s.previewRegionManager);
   const rotatePreview = useGameStore(s => s.rotatePreview);
   const lastPlacedTiles = useGameStore(s => s.lastPlacedTiles);
   const phase = useGameStore(s => s.phase);
-    
+
 
   /* ============================================
   * 📷 КАМЕРА
@@ -33,7 +33,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     camera,
     transform,
     svgRef,
-  
+
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -73,8 +73,8 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     rotatePreview();
   };
 
- const uniqueColorCombinations = useRegionPatterns();
- const isBoardLocked = phase === 'endTurn';
+  const uniqueColorCombinations = useRegionPatterns();
+  const isBoardLocked = phase === 'endTurn';
 
   return (
     <svg
@@ -158,21 +158,21 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
           strokeOpacity="0.3"
           pointerEvents="none"
         />
-        <line 
+        <line
           x1={WORLD_BOUNDS.minX * TILE_SIZE}
-          y1="0" 
-          x2={(WORLD_BOUNDS.maxX + 1)  * TILE_SIZE}
-          y2="0" 
-          className="axis-line" 
-          pointerEvents="none" 
+          y1="0"
+          x2={(WORLD_BOUNDS.maxX + 1) * TILE_SIZE}
+          y2="0"
+          className="axis-line"
+          pointerEvents="none"
         />
-        <line 
-          x1="0" 
+        <line
+          x1="0"
           y1={WORLD_BOUNDS.minY * TILE_SIZE}
-          x2="0" 
+          x2="0"
           y2={(WORLD_BOUNDS.maxY + 1) * TILE_SIZE}
-          className="axis-line" 
-          pointerEvents="none" 
+          className="axis-line"
+          pointerEvents="none"
         />
 
         {/* 🟢💀 СЛОЙ 1: СЛОЙ КЛЕТОК (ВАЛИДНЫЕ И МЕРТВЫЕ) */}
@@ -181,7 +181,6 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
         {/* 🎨 СЛОЙ 2: ТАЙЛЫ (только графика) */}
         {Array.from(board.values()).map((t) => {
           const key = `${t.x},${t.y}`;
-          const isDebugSelected = debugSelectedTile?.x === t.x && debugSelectedTile?.y === t.y;
 
           return (
             <g
@@ -192,10 +191,6 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
               }}
               style={{ cursor: 'pointer', overflow: 'visible' }}
             >
-              {isDebugSelected && (
-                <rect className="debug-selected" x={0} y={0} width={TILE_SIZE} height={TILE_SIZE} />
-              )}
-
               <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
                 <Tile
                   id={t.templateId as any}
@@ -235,7 +230,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
         <RegionOverlay regionManagerOverride={previewRegionManager || undefined} />
         <CompletionOverlay />
 
-        {/* 🌟 СЛОЙ 5 — ПОДСВЕТКА ПОСЛЕДНИХ ТАЙЛОВ ВСЕХ ИГРОКОВ */}
+        {/* 🌟 СЛОЙ 5: ПОДСВЕТКА ПОСЛЕДНИХ ТАЙЛОВ ВСЕХ ИГРОКОВ + Debug */}
         {Array.from(lastPlacedTiles.entries()).map(([playerId, tile]) => (
           <g
             key={`last-${playerId}`}
@@ -261,6 +256,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
             />
           </g>
         ))}
+        <DebugOverlay />
 
         {/* 🎨 СЛОЙ 6: СПОТЫ ДЛЯ РАЗМЕЩЕНИЯ МИПЛОВ */}
         <MeepleSelectionLayer />

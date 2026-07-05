@@ -1,6 +1,6 @@
 // renderer/DebugPanel.tsx
 import { useGameStore } from '@/state/useGameStore';
-import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@/core/scoring'; // 🌟 Импортируем логику подсчёта
+import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@/core/scoring';
 
 export const DebugPanel = () => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);

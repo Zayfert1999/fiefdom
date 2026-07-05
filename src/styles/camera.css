@@ -6,7 +6,7 @@
 .board-camera-group {
   will-change: transform;
   transform-origin: 0 0;
-  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition: transform var(--anim-camera) cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* При drag — отключаем transition (мгновенный отклик) */

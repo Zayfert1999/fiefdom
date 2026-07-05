@@ -11,10 +11,8 @@ export const WORLD_BOUNDS = {
     maxY: 25,
 };
 
-// Длительность анимации одного региона
-export const ANIMATION_DURATION = 3000;
-// Задержка между анимациями
-export const DELAY_BETWEEN_ANIMATIONS = ANIMATION_DURATION;
+// Длительность анимации одного региона (синхронизировано с --comp-reg-anim-completion)
+export const COMPLITED_REGION_ANIMATION_DURATION = 3000;
 
 //Настройки камеры
 export const CAMERA_CONFIG = {
@@ -23,7 +21,7 @@ export const CAMERA_CONFIG = {
     ZOOM_STEP: 1.2,
     WHEEL_ZOOM_STEP: 0.1,
     PAN_STEP: 50,
-    ANIMATION_DURATION: 300,
+    ANIMATION_DURATION: 300, // синхронизировано с --anim-camera
 };
 
 // Палитра цветов игроков
@@ -34,4 +32,20 @@ export const AVAILABLE_COLORS = [
     '#ffff55', // Жёлтый
     '#ff55ff', // Фиолетовый
 ];
+
+// Вспомогательная функция для экспорта JS констант в CSS
+export const syncCssVariables = () => {
+  const root = document.documentElement;
+
+  // Камера
+  root.style.setProperty('--anim-camera', `${CAMERA_CONFIG.ANIMATION_DURATION}ms`);
+
+  // Анимация завершения региона
+  root.style.setProperty('--comp-reg-anim-completion', `${COMPLITED_REGION_ANIMATION_DURATION}ms`);
+
+  console.log(`🎨 [CSS Sync] Переменные синхронизированы:`, {
+    '--anim-camera': `${CAMERA_CONFIG.ANIMATION_DURATION}ms`,
+    '--comp-reg-anim-completion': `${COMPLITED_REGION_ANIMATION_DURATION}ms`,
+  });
+};
 

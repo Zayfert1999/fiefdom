@@ -6,7 +6,7 @@ import { RegionManager, type FeatureKey } from '@/core/regionManager';
 import { findCompletedRegionsOnTile, calculateRegionPoints, type CompletedRegion } from '@/core/scoring';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
-import { ANIMATION_DURATION, DELAY_BETWEEN_ANIMATIONS, AVAILABLE_COLORS } from '@/core/constants'
+import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG} from '@/core/constants'
 
 
 export interface GameSlice {
@@ -391,16 +391,9 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             get().processCompletedRegionsInStore(completedRegions);
 
             // ⏱️ Вычисляем максимальное время ожидания:
-            // Последняя анимация: (n-1) * DELAY + ANIMATION_DURATION
-            // + запас на возврат камеры (400ms) + запас на CSS transition (200ms)
-            const lastAnimStart = (completedRegions.length - 1) * DELAY_BETWEEN_ANIMATIONS;
-            const lastAnimEnd = lastAnimStart + ANIMATION_DURATION;
-            const cameraReturnBuffer = 600; // возврат камеры (300ms) + запас
-
-            const maxWaitTime = lastAnimEnd + cameraReturnBuffer;
+            const maxWaitTime = completedRegions.length * COMPLITED_REGION_ANIMATION_DURATION + CAMERA_CONFIG.ANIMATION_DURATION;
 
             console.log(`⏱️ [Store] Передача хода через ${maxWaitTime}мс`);
-            console.log(`   Последняя анимация: старт=${lastAnimStart}мс, конец=${lastAnimEnd}мс`);
 
             setTimeout(() => {
                 get().finishEndTurn();
@@ -463,10 +456,10 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         for (let i = 0; i < regions.length; i++) {
             const region = regions[i];
-            // 🌟 Задержка: i * (ANIMATION_DURATION / 2)
-            const startDelay = i * DELAY_BETWEEN_ANIMATIONS;
+            // Задержка старта анимации у последующих регионов
+            const startDelay = i * COMPLITED_REGION_ANIMATION_DURATION;
 
-            // 🌟 НОВОЕ: одна функция для всей анимации
+            // Одна функция для всей анимации
             get().animateRegionCompletion(region, startDelay);
 
             rm.markComplete(region.rootKey, region.points);
@@ -561,9 +554,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
         }
 
         // 🌟 ШАГ 3: После ВСЕХ анимаций — переходим в gameOver
-        // Общая длительность: (regions.length - 1) * DELAY_BETWEEN_ANIMATIONS + ANIMATION_DURATION
         const totalAnimationTime = regionsWithMeeples.length > 0
-            ? (regionsWithMeeples.length - 1) * DELAY_BETWEEN_ANIMATIONS + ANIMATION_DURATION
+            ? regionsWithMeeples.length * COMPLITED_REGION_ANIMATION_DURATION
             : 0;
 
         setTimeout(() => {
@@ -673,7 +665,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             }));
             console.log(`✨ [Store] Обводка убрана для региона ${region.rootKey}`);
             console.log(`✨ [Store] Анимация региона ${region.rootKey} завершена`);
-        }, startDelay + ANIMATION_DURATION);
+        }, startDelay + COMPLITED_REGION_ANIMATION_DURATION);
     },
 
     // ============================================

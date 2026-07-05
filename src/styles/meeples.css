@@ -68,9 +68,7 @@
    ============================================ */
 /* Обёртка мипла во время анимации исчезновения */
 .meeple-completing {
-  animation: meeple-fade-out 3s ease-out forwards;
-  /* 🌟 Убираем transform-box: fill-box — он учитывает все дочерние элементы */
-  /* 🌟 Указываем центр масштабирования в локальных координатах (0, 0) */
+  animation: meeple-fade-out var(--comp-reg-anim-completion) ease-out forwards;
   transform-origin: 0 0;
 }
 
@@ -103,11 +101,11 @@
   font-family: 'Arial Black', sans-serif;
   font-size: 20px;
   font-weight: 900;
-  fill: var(--player-color, white);
+  fill: var(--n-color, white);
   stroke: #ffffff;
   stroke-width: 0.8;
   paint-order: stroke fill;
-  animation: points-float-up 3s ease-out forwards;
+  animation: points-float-up var(--comp-reg-anim-completion) ease-out forwards;
   /* 🌟 Центр масштабирования — центр текста */
   transform-origin: center;
   transform-box: fill-box;

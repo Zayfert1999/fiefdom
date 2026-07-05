@@ -70,9 +70,13 @@
    🐛 ДЕБАГ-ВЫДЕЛЕНИЕ ТАЙЛА
    ============================================ */
 
+.debug-overlay {
+  pointer-events: none;
+}
+
 .debug-selected {
-  fill: transparent;
-  stroke: #ffff00;
-  stroke-width: 4;
+  fill: none;
+  stroke: #e100ff;
+  stroke-width: 3;
   pointer-events: none;
 }

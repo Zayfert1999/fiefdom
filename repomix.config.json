@@ -1,0 +1,20 @@
+{
+  "output": {
+    "filePath": "PROJECT_CONTEXT.md",
+    "style": "xml"
+  },
+  "include": [
+    "src/**/*.{ts,tsx}",
+    "package.json",
+    "tsconfig.json",
+    "vite.config.ts"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      "node_modules",
+      "dist",
+      ".git"
+    ]
+  }
+}

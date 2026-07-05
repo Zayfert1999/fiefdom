@@ -12,6 +12,9 @@ import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG} f
 export interface GameSlice {
     //Лобби
     lobbyPlayers: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[];
+    showRegions: boolean;
+    showDeadCells: boolean;
+    enabledDeckView: boolean;
 
     //Игра
     deck: Tile[];
@@ -22,10 +25,8 @@ export interface GameSlice {
     drawnTile: Tile | null;
     phase: GamePhase;
     regionManager: RegionManager;
-    showRegions: boolean;
     visibleFeatureTypes: FeatureType[];
     completionAnimations: CompletionAnimation[];
-    showDeadCells: boolean;
     lastPlacedTiles: Map<string, LastPlacedTile>;
 
 
@@ -36,6 +37,9 @@ export interface GameSlice {
     renamePlayer: (id: string, newName: string) => void;
     startGame: () => void;
     exitToLobby: () => void; 
+    toggleRegions: () => void;
+    toggleDeadCells: () => void;
+    toggleDeckView: () => void;
 
     //Инициализация игры
     initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
@@ -46,10 +50,6 @@ export interface GameSlice {
     // Методы управления превью тайла 
     confirmPreview: () => void;
     confirmMeeple: () => void;
-
-    // Переключалки подсветки регионов и мертвых клеток
-    toggleRegions: () => void;
-    toggleDeadCells: () => void;
 
     // Вспомогательные функции
     processEndTurn: () => void;
@@ -91,6 +91,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     regionManager: new RegionManager(),
     showRegions: true,
     showDeadCells: true,
+    enabledDeckView: true,
     visibleFeatureTypes: ['field'],
     debugSelectedTile: null,
     completionAnimations: [],
@@ -673,12 +674,18 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     toggleRegions: () => {
         set((state) => ({ showRegions: !state.showRegions }));
+        console.log(`📦 [Store] Показ регионов: ${!get().showRegions ? 'ВКЛ' : 'ВЫКЛ'}`);
     },
 
     toggleDeadCells: () => {
         set((state) => ({ showDeadCells: !state.showDeadCells }));
         console.log(`💀 [Store] Показ мёртвых клеток: ${!get().showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}`);
     },
+
+    toggleDeckView: () => {
+        set((state) => ({ enabledDeckView: !state.enabledDeckView }));
+        console.log(`📦 [Store] Показ колоды: ${!get().enabledDeckView ? 'ВКЛ' : 'ВЫКЛ'}`);
+    },    
 
     // ============================================
     // 💾 СОХРАНЕНИЕ ИГРЫ

@@ -1,4 +1,4 @@
-// renderer/GameOverScreen.tsx
+// components/GameOverScreen.tsx
 import { useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 

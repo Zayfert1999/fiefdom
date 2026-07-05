@@ -90,6 +90,11 @@ export const HOTKEY_DEFINITIONS = {
     description: 'Показать подсказку по хоткеям',
     category: 'system',
   },
+    SHOW_DECK: {
+    key: 'D',
+    description: 'Показать/скрыть содержимое колоды',
+    category: 'system',
+  },
 } as const satisfies Record<string, HotkeyDefinition>;
 
 // ============================================

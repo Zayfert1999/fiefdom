@@ -7,12 +7,14 @@ export const Lobby = () => {
     lobbyPlayers = [],
     showRegions,
     showDeadCells,
+    enabledDeckView,
     addPlayer,
     removePlayer,
     renamePlayer,
     startGame,
     toggleRegions,
     toggleDeadCells,
+    toggleDeckView
   } = useGameStore();
 
   // 🌟 Состояние inline-редактирования
@@ -258,6 +260,18 @@ export const Lobby = () => {
               />
               <span style={{ color: '#fff', fontSize: '14px' }}>
                 💀 Показывать мёртвые клетки
+              </span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={enabledDeckView}
+                onChange={toggleDeckView}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span style={{ color: '#fff', fontSize: '14px' }}>
+                📦 Просмотр колоды
               </span>
             </label>
           </div>

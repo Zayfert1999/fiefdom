@@ -1,4 +1,4 @@
-// renderer/DebugPanel.tsx
+// components/DebugPanel.tsx
 import { useGameStore } from '@/state/useGameStore';
 import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@/core/scoring';
 

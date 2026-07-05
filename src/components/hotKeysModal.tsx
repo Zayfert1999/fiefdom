@@ -16,7 +16,6 @@ interface HotkeysModalProps {
 
 
 export const HotkeysModal = ({ isOpen, onClose }: HotkeysModalProps) => {
-    console.log(`🎨 [HotkeysModal] render, isOpen=${isOpen}`);
   // Закрытие по Escape
   useEffect(() => {
     if (!isOpen) return;
@@ -112,6 +111,7 @@ export const HotkeysModal = ({ isOpen, onClose }: HotkeysModalProps) => {
               width: '32px', height: '32px',
             }}
           >
+            ×
           </button>
         </div>
 

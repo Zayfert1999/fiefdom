@@ -4,20 +4,18 @@ import { useGameStore } from '@/state/useGameStore';
 import { getValidPlacementCells } from '@/core/tileUtils';
 import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
-import { useHotkeysModal } from '@/hooks/useHotkeysModal';
 
-//Статические импорты 
+// Статические импорты 
 import { Board } from '@/renderer/Board';
 import { HUD } from '@/components/HUD';
 import { PlayersPanel } from '@/components/PlayersPanel';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-//КОМПОНЕНТЫ
+// Ленивый импорт
 const Lobby = lazy(() => import('@/components/Lobby').then(m => ({ default: m.Lobby })));
 const GameOverScreen = lazy(() => import('@/components/GameOverScreen').then(m => ({ default: m.GameOverScreen })));
 const DebugPanel = lazy(() => import('@/components/DebugPanel').then(m => ({ default: m.DebugPanel })));
-const HotkeysModal = lazy(() => import('@/components/hotKeysModal').then(m => ({ default: m.HotkeysModal })));
 
 // 🌟 Fallback для Suspense — минимальный, не мешает UX
 const LazyFallback = () => null;  // Или можно <div>Загрузка...</div>
@@ -32,8 +30,7 @@ export default function App() {
   // 🎯 ДЕЙСТВИЯ — стабильные ссылки (Zustand так делает)
   const drawTile = useGameStore(s => s.drawTile);
 
-  // 🪟 МОДАЛКА ХОТКЕЕВ
-  const hotkeysModal = useHotkeysModal();
+
 
   // ============================================
   // 🎴 АВТОВЫДАЧА ТАЙЛА
@@ -86,7 +83,6 @@ export default function App() {
     { ...HOTKEY_DEFINITIONS.CONFIRM, action: handleConfirm, enabled: confirmEnabled },
     { ...HOTKEY_DEFINITIONS.CONFIRM_ALT, action: handleConfirm, enabled: confirmEnabled },
     { ...HOTKEY_DEFINITIONS.CANCEL, action: handleCancel, enabled: confirmEnabled },
-    { ...HOTKEY_DEFINITIONS.SHOW_HOTKEYS, action: hotkeysModal.toggle },
   ]);
 
   // ============================================
@@ -162,13 +158,6 @@ export default function App() {
       <ErrorBoundary name="Board">
         <Board onGridClick={handleBoardClick} validCells={validCells} />
       </ErrorBoundary>
-
-      {/* ⌨️ Модалка хоткеев */}
-      <Suspense fallback={<LazyFallback />}>
-        <ErrorBoundary name="HotkeysModal">
-          <HotkeysModal isOpen={hotkeysModal.isOpen} onClose={hotkeysModal.close} />
-        </ErrorBoundary>
-      </Suspense>
 
       {/* 🐛 Рендерим дебаг-панель поверх всего */}
       <Suspense fallback={<LazyFallback />}>

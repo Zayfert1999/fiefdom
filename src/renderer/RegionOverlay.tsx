@@ -119,7 +119,7 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       const clipPathEl = containerRef.current.querySelector(`#${safeRootId}`) as SVGClipPathElement | null;
       if (!clipPathEl) continue;
 
-      cloneFeatureGeometry(clipPathEl, features, { fill: 'white' });
+      cloneFeatureGeometry(clipPathEl, features);
     }
 
     console.log(`✅ [RegionOverlay] Клонирование завершено`);

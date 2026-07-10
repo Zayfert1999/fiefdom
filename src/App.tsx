@@ -30,7 +30,28 @@ export default function App() {
   // 🎯 ДЕЙСТВИЯ — стабильные ссылки (Zustand так делает)
   const drawTile = useGameStore(s => s.drawTile);
 
+  // ============================================
+  // 🔒 Блокировка контекстного меню
+  // ============================================
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      // Разрешаем контекстное меню в input/textarea
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+    };
 
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
 
   // ============================================
   // 🎴 АВТОВЫДАЧА ТАЙЛА

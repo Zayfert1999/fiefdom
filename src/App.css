@@ -8,3 +8,21 @@
 @import './styles/tiles.css';
 @import './styles/regions.css';
 @import './styles/meeples.css';
+
+/* Глобальная блокировка выделения */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Разрешаем выделение в input/textarea */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}

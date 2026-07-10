@@ -1,0 +1,108 @@
+/* components/ActionPanel.module.css */
+
+/* ============================================
+🎯 БАЗОВЫЕ СТИЛИ КНОПОК
+============================================ */
+
+.btn {
+  padding: 8px 16px;
+  background: #4a90e2;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:hover {
+  background: #3a7bc8;
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* ============================================
+✅ КНОПКА ПОДТВЕРЖДЕНИЯ (зелёная)
+============================================ */
+
+.confirmBtn {
+  composes: btn;
+  width: 100%;
+  height: 100%;
+  background: #2ecc71;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.confirmBtn:hover {
+  background: #27ae60;
+}
+
+.confirmBtn svg {
+  width: 64px;
+  height: 64px;
+}
+
+/* ============================================
+↩️ КНОПКА ОТМЕНЫ (оранжевая)
+============================================ */
+
+.cancelBtn {
+  composes: btn;
+  width: 100%;
+  background: #e67e22;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.cancelBtn:hover {
+  background: #d35400;
+}
+
+.cancelBtn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ============================================
+📦 КНОПКА ПРОСМОТРА КОЛОДЫ
+============================================ */
+
+.deckBtn {
+  composes: btn; 
+  width: 42px;
+  height: 32px;
+  padding: 0;  
+  border: 1px solid rgba(255, 215, 0, 0.5);  
+  background: rgba(255, 215, 0, 0.1);
+  color: #ffd700;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+/* 🌟 Переопределяем hover из .btn */
+.deckBtn:hover:not(:disabled) {
+  background: rgba(255, 215, 0, 0.25);
+  border-color: #ffd700;
+  transform: scale(1.05);
+}
+
+.deckBtn:disabled {
+  border-color: #444;
+  background: rgba(255, 255, 255, 0);
+  color: #666;
+  cursor: default;
+  transform: scale(1.05);
+}
+
+.deckBtn svg {
+  width: 24px;
+  height: 24px;
+  color: white;
+}

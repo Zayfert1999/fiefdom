@@ -7,41 +7,17 @@ import { useHotkeys } from '@/hooks/useHotkeys';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 
+// 🌟 Импортируем CSS-модуль и иконки
+import styles from './ActionPanel.module.css';
+import CheckIcon from '@/assets/svg/icon/checkIcon.svg?react' 
+import UndoIcon from '@/assets/svg/icon/undoIcon.svg?react'
+import DeckIcon from '@/assets/svg/icon/deckIcon.svg?react' 
+
 // Ленивый импорт
 const DeckModal = lazy(() => import('@/components/DeckModal').then(m => ({ default: m.DeckModal })));
 
 // 🌟 Минимальный fallback — ничего не показываем во время загрузки
 const DeckModalFallback = () => null;
-
-// 🌟 Стили вынесены локально (в будущем перенесём в CSS-модуль)
-const btnStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  background: '#4a90e2',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: '500',
-  transition: 'background 0.2s, transform 0.1s',
-};
-
-const confirmBtnStyle: React.CSSProperties = {
-  ...btnStyle,
-  width: '100%',
-  height: '100%',
-  background: '#2ecc71',
-  fontSize: '14px',
-  fontWeight: 'bold',
-};
-
-const cancelBtnStyle: React.CSSProperties = {
-  ...btnStyle,
-  width: '100%',
-  background: '#e67e22',
-  fontSize: '14px',
-  fontWeight: 'bold',
-};
 
 export const ActionPanel: React.FC = () => {
   const phase = useGameStore(s => s.phase);
@@ -109,45 +85,18 @@ export const ActionPanel: React.FC = () => {
             aria-label={enabledDeckView 
               ? "Посмотреть оставшиеся тайлы (D)" 
               : "Просмотр колоды отключён"}
-            style={{
-              width: '32px',
-              height: '32px',
-              border: `1px solid ${enabledDeckView ? 'rgba(255, 215, 0, 0.5)' : '#444'}`,
-              borderRadius: '6px',
-              background: enabledDeckView ? 'rgba(255, 215, 0, 0.1)' : 'rgba(100, 100, 100, 0.1)',
-              color: enabledDeckView ? '#ffd700' : '#666',
-              fontSize: '16px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              flexShrink: 0,
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              if (!enabledDeckView) return;
-              e.currentTarget.style.background = 'rgba(255, 215, 0, 0.25)';
-              e.currentTarget.style.borderColor = '#ffd700';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              if (!enabledDeckView) return;
-              e.currentTarget.style.background = 'rgba(255, 215, 0, 0.1)';
-              e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.5)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
+            className={styles.deckBtn}
           >
-            📦
+            <DeckIcon />
           </button>
 
           {/* 🌟 Текст колоды */}
           <span style={{
             color: '#fff',
-            fontSize: '15px',
+            fontSize: '20px',
             fontWeight: 'bold',
           }}>
-            Колода: {deck.length} / {totalTiles}
+            {deck.length} / {totalTiles}
           </span>
         </div>
 
@@ -182,17 +131,17 @@ export const ActionPanel: React.FC = () => {
             <>
               <button
                 onClick={confirmPreview}
-                style={confirmBtnStyle}
+                className={styles.confirmBtn}
                 title="Подтвердить установку тайла (Enter)"
               >
-                ✅ Подтвердить
+                <CheckIcon />
               </button>
               <button
                 onClick={cancelPreview}
-                style={cancelBtnStyle}
+                className={styles.cancelBtn}
                 title="Отменить примерку (Z)"
               >
-                ↩️ Вернуться
+                <UndoIcon />
               </button>
             </>
           )}
@@ -202,17 +151,17 @@ export const ActionPanel: React.FC = () => {
             <>
               <button
                 onClick={confirmMeeple}
-                style={confirmBtnStyle}
+                className={styles.confirmBtn}
                 title="Подтвердить установку мипла (Enter)"
               >
-                ✅ Подтвердить
+                <CheckIcon />
               </button>
               <button
                 onClick={rollbackMove}
-                style={cancelBtnStyle}
+                className={styles.cancelBtn}
                 title="Выбрать другую позицию тайла (Z)"
               >
-                ↩️ Вернуться
+                <UndoIcon />
               </button>
             </>
           )}

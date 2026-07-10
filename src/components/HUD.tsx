@@ -6,6 +6,10 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
 
+//Иконки
+import DeadCellsIcon from '@/assets/svg/icon/deadCellsIcon.svg?react'
+import RegionOverlayIcon from '@/assets/svg/icon/regionOverlayIcon.svg?react'
+
 // Ленивый импорт
 const HotkeysModal = lazy(() => import('@/components/hotKeysModal').then(m => ({ default: m.HotkeysModal })));
 
@@ -53,31 +57,40 @@ export const HUD: React.FC = () => {
         {/* 🎯 Индикаторы — справа */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {/* 🗺️ Регионы */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            title={showRegions ? 'Подсветка полей: ВКЛ' : 'Подсветка полей: ВЫКЛ'}
+          >
+            <RegionOverlayIcon width={30} height={30} />
             <div style={{
               width: '10px', height: '10px', borderRadius: '50%',
               background: showRegions ? '#5cb85c' : '#555',
               boxShadow: showRegions ? '0 0 8px #5cb85c' : 'none',
             }} />
-            <span style={{ fontSize: '13px', color: '#aaa' }}>
-              Регионы: <strong style={{ color: showRegions ? '#5cb85c' : '#666' }}>
-                {showRegions ? 'ВКЛ' : 'ВЫКЛ'}
-              </strong>
-            </span>
           </div>
 
+          {/* Разделитель */}
+          <div style={{ width: '1px', height: '20px', background: '#444' }} />
+
           {/* 💀 Мёртвые клетки */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            title={showDeadCells ? 'Отображение мёртвых клеток: ВКЛ' : 'Отображение мёртвых клеток: ВЫКЛ'}
+          >
+            <DeadCellsIcon width={30} height={30} />
             <div style={{
               width: '10px', height: '10px', borderRadius: '50%',
               background: showDeadCells ? '#5cb85c' : '#555',
               boxShadow: showDeadCells ? '0 0 8px #5cb85c' : 'none',
             }} />
-            <span style={{ fontSize: '13px', color: '#aaa' }}>
-              Мёртвые: <strong style={{ color: showDeadCells ? '#5cb85c' : '#666' }}>
-                {showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}
-              </strong>
-            </span>
           </div>
 
           {/* Разделитель */}

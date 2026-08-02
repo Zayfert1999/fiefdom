@@ -4,6 +4,9 @@ import { useGameStore } from '@/state/useGameStore';
 import { TILE_DEFINITIONS } from '@/core/tileData';
 import { Tile } from '@/renderer/Tile';
 
+import CrossIcon from '@/assets/svg/icon/cross-icon.svg?react'
+import DeckIcon from '@/assets/svg/icon/deck-icon.svg?react'
+
 interface DeckModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -58,13 +61,14 @@ export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
           <div style={{ width: '36px' }} />
           
           {/* Заголовок — по центру */}
+          
           <h2 style={titleStyle}>
-            📦 Колода: {deck.length} / {totalTiles}
+            <DeckIcon/> Колода: {deck.length} / {totalTiles}
           </h2>
           
           {/* Кнопка закрытия справа */}
           <button onClick={onClose} style={closeBtnStyle} aria-label="Закрыть">
-            ×
+            <CrossIcon/>
           </button>
         </div>
 

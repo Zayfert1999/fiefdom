@@ -126,7 +126,6 @@ export const DebugPanel = () => {
                   {metadata.type === 'city' && (
                     <p style={{ color: '#4a90e2' }}>🛡️ Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
                   )}
-                  <p>Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
                   <p style={{ color: metadata.isComplete ? '#4CAF50' : '#FF9800' }}>
                     Статус завершения (DSU): {metadata.isComplete ? 'ЗАВЕРШЁН' : 'НЕ ЗАВЕРШЁН'}
                   </p>

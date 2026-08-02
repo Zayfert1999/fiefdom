@@ -9,9 +9,9 @@ import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 
 // 🌟 Импортируем CSS-модуль и иконки
 import styles from './ActionPanel.module.css';
-import CheckIcon from '@/assets/svg/icon/checkIcon.svg?react' 
-import UndoIcon from '@/assets/svg/icon/undoIcon.svg?react'
-import DeckIcon from '@/assets/svg/icon/deckIcon.svg?react' 
+import CheckIcon from '@/assets/svg/icon/check-icon.svg?react' 
+import UndoIcon from '@/assets/svg/icon/undo-icon.svg?react'
+import DeckIcon from '@/assets/svg/icon/deck-icon.svg?react' 
 
 // Ленивый импорт
 const DeckModal = lazy(() => import('@/components/DeckModal').then(m => ({ default: m.DeckModal })));

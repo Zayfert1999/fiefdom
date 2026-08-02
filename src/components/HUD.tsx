@@ -7,8 +7,8 @@ import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
 
 //Иконки
-import DeadCellsIcon from '@/assets/svg/icon/deadCellsIcon.svg?react'
-import RegionOverlayIcon from '@/assets/svg/icon/regionOverlayIcon.svg?react'
+import DeadCellsIcon from '@/assets/svg/icon/dead-cells-icon.svg?react'
+import RegionOverlayIcon from '@/assets/svg/icon/region-overlay-icon.svg?react'
 
 // Ленивый импорт
 const HotkeysModal = lazy(() => import('@/components/hotKeysModal').then(m => ({ default: m.HotkeysModal })));

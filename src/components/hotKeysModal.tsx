@@ -9,6 +9,8 @@ import {
   type HotkeyDefinition,
 } from '@/core/hotkeys'
 
+import CrossIcon from '@/assets/svg/icon/cross-icon.svg?react'
+
 interface HotkeysModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -111,7 +113,7 @@ export const HotkeysModal = ({ isOpen, onClose }: HotkeysModalProps) => {
               width: '32px', height: '32px',
             }}
           >
-            ×
+            <CrossIcon/>
           </button>
         </div>
 

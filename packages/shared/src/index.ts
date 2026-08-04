@@ -1,3 +1,5 @@
 // packages/shared/src/index.ts
-// Этот файл будет заполнен на следующих этапах
-export {};
+// 🌟 Главный экспорт shared-пакета
+
+export * as core from './core';
+export * from './core';  // Также реэкспортируем всё наверх для удобства

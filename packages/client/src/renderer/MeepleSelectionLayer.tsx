@@ -2,9 +2,9 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
-import { TILE_DEFINITIONS } from '@/core/tileData';
-import type { TileFeature } from '@/core/types';
-import {TILE_SIZE} from '@/core/constants'
+import { TILE_DEFINITIONS } from '@carcassonne/shared/core/tileData';
+import type { TileFeature } from '@carcassonne/shared/core/types';
+import {TILE_SIZE} from '@carcassonne/shared/core/constants'
 
 /**
  * 🌟 Глобальный слой для спотов размещения миплов.

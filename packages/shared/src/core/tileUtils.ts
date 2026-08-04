@@ -1,6 +1,6 @@
 // core/tileUtils.ts
 import type { Direction, FeatureType, Tile, TileFeature, PlacedTile } from './types';
-import { RegionManager, type FeatureKey } from '@/core/regionManager';
+import { RegionManager, type FeatureKey } from './regionManager';
 
 const COMPASS_ORDER: Direction[] = ['N','NE(N)', 'NE', 'NE(E)', 'E', 'SE(E)', 'SE', 'SE(S)', 'S', 'SW(S)', 'SW', 'SW(W)', 'W', 'NW(W)', 'NW', 'NW(N)'];
 

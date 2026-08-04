@@ -5,7 +5,7 @@ import { Tile } from '@/renderer/Tile';
 import { useDeckModal } from '@/hooks/useDeckModal';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
+import { HOTKEY_DEFINITIONS } from '@carcassonne/shared/core/hotkeys';
 
 // 🌟 Импортируем CSS-модуль и иконки
 import styles from './ActionPanel.module.css';

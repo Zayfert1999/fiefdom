@@ -1,4 +1,4 @@
-import type { Tile } from '@/core/types';
+import type { Tile } from './types';
 
 export const TILE_DEFINITIONS: Tile[] = [
   { id: 'tile_CCCC -S', quantity: 1, features: [

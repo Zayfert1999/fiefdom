@@ -1,20 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
-import path from 'path';
+import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   plugins: [react(), svgr()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      // Алиас на shared пакет (для будущих импортов)
-      '@carcassonne/shared': path.resolve(__dirname, '../shared/src'),
+      // 🌟 Используем fileURLToPath вместо __dirname
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@carcassonne/shared': fileURLToPath(new URL('../shared/src', import.meta.url)),
     },
   },
   server: {
     port: 5173,
-    // 🆕 Проксирование запросов к серверу (чтобы не было CORS)
     proxy: {
       '/socket.io': {
         target: 'http://localhost:3001',

@@ -1,5 +1,5 @@
 // utils/cloneFeatureGeometry.ts
-import { TILE_SIZE } from '@/core/constants';
+import { TILE_SIZE } from '@carcassonne/shared/core/constants.js';
 
 export interface FeatureGeometry {
   tileX: number;

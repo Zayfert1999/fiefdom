@@ -1,10 +1,10 @@
 // renderer/CellsOverlay.tsx
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { findDeadCells } from '@/core/tileUtils';
-import { rotateFeatures, getTileSides } from '@/core/tileUtils';
-import type { PlacedTile } from '@/core/types';
-import {TILE_SIZE} from '@/core/constants'
+import { findDeadCells } from '@carcassonne/shared/core/tileUtils';
+import { rotateFeatures, getTileSides } from '@carcassonne/shared/core/tileUtils';
+import type { PlacedTile } from '@carcassonne/shared/core/types';
+import {TILE_SIZE} from '@carcassonne/shared/core/constants'
 
 
 interface CellsOverlayProps {

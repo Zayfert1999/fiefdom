@@ -1,7 +1,7 @@
 // components/DeckModal.tsx
 import { useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { TILE_DEFINITIONS } from '@/core/tileData';
+import { TILE_DEFINITIONS } from '@carcassonne/shared/core/tileData';
 import { Tile } from '@/renderer/Tile';
 
 import CrossIcon from '@/assets/svg/icon/cross-icon.svg?react'

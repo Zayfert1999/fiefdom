@@ -1,7 +1,7 @@
 // renderer/DebugOverlay.tsx
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { TILE_SIZE } from '@/core/constants';
+import { TILE_SIZE } from '@carcassonne/shared/core/constants';
 
 export const DebugOverlay = () => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);

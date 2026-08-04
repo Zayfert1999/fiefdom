@@ -7,7 +7,7 @@ import {
   formatHotkeyKey,
   type HotkeyCategory,
   type HotkeyDefinition,
-} from '@/core/hotkeys'
+} from '@carcassonne/shared/core/hotkeys'
 
 import CrossIcon from '@/assets/svg/icon/cross-icon.svg?react'
 

@@ -3,7 +3,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { useHotkeysModal } from '@/hooks/useHotkeysModal';
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { HOTKEY_DEFINITIONS } from '@/core/hotkeys';
+import { HOTKEY_DEFINITIONS } from '@carcassonne/shared/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
 
 //Иконки

@@ -1,6 +1,6 @@
 // components/DebugPanel.tsx
 import { useGameStore } from '@/state/useGameStore';
-import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@/core/scoring';
+import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@carcassonne/shared/core/scoring';
 
 export const DebugPanel = () => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);

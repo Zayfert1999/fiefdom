@@ -1,8 +1,8 @@
 // hooks/useRegionPatterns.ts
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { rotateFeatures } from '@/core/tileUtils';
-import type { RegionManager } from '@/core/regionManager';
+import { rotateFeatures } from '@carcassonne/shared/core/tileUtils';
+import type { RegionManager } from '@carcassonne/shared/core/regionManager';
 
 /**
  * 🌟 Хук для вычисления уникальных цветовых комбинаций регионов

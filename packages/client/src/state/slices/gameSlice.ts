@@ -1,12 +1,12 @@
 import type { StateCreator } from 'zustand';
 import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@carcassonne/shared/core/types';
-import { TILE_DEFINITIONS } from '@carcassonne/shared/core/tileData';
 import { getTileSides, rotateFeatures, getValidPlacementCells } from '@carcassonne/shared/core/tileUtils';
 import { RegionManager, type FeatureKey } from '@carcassonne/shared/core/regionManager';
 import { findCompletedRegionsOnTile, calculateRegionPoints, type CompletedRegion } from '@carcassonne/shared/core/scoring';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
 import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG} from '@carcassonne/shared/core/constants'
+import { createDeck } from '@carcassonne/shared/core/deck';
 
 
 export interface GameSlice {
@@ -62,18 +62,6 @@ export interface GameSlice {
     saveGame: () => void;
     loadGame: () => void;
 }
-
-const createDeck = (): Tile[] => {
-    const deck: Tile[] = [];
-    for (const def of TILE_DEFINITIONS) {
-        for (let i = 0; i < def.quantity; i++) deck.push(def);
-    }
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    return deck;
-};
 
 export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set, get) => ({
     // Начальное состояние

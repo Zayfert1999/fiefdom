@@ -11,3 +11,4 @@ export * from './tileData';
 export * from './tileUtils';
 export * from './hotkeys';
 export * from './constants';
+export * from './deck';

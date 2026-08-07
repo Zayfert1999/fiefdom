@@ -9,6 +9,15 @@
     ".": "./src/index.ts",
     "./core": "./src/core/index.ts",
     "./core/*": "./src/core/*",
-    "./protocol/*": "./src/protocol/*"
+    "./protocol": "./src/protocol/index.ts",
+    "./protocol/*": "./src/protocol/*",
+    "./prng/*": "./src/prng/*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "~5.8.0"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }

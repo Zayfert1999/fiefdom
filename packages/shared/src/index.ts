@@ -1,5 +1,7 @@
 // packages/shared/src/index.ts
-// 🌟 Главный экспорт shared-пакета
-
 export * as core from './core';
-export * from './core';  // Также реэкспортируем всё наверх для удобства
+export * as protocol from './protocol';
+export * as prng from './prng';
+
+// Реэкспорт для удобства
+export * from './core';

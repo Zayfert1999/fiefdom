@@ -14,7 +14,7 @@
     "lib": ["ES2020"],
     "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["src", "../shared/src/prng/seedRandom.ts"],
   "exclude": ["node_modules", "dist"],
   "references": [
     { "path": "../shared" }

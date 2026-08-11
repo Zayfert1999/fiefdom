@@ -2,8 +2,9 @@
 // 🌟 Определения всех сетевых событий Client ↔ Server
 // Единый источник истины для обоих сторон
 
-import type { Player, Tile, PlacedTile } from '../core/types';
+import type { Player, Tile } from '../core/types';
 import type { SerializedGameState } from '../core/serialization';
+import type {CompletedRegion} from '../core/scoring'
 
 // ============================================
 // 📦 ТИПЫ ДАННЫХ
@@ -56,19 +57,18 @@ export interface ClientToServerEvents {
   'lobby:start-game': () => void;  // Только хост
   
   // --- Игра ---
-  'game:place-tile': (data: {
-    x: number;
-    y: number;
-    rotation: 0 | 90 | 180 | 270;
+  'game:commit-move': (data: {
+    tile: {
+      x: number;
+      y: number;
+      rotation: 0 | 90 | 180 | 270;
+    };
+    meeple: {
+      featureId: string;
+      x: number;
+      y: number;
+    } | null;  // null = пропуск мипла
   }) => void;
-  
-  'game:place-meeple': (data: {
-    featureId: string;
-    x: number;
-    y: number;
-  }) => void;
-  
-  'game:skip-meeple': () => void;
   
   // --- Reconnection ---
   'reconnect': (data: {
@@ -119,36 +119,31 @@ export interface ServerToClientEvents {
     drawnTile: Tile;
   }) => void;
   
-  'game:tile-placed': (data: {
+  'game:move-committed': (data: {
     playerId: string;
-    x: number;
-    y: number;
-    rotation: number;
-    tileId: string;
+    tile: { x: number; y: number; rotation: number; tileId: string };
+    meeple: { featureId: string; x: number; y: number } | null;
   }) => void;
   
-  'game:meeple-placed': (data: {
-    playerId: string;
-    featureId: string;
-    x: number;
-    y: number;
+  'game:regions-completed': (data: {
+    regions: Array<{
+      rootKey: string;
+      type: string;
+      points: number;
+      winners: string[];
+      allMeepleOwners: string[];
+      featureKeys: string[];
+    }>;
   }) => void;
   
-  'game:meeple-skipped': (data: {
-    playerId: string;
-  }) => void;
-  
-  'game:region-completed': (data: {
-    rootKey: string;
-    type: string;
-    points: number;
-    winners: string[];
-  }) => void;
-  
-  'game:turn-changed': (data: {
+  'game:next-turn': (data: {
     nextPlayerId: string;
     turnIndex: number;
   }) => void;
+
+  'game:final-scoring': (data: {
+    regions: CompletedRegion[];
+}) => void;
   
   'game:over': (data: {
     finalScores: Player[];

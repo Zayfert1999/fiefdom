@@ -11,9 +11,12 @@ import {
   applyTileToBoardAndRM,
   getTileSides,
   getValidPlacementCells,
+  rotateFeatures,      // 🌟 НОВОЕ: для валидации
+  isValidPlacement,    // 🌟 НОВОЕ: для валидации
 } from '@carcassonne/shared/core/tileUtils';
 import {
   findCompletedRegionsOnTile,
+  findAllIncompleteRegionsWithMeeples,
   type CompletedRegion,
 } from '@carcassonne/shared/core/scoring';
 import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
@@ -26,10 +29,13 @@ export class ServerGameState {
   public regionManager = new RegionManager();
   public players: Player[] = [];
   public deck: Tile[] = [];
+  public totalTiles: number = 0;
   public currentTurn = 0;
   public drawnTile: Tile | null = null;
   public phase: ServerPhase = 'lobby';
   public seed: string = '';
+  public lastPlacedTiles: Record<string, { x: number; y: number; color: string }> = {};
+
 
   /** Инициализация новой игры */
   initialize(players: Player[], seed: string): void {
@@ -41,10 +47,12 @@ export class ServerGameState {
       pointsByCategory: { road: 0, city: 0, field: 0, monastery: 0 },
     }));
     this.deck = createDeck(seed);
+    this.totalTiles = this.deck.length;
     this.board = new Map();
     this.regionManager = new RegionManager();
     this.currentTurn = 0;
     this.phase = 'playing';
+    this.lastPlacedTiles = {};
 
     // 🌟 Стартовый тайл в центре (0,0)
     const startingTile = this.deck.pop();
@@ -80,33 +88,106 @@ export class ServerGameState {
         logger.info('[GameState]', `Тайл выдан: ${candidate.id} игроку ${this.currentPlayer.name}`);
         return true;
       }
+
+      logger.info('[GameState]', `Тайл ${candidate.id} неиграбелен (попытка ${attempts}/${maxAttempts})`);
+
       // Возвращаем неиграбельный тайл в случайное место колоды
       const insertIndex = Math.floor(Math.random() * (this.deck.length + 1));
       this.deck.splice(insertIndex, 0, candidate);
     }
+
     logger.info('[GameState]', 'Нет играбельных тайлов → конец игры');
     this.phase = 'gameOver';
     return false;
   }
 
-  /** Валидация + установка тайла. Возвращает ошибку или null */
-  placeTile(playerId: string, x: number, y: number, rotation: 0 | 90 | 180 | 270): string | null {
-    if (playerId !== this.currentPlayer.id) return 'NOT_YOUR_TURN';
-    if (!this.drawnTile) return 'NO_TILE_DRAWN';
-    if (this.board.has(`${x},${y}`)) return 'CELL_OCCUPIED';
+  // 🌟 ИСПРАВЛЕНО: объединяем placeTile и placeMeeple
+  commitMove(
+    playerId: string,
+    tileData: { x: number; y: number; rotation: 0 | 90 | 180 | 270 },
+    meepleData: { featureId: string; x: number; y: number } | null
+  ): { error?: string } {
+    logger.info('[GameState]', `🎴 commitMove: игрок=${playerId}`);
 
+    // Валидация: чей ход?
+    if (playerId !== this.currentPlayer.id) {
+      return { error: 'NOT_YOUR_TURN' };
+    }
+    if (!this.drawnTile) {
+      return { error: 'NO_TILE_DRAWN' };
+    }
+    if (this.board.has(`${tileData.x},${tileData.y}`)) {
+      return { error: 'CELL_OCCUPIED' };
+    }
+
+    // Валидация размещения тайла
+    const rotatedFeatures = rotateFeatures(this.drawnTile.features, tileData.rotation);
+    if (!isValidPlacement(this.board, tileData.x, tileData.y, rotatedFeatures)) {
+      return { error: 'INVALID_PLACEMENT' };
+    }
+
+    // Применяем тайл
     const { newBoard, newRM } = applyTileToBoardAndRM(
-      this.board, this.regionManager, this.drawnTile, x, y, rotation
+      this.board, this.regionManager, this.drawnTile,
+      tileData.x, tileData.y, tileData.rotation
     );
-
-    // applyTileToBoardAndRM не валидирует грани — проверяем отдельно
-    // (валидация уже произошла внутри, но убедимся что клетка была валидна)
     this.board = newBoard;
     this.regionManager = newRM;
     this.drawnTile = null;
 
-    logger.info('[GameState]', `Тайл установлен игроком ${this.currentPlayer.name} в (${x}, ${y}), rot=${rotation}`);
-    return null;
+    this.lastPlacedTiles[playerId] = {
+      x: tileData.x,
+      y: tileData.y,
+      color: this.currentPlayer.color,
+    };
+
+    logger.info('[GameState]', `✅ Тайл установлен: (${tileData.x}, ${tileData.y})`);
+
+    // Применяем мипла (если есть)
+    if (meepleData) {
+      const player = this.currentPlayer;
+      if (player.meepleCount <= 0) {
+        return { error: 'NO_MEEPLES' };
+      }
+
+      const featureKey: FeatureKey = `${tileData.x},${tileData.y}:${meepleData.featureId}`;
+      const owners = this.regionManager.getFeatureOwners(featureKey);
+      if (owners.length > 0) {
+        return { error: 'FEATURE_OCCUPIED' };
+      }
+
+      const tile = this.board.get(`${tileData.x},${tileData.y}`);
+      if (!tile) {
+        return { error: 'TILE_NOT_FOUND' };
+      }
+
+      tile.meeple = {
+        playerId: player.id,
+        featureId: meepleData.featureId,
+        color: player.color,
+        x: meepleData.x,
+        y: meepleData.y,
+      };
+      player.meepleCount -= 1;
+      this.regionManager.addMeeple(featureKey, player.id);
+      this.regionManager.addOwner(featureKey, player.id);
+
+      logger.info('[GameState]', `✅ Мипл размещён: ${meepleData.featureId}`);
+    } else {
+      logger.info('[GameState]', `⏭️ Мипл пропущен`);
+    }
+
+    return {};
+  }
+
+  /** Пропуск хода (таймаут или автопропуск). Возвращает тайл в колоду */
+  skipTurn(): void {
+    if (this.drawnTile) {
+      this.deck.push(this.drawnTile);
+      this.drawnTile = null;
+      logger.info('[GameState]', `Тайл возвращён в колоду из-за пропуска хода`);
+    }
+    this.nextTurn();
   }
 
   /** Проверка завершённых регионов после установки тайла */
@@ -132,38 +213,41 @@ export class ServerGameState {
       // Возврат миплов
       for (const ownerId of region.allMeepleOwners) {
         const player = this.players.find(p => p.id === ownerId);
-        if (player) player.meepleCount += 1;
+        const meta = this.regionManager.getMetadata(region.rootKey);
+        if (player && meta) {
+          player.meepleCount += meta.meepleCounts.get(ownerId) ?? 0;
+        }
       }
+
+      // Удаляем миплы с board
+      for (const featureKey of region.featureKeys) {
+        const [tileCoord, featureId] = featureKey.split(':');
+        const tile = this.board.get(tileCoord);
+        if (tile?.meeple?.featureId === featureId) {
+          tile.meeple = undefined;
+          logger.info('[GameState]', `🗑️ Мипл удалён с тайла ${tileCoord} (фича ${featureId})`);
+        }
+      }
+
       logger.info('[GameState]', `Регион ${region.type} завершён: +${region.points}, победители: ${region.winners.join(',')}`);
     }
   }
 
-  /** Разместить мипла на последнем тайле */
-  placeMeeple(playerId: string, featureId: string, x: number, y: number): string | null {
-    if (playerId !== this.currentPlayer.id) return 'NOT_YOUR_TURN';
-    const player = this.currentPlayer;
-    if (player.meepleCount <= 0) return 'NO_MEEPLES';
+  /** Финальный подсчёт очков в конце игры */
+  finalizeGame(): CompletedRegion[] {
+    logger.info('[GameState]', '🏁 === КОНЕЦ ИГРЫ: финальный подсчёт ===');
 
-    const featureKey: FeatureKey = `${x},${y}:${featureId}`;
-    const owners = this.regionManager.getFeatureOwners(featureKey);
-    if (owners.length > 0) return 'FEATURE_OCCUPIED';
+    // 🌟 Используем shared-функцию
+    const regionsWithMeeples = findAllIncompleteRegionsWithMeeples(
+      this.board,
+      this.regionManager
+    );
 
-    const tile = this.board.get(`${x},${y}`);
-    if (!tile) return 'TILE_NOT_FOUND';
+    // Применяем через тот же applyCompletedRegions
+    this.applyCompletedRegions(regionsWithMeeples);
 
-    // Ставим постоянного мипла
-    tile.meeple = {
-      playerId: player.id,
-      featureId,
-      color: player.color,
-      x, y,
-    };
-    player.meepleCount -= 1;
-    this.regionManager.addMeeple(featureKey, player.id);
-    this.regionManager.addOwner(featureKey, player.id);
-
-    logger.info('[GameState]', `Мипл ${player.name} размещён на ${featureId}`);
-    return null;
+    logger.info('[GameState]', `🏁 Финальный подсчёт: ${regionsWithMeeples.length} регионов`);
+    return regionsWithMeeples;
   }
 
   /** Переход к следующему игроку */
@@ -190,8 +274,8 @@ export class ServerGameState {
       currentTurn: this.currentTurn,
       phase: this.phase,
       drawnTile: isCurrentPlayer ? this.drawnTile : null, // 🌟 приватно
-      totalTiles: this.deck.length,
-      lastPlacedTiles: {}, // упрощённо на сервере
+      totalTiles: this.totalTiles,
+      lastPlacedTiles: this.lastPlacedTiles,
     };
   }
 }

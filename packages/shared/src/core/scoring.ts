@@ -21,7 +21,7 @@ export function checkRegionCompleteness(
     const x = parseInt(xStr, 10);
     const y = parseInt(yStr, 10);
     const placedTile = board.get(`${x},${y}`);
-    
+
     if (!placedTile) continue;
 
     const feature = placedTile.features.find(f => f.id === featureId);
@@ -105,7 +105,7 @@ function calculateRoadPoints(
   }
 
   const basePoints = uniqueTiles.size;
-  
+
   const totalPoints = uniqueTiles.size;
   const isComplete = checkRegionCompleteness(board, rm, rootKey, 'road');
 
@@ -130,7 +130,7 @@ function calculateCityPoints(
 
   for (const featureKey of meta.featureKeys) {
     const [tileCoord, featureId] = featureKey.split(':');
-    
+
     if (processedTiles.has(tileCoord)) continue;
     processedTiles.add(tileCoord);
 
@@ -138,7 +138,7 @@ function calculateCityPoints(
     const x = parseInt(xStr, 10);
     const y = parseInt(yStr, 10);
     const placedTile = board.get(`${x},${y}`);
-    
+
     if (!placedTile) continue;
 
     const feature = placedTile.features.find(f => f.id === featureId);
@@ -252,6 +252,48 @@ export interface CompletedRegion {
   featureKeys: string[]; // Все featureKey в регионе
 }
 
+/**
+ * 🌟 Формирует CompletedRegion из rootKey.
+ * Единый источник истины для формирования данных региона.
+ * 
+ * Используется и в середине игры (findCompletedRegionsOnTile),
+ * и в конце игры (findAllIncompleteRegionsWithMeeples).
+ */
+export function buildCompletedRegion(
+  board: Map<string, PlacedTile>,
+  rm: RegionManager,
+  rootKey: FeatureKey,
+  isEndGame: boolean = false
+): CompletedRegion | null {
+  const meta = rm.getMetadata(rootKey);
+  if (!meta) return null;
+
+  // Очки считаются универсальной функцией
+  const points = calculateRegionPoints(board, rm, rootKey, isEndGame);
+
+  // Находим победителей (доминантов)
+  const counts = Array.from(meta.meepleCounts.values());
+  const maxCount = counts.length > 0 ? Math.max(...counts) : 0;
+
+  // Если нет миплов — регион всё равно может быть завершён (для анимации)
+  const winners = maxCount > 0
+    ? Array.from(meta.meepleCounts.entries())
+      .filter(([_, count]) => count === maxCount)
+      .map(([ownerId]) => ownerId)
+    : [];
+
+  const allMeepleOwners = Array.from(meta.meepleCounts.keys());
+
+  return {
+    rootKey,
+    type: meta.type,
+    points,
+    winners,
+    allMeepleOwners,
+    featureKeys: [...meta.featureKeys],
+  };
+}
+
 export function findCompletedRegionsOnTile(
   board: Map<string, PlacedTile>,
   rm: RegionManager,
@@ -288,28 +330,11 @@ export function findCompletedRegionsOnTile(
 
     if (!isComplete) continue;
 
-    // Регион завершён — собираем данные
-    const points = calculateRegionPoints(board, rm, rootKey, false);
-    
-    // Находим победителей (доминантов)
-    const maxCount = Math.max(...Array.from(meta.meepleCounts.values()), 0);
-    const winners = Array.from(meta.meepleCounts.entries())
-      .filter(([_, count]) => count === maxCount && count > 0)
-      .map(([ownerId]) => ownerId);
+    // 🌟 Используем общую функцию
+    const region = buildCompletedRegion(board, rm, rootKey, false);
+    if (region) completed.push(region);
 
-    // Все владельцы миплов в регионе
-    const allMeepleOwners = Array.from(meta.meepleCounts.keys());
-
-    completed.push({
-      rootKey,
-      type: feature.type,
-      points,
-      winners,
-      allMeepleOwners,
-      featureKeys: [...meta.featureKeys]
-    });
-
-    console.log(`✅ [Scoring] Регион ${feature.type} с корнем ${rootKey} завершён (+${points} очков)`);
+    console.log(`✅ [Scoring] Регион ${feature.type} с корнем ${rootKey} завершён`);
   }
 
   // ============================================
@@ -346,31 +371,61 @@ export function findCompletedRegionsOnTile(
       const meta = rm.getMetadata(rootKey);
       if (!meta || meta.isComplete) continue;
 
-      // 🌟 Монастырь завершён, если все 8 соседей на месте
+      // Монастырь завершён, если все 8 соседей на месте
       const { isComplete, points } = calculateMonasteryPoints(board, x, y);
       if (!isComplete) continue;
 
-      const maxCount = Math.max(...Array.from(meta.meepleCounts.values()), 0);
-      const winners = Array.from(meta.meepleCounts.entries())
-        .filter(([_, count]) => count === maxCount && count > 0)
-        .map(([ownerId]) => ownerId);
+      // 🌟 Используем общую функцию
+      const region = buildCompletedRegion(board, rm, rootKey, false);
+      if (region) completed.push(region);
 
-      const allMeepleOwners = Array.from(meta.meepleCounts.keys());
 
-      completed.push({
-        rootKey,
-        type: feature.type,
-        points,
-        winners,
-        allMeepleOwners,
-        featureKeys: [...meta.featureKeys]
-      });
+      console.log(`✅ [Scoring] Монастырь на (${x},${y}) завершён (+${region?.points} очков)`);
 
-      console.log(`✅ [Scoring] Монастырь на (${x},${y}) завершён (+${points} очков)`);
     }
   }
 
   return completed;
+}
+
+/**
+ * 🌟 Находит все незавершённые регионы с миплами (для конца игры).
+ * 
+ * В отличие от findCompletedRegionsOnTile:
+ * - Итерирует ВСЕ тайлы, а не только последний
+ * - Включает поля (которые не обрабатываются в середине игры)
+ * - Использует isEndGame=true для подсчёта очков
+ */
+export function findAllIncompleteRegionsWithMeeples(
+    board: Map<string, PlacedTile>,
+    rm: RegionManager,
+): CompletedRegion[] {
+    const regions: CompletedRegion[] = [];
+    const processedRoots = new Set<string>();
+
+    for (const tile of board.values()) {
+        for (const feature of tile.features) {
+            const featureKey: FeatureKey = `${tile.x},${tile.y}:${feature.id}`;
+            const rootKey = rm.find(featureKey);
+
+            if (!rootKey || processedRoots.has(rootKey)) continue;
+            processedRoots.add(rootKey);
+
+            const meta = rm.getMetadata(rootKey);
+            if (!meta) continue;
+            if (meta.isComplete) continue;
+            if (meta.meepleCounts.size === 0) continue;
+
+            // 🌟 Используем общую функцию с isEndGame=true
+            const region = buildCompletedRegion(board, rm, rootKey, true);
+            if (region) {
+                regions.push(region);
+                console.log(`🏆 [Scoring] EndGame: ${meta.type} ${rootKey} → ${region.points} очков`);
+            }
+        }
+    }
+
+    return regions;
 }
 
 /**
@@ -400,7 +455,7 @@ export function calculateMonasteryPoints(
 
   const isComplete = points === 9;
   console.log(`⛪ [Scoring] Монастырь на (${x},${y}): ${points - 1} соседей, очки: ${points}, завершён: ${isComplete}`);
-  
+
   return { points, isComplete };
 }
 

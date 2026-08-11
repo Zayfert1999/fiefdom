@@ -1,11 +1,11 @@
 import type { StateCreator } from 'zustand';
-import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@carcassonne/shared/core/types';
-import { getTileSides, rotateFeatures, getValidPlacementCells } from '@carcassonne/shared/core/tileUtils';
-import { RegionManager, type FeatureKey } from '@carcassonne/shared/core/regionManager';
-import { findCompletedRegionsOnTile, calculateRegionPoints, type CompletedRegion } from '@carcassonne/shared/core/scoring';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
-import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG} from '@carcassonne/shared/core/constants'
+import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@carcassonne/shared/core/types';
+import { getTileSides, rotateFeatures, getValidPlacementCells } from '@carcassonne/shared/core/tileUtils';
+import { RegionManager } from '@carcassonne/shared/core/regionManager';
+import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@carcassonne/shared/core/scoring';
+import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@carcassonne/shared/core/constants'
 import { createDeck } from '@carcassonne/shared/core/deck';
 
 
@@ -36,7 +36,7 @@ export interface GameSlice {
     removePlayer: (id: string) => void;
     renamePlayer: (id: string, newName: string) => void;
     startGame: () => void;
-    exitToLobby: () => void; 
+    exitToLobby: () => void;
     toggleRegions: () => void;
     toggleDeadCells: () => void;
     toggleDeckView: () => void;
@@ -56,7 +56,15 @@ export interface GameSlice {
     finishEndTurn: () => void;
     processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
     processEndGameInStore: (nextTurn: number) => void;
-    animateRegionCompletion: (region: CompletedRegion, startDelay?: number) => void;
+    animateRegionCompletion: (
+        region: CompletedRegion,
+        startDelay?: number,
+        preCollectedMeeples?: Array<{
+            tileKey: string;
+            meeple: PlacedMeeple;
+            points: number | undefined;
+        }>
+    ) => void;
 
     //Сериализация
     saveGame: () => void;
@@ -151,7 +159,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
     exitToLobby: () => {
         console.log('🚪 [Store] Выход в лобби');
-        
+
         // Сбрасываем всё игровое состояние
         set({
             lobbyPlayers: [
@@ -285,6 +293,40 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         const { x, y, rotation, tile } = state.previewTile;
 
+        // 🌟 СЕТЕВОЙ РЕЖИМ: НЕ отправляем на сервер
+        // Просто переходим в placeMeeple локально
+        if (state.roomId !== null) {
+            const snapshot: MoveSnapshot = {
+                board: new Map(state.board),
+                regionManager: state.regionManager,
+                drawnTile: state.drawnTile!,
+                deck: [...state.deck],
+                previewTile: { ...state.previewTile },
+                previewTileRegionManager: state.previewRegionManager.clone(),
+            };
+
+            const rotatedFeatures = rotateFeatures(state.previewTile.tile.features, rotation);
+            const newBoard = new Map(state.board);
+            newBoard.set(`${x},${y}`, {
+                templateId: state.previewTile.tile.id,
+                x, y, rotation,
+                features: rotatedFeatures,
+                derivedSides: getTileSides({ ...state.previewTile.tile, features: rotatedFeatures }),
+            });
+
+            set({
+                board: newBoard,
+                regionManager: state.previewRegionManager,
+                previewRegionManager: null,
+                previewTile: null,
+                drawnTile: null,
+                phase: 'placeMeeple',
+                moveSnapshot: snapshot,
+            });
+            console.log(`✅ [Store] Примерка подтверждена (локально, ждём мипла)`);
+            return;
+        }
+
         // Сохраняем snapshot ПОЛНОСТЬЮ (включая preview)
         const snapshot: MoveSnapshot = {
             board: new Map(state.board),
@@ -331,6 +373,25 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         const tiles = Array.from(state.board.values());
         const last = tiles[tiles.length - 1];
+
+        // 🌟 СЕТЕВОЙ РЕЖИМ: отправляем commit-move на сервер
+        if (state.roomId !== null) {
+            const tileData = {
+                x: last.x,
+                y: last.y,
+                rotation: last.rotation,
+            };
+
+            const meepleData = last.meeple?.isTemporary
+                ? { featureId: last.meeple.featureId, x: last.meeple.x, y: last.meeple.y }
+                : null;
+
+            console.log(`📤 [Store] Отправка commit-move на сервер`);
+            state.sendCommitMove(tileData, meepleData);
+
+            // НЕ меняем состояние локально — ждём state-update от сервера
+            return;
+        }
 
         if (last?.meeple?.isTemporary) {
             const { featureId } = last.meeple;
@@ -445,20 +506,28 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         for (let i = 0; i < regions.length; i++) {
             const region = regions[i];
-            // Задержка старта анимации у последующих регионов
             const startDelay = i * COMPLITED_REGION_ANIMATION_DURATION;
 
-            // Одна функция для всей анимации
+            // Получаем метаданные ДО markComplete
+            const metaBeforeComplete = rm.getMetadata(region.rootKey);
+
+            // ============================================
+            // 🌟 ШАГ 1: Запускаем анимацию С предсобранымы миплами
+            // ============================================
             get().animateRegionCompletion(region, startDelay);
 
+            // ============================================
+            // 🌟 ШАГ 2: Применяем изменения к RegionManager
+            // ============================================
             rm.markComplete(region.rootKey, region.points);
 
-            // Начисляем очки победителям
+            // ============================================
+            // 🌟 ШАГ 3: Начисляем очки победителям
+            // ============================================
             for (const winnerId of region.winners) {
                 const playerIndex = newPlayers.findIndex(p => p.id === winnerId);
                 if (playerIndex !== -1) {
                     const player = newPlayers[playerIndex];
-                    // Распределяем очки по категории региона
                     newPlayers[playerIndex] = {
                         ...player,
                         score: player.score + region.points,
@@ -471,12 +540,21 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 }
             }
 
-            // Возвращаем миплы всем владельцам
+            // ============================================
+            // 🌟 ШАГ 4: Возвращаем миплы всем владельцам
+            // ============================================
             for (const meepleOwnerId of region.allMeepleOwners) {
                 const playerIndex = newPlayers.findIndex(p => p.id === meepleOwnerId);
                 if (playerIndex !== -1) {
-                    newPlayers[playerIndex].meepleCount += 1;
-                    console.log(`🔄 [Store] Мипл возвращён игроку ${newPlayers[playerIndex].name}`);
+                    // 🌟 ИСПРАВЛЕНО: используем метаданные, полученные ДО markComplete
+                    const meepleCount = metaBeforeComplete?.meepleCounts.get(meepleOwnerId) ?? 1;
+
+                    newPlayers[playerIndex] = {
+                        ...newPlayers[playerIndex],
+                        meepleCount: newPlayers[playerIndex].meepleCount + meepleCount,
+                    };
+
+                    console.log(`🔄 [Store] Мипл${meepleCount > 1 ? `ы (${meepleCount} шт.)` : ''} возвращён игроку ${newPlayers[playerIndex].name}`);
                 }
             }
         }
@@ -490,62 +568,24 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     processEndGameInStore: (nextTurn: number) => {
         const state = get();
-        const rm = state.regionManager;
 
         console.log('🏁 [Store] === КОНЕЦ ИГРЫ: сбор всех регионов с миплами ===');
 
-        // 🌟 ШАГ 1: Собираем ВСЕ регионы с миплами в формате CompletedRegion
-        const regionsWithMeeples: CompletedRegion[] = [];
-        const processedRegions = new Set<string>();
+        // 🌟 ИСПОЛЬЗУЕМ shared-функцию вместо ручной итерации
+        const regionsWithMeeples = findAllIncompleteRegionsWithMeeples(
+            state.board,
+            state.regionManager
+        );
 
-        for (const tile of state.board.values()) {
-            for (const feature of tile.features) {
-                const featureKey: FeatureKey = `${tile.x},${tile.y}:${feature.id}`;
-                const root = rm.find(featureKey);
+        console.log(`🏁 [Store] Найдено ${regionsWithMeeples.length} регионов для финального подсчёта`);
 
-                if (!root || processedRegions.has(root)) continue;
-                processedRegions.add(root);
-
-                const meta = rm.getMetadata(root);
-                if (!meta || meta.meepleCounts.size === 0) continue;
-
-                //Пропуск завершенных регионов
-                if (meta.isComplete) continue;
-
-                // Подсчёт очков БЕЗ удвоения (isEndGame = true)
-                const points = calculateRegionPoints(state.board, rm, root, true);
-
-                // Находим победителей (доминантов)
-                const maxCount = Math.max(...Array.from(meta.meepleCounts.values()));
-                const winners = Array.from(meta.meepleCounts.entries())
-                    .filter(([_, count]) => count === maxCount)
-                    .map(([ownerId]) => ownerId);
-
-                const allMeepleOwners = Array.from(meta.meepleCounts.keys());
-
-                regionsWithMeeples.push({
-                    rootKey: root,
-                    type: meta.type,
-                    points,
-                    winners,
-                    allMeepleOwners,
-                    featureKeys: [...meta.featureKeys]
-                });
-
-                console.log(`🏆 [Store] EndGame: Регион ${meta.type} ${root} — ${points} очков`);
-            }
-        }
-
-        // 🌟 ШАГ 2: Используем ту же функцию, что и в середине игры
-        // Она сама запустит поэтапную анимацию с задержкой DELAY_BETWEEN_ANIMATIONS
+        // Используем ту же функцию, что и в середине игры
         if (regionsWithMeeples.length > 0) {
             get().processCompletedRegionsInStore(regionsWithMeeples);
         }
 
-        // 🌟 ШАГ 3: После ВСЕХ анимаций — переходим в gameOver
-        const totalAnimationTime = regionsWithMeeples.length > 0
-            ? regionsWithMeeples.length * COMPLITED_REGION_ANIMATION_DURATION
-            : 0;
+        // После ВСЕХ анимаций — переходим в gameOver
+        const totalAnimationTime = regionsWithMeeples.length * COMPLITED_REGION_ANIMATION_DURATION;
 
         setTimeout(() => {
             set({
@@ -557,13 +597,18 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
         }, totalAnimationTime);
     },
 
-    animateRegionCompletion: (region: CompletedRegion, startDelay: number = 0) => {
+    animateRegionCompletion: (
+        region: CompletedRegion,
+        startDelay: number = 0,
+    ) => {
+
         console.log(`✨ [Store] Запуск анимации региона ${region.type} ${region.rootKey} (задержка ${startDelay}мс)`);
 
-        // 🌟 Собираем миплов региона для анимации
-        const animatedPlayers = new Set<string>();
+        // 🌟 Собираем миплов и определяем, кому показать очки
+        const animatedWinners = new Set<string>();
         const meeplesToAnimate: Array<{
             tileKey: string;
+            featureId: string;
             meeple: PlacedMeeple;
             points: number | undefined;
         }> = [];
@@ -575,17 +620,23 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
             if (tileWithMeeple?.meeple?.featureId === featureId) {
                 const meepleOwnerId = tileWithMeeple.meeple.playerId;
-                const showPoints = !animatedPlayers.has(meepleOwnerId);
+
+                // 🌟 Очки показываем ТОЛЬКО победителям
+                const isWinner = region.winners.includes(meepleOwnerId);
+                const showPoints = isWinner && !animatedWinners.has(meepleOwnerId);
 
                 meeplesToAnimate.push({
                     tileKey: tileCoord,
+                    featureId,
                     meeple: tileWithMeeple.meeple,
                     points: showPoints ? region.points : undefined,
                 });
 
-                if (showPoints) animatedPlayers.add(meepleOwnerId);
+                if (showPoints) animatedWinners.add(meepleOwnerId);
             }
         }
+
+        console.log(`✨ [Store] Собрано миплов для анимации: ${meeplesToAnimate.length}`);
 
         // ============================================
         // 🎬 ФАЗА 1: Начало анимации (startDelay)
@@ -605,9 +656,9 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 const currentState = get();
                 const currentBoard = new Map(currentState.board);
 
-                for (const { tileKey, meeple, points } of meeplesToAnimate) {
+                for (const { tileKey, featureId, meeple, points } of meeplesToAnimate) {
                     const tile = currentBoard.get(tileKey);
-                    if (tile?.meeple) {
+                    if (tile?.meeple?.featureId === featureId) {
                         currentBoard.set(tileKey, {
                             ...tile,
                             meeple: { ...meeple, isCompleting: true, points },
@@ -632,9 +683,9 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 const currentBoard = new Map(currentState.board);
                 let boardChanged = false;
 
-                for (const { tileKey } of meeplesToAnimate) {
+                for (const { tileKey, featureId } of meeplesToAnimate) {
                     const tile = currentBoard.get(tileKey);
-                    if (tile?.meeple?.isCompleting) {
+                    if (tile?.meeple?.isCompleting && tile.meeple.featureId === featureId) {
                         currentBoard.set(tileKey, { ...tile, meeple: undefined });
                         boardChanged = true;
                     }
@@ -673,7 +724,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     toggleDeckView: () => {
         set((state) => ({ enabledDeckView: !state.enabledDeckView }));
         console.log(`📦 [Store] Показ колоды: ${!get().enabledDeckView ? 'ВКЛ' : 'ВЫКЛ'}`);
-    },    
+    },
 
     // ============================================
     // 💾 СОХРАНЕНИЕ ИГРЫ

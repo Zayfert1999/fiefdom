@@ -11,11 +11,15 @@ import { HUD } from '@/components/HUD';
 import { PlayersPanel } from '@/components/PlayersPanel';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { ModeSelector } from '@/components/ModeSelector';
 
 // Ленивый импорт
 const Lobby = lazy(() => import('@/components/Lobby').then(m => ({ default: m.Lobby })));
 const GameOverScreen = lazy(() => import('@/components/GameOverScreen').then(m => ({ default: m.GameOverScreen })));
 const DebugPanel = lazy(() => import('@/components/DebugPanel').then(m => ({ default: m.DebugPanel })));
+const NetworkLobby = lazy(() => import('@/components/NetworkLobby').then(m => ({ default: m.NetworkLobby })));
+
 
 // 🌟 Fallback для Suspense — минимальный, не мешает UX
 const LazyFallback = () => null;  // Или можно <div>Загрузка...</div>
@@ -24,6 +28,7 @@ export default function App() {
   // 🎯 ЗНАЧЕНИЯ — рендеримся только когда меняются
   const drawnTile = useGameStore(s => s.drawnTile);
   const phase = useGameStore(s => s.phase);
+  const lobbyScreen = useGameStore(s => s.lobbyScreen);
   const board = useGameStore(s => s.board);
   const previewTile = useGameStore(s => s.previewTile);
 
@@ -145,20 +150,42 @@ export default function App() {
   // 🌐 ЛОББИ
   // ============================================
   if (phase === 'lobby') {
-    return (
-      <Suspense fallback={null}>
-        <ErrorBoundary name="Lobby">
-          <Lobby />
-        </ErrorBoundary>
-      </Suspense>
-    );
-  }
+      if (lobbyScreen === 'modeSelect') {
+        return (
+          <ErrorBoundary name="ModeSelector">
+            <ModeSelector />
+          </ErrorBoundary>
+        );
+      }
+
+      if (lobbyScreen === 'networkLobby') {
+        return (
+          <Suspense fallback={null}>
+            <ErrorBoundary name="NetworkLobby">
+              <NetworkLobby />
+            </ErrorBoundary>
+          </Suspense>
+        );
+      }
+
+      if (lobbyScreen === 'localLobby') {
+        return (
+          <Suspense fallback={null}>
+            <ErrorBoundary name="Lobby">
+              <Lobby />
+            </ErrorBoundary>
+          </Suspense>
+        );
+      }
+    }
 
   // ============================================
   // 🎨 РЕНДЕР
   // ============================================
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
+      
+      <ConnectionStatus />
 
       {/* 🖼️ Верхняя панель (HUD) */}
       <ErrorBoundary name="HUD">

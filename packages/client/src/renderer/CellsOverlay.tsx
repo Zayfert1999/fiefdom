@@ -4,7 +4,8 @@ import { useGameStore } from '@/state/useGameStore';
 import { findDeadCells } from '@carcassonne/shared/core/tileUtils';
 import { rotateFeatures, getTileSides } from '@carcassonne/shared/core/tileUtils';
 import type { PlacedTile } from '@carcassonne/shared/core/types';
-import {TILE_SIZE} from '@carcassonne/shared/core/constants'
+import { TILE_SIZE } from '@carcassonne/shared/core/constants'
+import { getVirtualDeck } from '@/core/deckUtils';
 
 
 interface CellsOverlayProps {
@@ -14,7 +15,6 @@ interface CellsOverlayProps {
 
 export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => {
   const board = useGameStore(s => s.board);
-  const deck = useGameStore(s => s.deck);
   const drawnTile = useGameStore(s => s.drawnTile);
   const phase = useGameStore(s => s.phase);
   const showDeadCells = useGameStore(s => s.showDeadCells);
@@ -23,48 +23,43 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
   // Валидные клетки БЕЗ позиции preview-тайла
   const filteredValidCells = useMemo(() => {
     if (!previewTile) return validCells;
-    
+
     const filtered = new Set(validCells);
     filtered.delete(`${previewTile.x},${previewTile.y}`);
     return filtered;
   }, [validCells, previewTile]);
-  
+
   // 💀 Мёртвые клетки с учётом preview-тайла
   const allDeadCells = useMemo(() => {
-    
-    // 🌟 ЛОГИКА:
-    // - Если НЕТ previewTile → drawnTile в руке → доступен → добавляем в колоду
-    // - Если ЕСТЬ previewTile → drawnTile виртуально поставлен → занят → НЕ добавляем
-    const availableDeck = previewTile ? deck : (drawnTile ? [...deck, drawnTile] : deck);
-    
-    // 🌟 Создаём виртуальный board с preview-тайлом (если есть)
+    // 🌟 ИСПРАВЛЕНО: используем виртуальную колоду
+    // Работает и для локальной, и для сетевой игры
     let boardToCheck = board;
     if (previewTile) {
-        const virtualBoard = new Map(board);
-        const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
-      
-        const virtualTile: PlacedTile = {
-            templateId: previewTile.tile.id,
-            x: previewTile.x,
-            y: previewTile.y,
-            rotation: previewTile.rotation,
-            features: rotatedFeatures,
-            derivedSides: getTileSides({ ...previewTile.tile, features: rotatedFeatures }),
-        };
-      
-        virtualBoard.set(`${previewTile.x},${previewTile.y}`, virtualTile);
-        boardToCheck = virtualBoard;
+      const virtualBoard = new Map(board);
+      const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
+      const virtualTile: PlacedTile = {
+        templateId: previewTile.tile.id,
+        x: previewTile.x,
+        y: previewTile.y,
+        rotation: previewTile.rotation,
+        features: rotatedFeatures,
+        derivedSides: getTileSides({ ...previewTile.tile, features: rotatedFeatures }),
+      };
+      virtualBoard.set(`${previewTile.x},${previewTile.y}`, virtualTile);
+      boardToCheck = virtualBoard;
     }
-    
+
+    // 🌟 ИСПРАВЛЕНО: виртуальная колода вместо deck из store
+    const availableDeck = getVirtualDeck(boardToCheck);
     const dead = findDeadCells(boardToCheck, availableDeck);
-    
-    // 🌟 Исключаем саму клетку preview-тайла из мёртвых (она занята, а не мёртвая)
+
+    // Исключаем саму клетку preview-тайла из мёртвых
     if (previewTile) {
       dead.delete(`${previewTile.x},${previewTile.y}`);
     }
-    
+
     return dead;
-  }, [board, deck, drawnTile, phase, showDeadCells, previewTile]);
+  }, [board, drawnTile, phase, showDeadCells, previewTile]);
 
   // 🌟 ОДИН useMemo для всех трёх типов клеток
   const { pureValidCells, pureDeadCells, conflictedCells } = useMemo(() => {
@@ -84,7 +79,7 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
     // 🟢 Чистые валидные (не конфликтные)
     for (const cell of filteredValidCells) {
       if (!conflicted.has(cell)) {
-        
+
         pureValid.add(cell);
       }
     }
@@ -117,7 +112,7 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
         const crossSize = 15;
 
         return (
-          <g key={`dead-${cellKey}`} className="dead-cell-container">         
+          <g key={`dead-${cellKey}`} className="dead-cell-container">
             {/* Красная пунктирная рамка */}
             <rect
               className="dead-cell"
@@ -129,15 +124,15 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
             {/* Крестик в центре */}
             <g className="dead-cell-cross">
               <line
-                x1={cx - crossSize} 
-                y1={cy} 
-                x2={cx + crossSize} 
-                y2={cy} 
+                x1={cx - crossSize}
+                y1={cy}
+                x2={cx + crossSize}
+                y2={cy}
               />
               <line
-                x1={cx} 
-                y1={cy - crossSize} 
-                x2={cx} 
+                x1={cx}
+                y1={cy - crossSize}
+                x2={cx}
                 y2={cy + crossSize}
               />
             </g>
@@ -165,25 +160,25 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
             }}
           >
             {/* 🌟 Заливка и рамка валидной клетки) */}
-            <rect 
-              className="valid-cell" 
-              x={px+2} 
-              y={py+2} 
-              width={TILE_SIZE-4} 
-              height={TILE_SIZE-4} 
+            <rect
+              className="valid-cell"
+              x={px + 2}
+              y={py + 2}
+              width={TILE_SIZE - 4}
+              height={TILE_SIZE - 4}
             />
             {/* 🌟 Крестик мёртвой клетки */}
             <g className="dead-cell-cross">
               <line
-                x1={cx - crossSize} 
-                y1={cy} 
-                x2={cx + crossSize} 
-                y2={cy} 
+                x1={cx - crossSize}
+                y1={cy}
+                x2={cx + crossSize}
+                y2={cy}
               />
               <line
-                x1={cx} 
-                y1={cy - crossSize} 
-                x2={cx} 
+                x1={cx}
+                y1={cy - crossSize}
+                x2={cx}
                 y2={cy + crossSize}
               />
             </g>
@@ -212,24 +207,24 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
           >
 
             <rect
-                className="valid-cell"
-                x={px+2}
-                y={py+2}
-                width={TILE_SIZE - 4}
-                height={TILE_SIZE - 4}
+              className="valid-cell"
+              x={px + 2}
+              y={py + 2}
+              width={TILE_SIZE - 4}
+              height={TILE_SIZE - 4}
             />
             <g className="valid-cell-plus">
-              <line 
-                x1={cx - plusSize} 
-                y1={cy} 
-                x2={cx + plusSize} 
-                y2={cy} 
+              <line
+                x1={cx - plusSize}
+                y1={cy}
+                x2={cx + plusSize}
+                y2={cy}
               />
-              <line 
-                x1={cx} 
-                y1={cy - plusSize} 
-                x2={cx} 
-                y2={cy + plusSize} 
+              <line
+                x1={cx}
+                y1={cy - plusSize}
+                x2={cx}
+                y2={cy + plusSize}
               />
             </g>
           </g>

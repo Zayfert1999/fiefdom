@@ -13,7 +13,8 @@ interface DeckModalProps {
 }
 
 export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
-  const deck = useGameStore(s => s.deck);
+  const board = useGameStore(s => s.board);        // 🌟 НОВОЕ
+  const drawnTile = useGameStore(s => s.drawnTile);
   const totalTiles = useGameStore(s => s.totalTiles);
 
   // Закрытие по Escape
@@ -26,14 +27,37 @@ export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
-  // Группируем колоду по id
+  // Работает и для локальной, и для сетевой игры
   const remainingByTemplate = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const tile of deck) {
-      map.set(tile.id, (map.get(tile.id) || 0) + 1);
+    // Считаем использованные тайлы каждого типа
+    const usedCounts = new Map<string, number>();
+    
+    // 1. Тайлы на доске (все видны)
+    for (const tile of board.values()) {
+      usedCounts.set(tile.templateId, (usedCounts.get(tile.templateId) || 0) + 1);
     }
-    return map;
-  }, [deck]);
+    
+    // 2. Тайл в руке (если есть — тоже взят из колоды)
+    if (drawnTile) {
+      usedCounts.set(drawnTile.id, (usedCounts.get(drawnTile.id) || 0) + 1);
+    }
+    
+    // 3. Вычисляем остатки: изначальное количество минус использованные
+    const result = new Map<string, number>();
+    for (const def of TILE_DEFINITIONS) {
+      const used = usedCounts.get(def.id) || 0;
+      result.set(def.id, Math.max(0, def.quantity - used));
+    }
+    
+    return result;
+  }, [board, drawnTile]);
+
+  // 🌟 Общее количество оставшихся тайлов
+  const deckRemaining = useMemo(() => {
+    let remaining = totalTiles - board.size;
+    if (drawnTile) remaining -= 1;
+    return Math.max(0, remaining);
+  }, [totalTiles, board, drawnTile]);
 
   // Сортируем: сначала с остатком (по убыванию), затем пустые
   const tileList = useMemo(() => {
@@ -63,7 +87,7 @@ export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
           {/* Заголовок — по центру */}
           
           <h2 style={titleStyle}>
-            <DeckIcon/> Колода: {deck.length} / {totalTiles}
+            <DeckIcon/> Колода: {deckRemaining} / {totalTiles}
           </h2>
           
           {/* Кнопка закрытия справа */}

@@ -41,6 +41,12 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     roomManager.addRoom(room);
 
     socket.emit('lobby:room-created', { roomId, playerId: hostPlayer.id });
+    socket.emit('lobby:room-joined', {
+      roomId,
+      playerId: hostPlayer.id,
+      players: [hostConn.toLobbyPlayer(true)], // 🌟 Хост — первый игрок
+      settings,
+    });
     logger.info('[Lobby]', `${playerName} создал комнату ${roomId} (private=${settings.isPrivate})`);
   });
 

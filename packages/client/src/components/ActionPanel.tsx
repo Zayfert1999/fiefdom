@@ -1,5 +1,5 @@
 // components/ActionPanel.tsx
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from '@/renderer/Tile';
 import { useDeckModal } from '@/hooks/useDeckModal';
@@ -23,7 +23,7 @@ export const ActionPanel: React.FC = () => {
   const phase = useGameStore(s => s.phase);
   const drawnTile = useGameStore(s => s.drawnTile);
   const previewTile = useGameStore(s => s.previewTile);
-  const deck = useGameStore(s => s.deck);
+  const board = useGameStore(s => s.board);
   const totalTiles = useGameStore(s => s.totalTiles);
   const enabledDeckView = useGameStore(s => s.enabledDeckView);
 
@@ -33,6 +33,14 @@ export const ActionPanel: React.FC = () => {
   const rollbackMove = useGameStore(s => s.rollbackMove);
 
   const deckModal = useDeckModal();
+
+  // 🌟 ИСПРАВЛЕНО: вычисляем оставшиеся тайлы
+  // Работает и для локальной, и для сетевой игры
+  const deckRemaining = useMemo(() => {
+    let remaining = totalTiles - board.size;
+    if (drawnTile) remaining -= 1;
+    return Math.max(0, remaining);
+  }, [totalTiles, board, drawnTile]);
 
   useHotkeys([
     {
@@ -96,7 +104,7 @@ export const ActionPanel: React.FC = () => {
             fontSize: '20px',
             fontWeight: 'bold',
           }}>
-            {deck.length} / {totalTiles}
+            {deckRemaining} / {totalTiles}
           </span>
         </div>
 

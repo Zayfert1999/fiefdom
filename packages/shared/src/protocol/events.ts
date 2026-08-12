@@ -4,7 +4,7 @@
 
 import type { Player, Tile } from '../core/types';
 import type { SerializedGameState } from '../core/serialization';
-import type {CompletedRegion} from '../core/scoring'
+import type { CompletedRegion } from '../core/scoring'
 
 // ============================================
 // 📦 ТИПЫ ДАННЫХ
@@ -46,16 +46,22 @@ export interface ClientToServerEvents {
     playerName: string;
     settings: RoomSettings;
   }) => void;
-  
+
   'lobby:join-room': (data: {
     roomId: string;
     playerName: string;
   }) => void;
-  
+
+  'lobby:reconnect': (data: {
+    playerId: string;
+    roomId: string;
+    playerName: string;
+  }) => void;
+
   'lobby:leave-room': () => void;
   'lobby:set-ready': (ready: boolean) => void;
   'lobby:start-game': () => void;  // Только хост
-  
+
   // --- Игра ---
   'game:commit-move': (data: {
     tile: {
@@ -69,13 +75,13 @@ export interface ClientToServerEvents {
       y: number;
     } | null;  // null = пропуск мипла
   }) => void;
-  
+
   // --- Reconnection ---
   'reconnect': (data: {
     roomId: string;
     playerId: string;
   }) => void;
-  
+
   // --- Чат (последняя очередь) ---
   'chat:message': (text: string) => void;
 }
@@ -90,41 +96,54 @@ export interface ServerToClientEvents {
     roomId: string;
     playerId: string;
   }) => void;
-  
+
   'lobby:room-joined': (data: {
     roomId: string;
     playerId: string;
     players: LobbyPlayer[];
     settings: RoomSettings;
   }) => void;
-  
+
+  'lobby:reconnect-success': (data: {
+    roomId: string;
+    playerId: string;
+    players: LobbyPlayer[];
+    settings: RoomSettings;
+    isHost: boolean;
+    gameState?: SerializedGameState;  // Если игра уже началась
+  }) => void;
+
+  'lobby:reconnect-failed': (data: {
+    reason: string;
+  }) => void;
+
   'lobby:player-joined': (player: LobbyPlayer) => void;
   'lobby:player-left': (data: { playerId: string; newHostId?: string }) => void;
   'lobby:player-ready': (data: { playerId: string; isReady: boolean }) => void;
   'lobby:settings-changed': (settings: RoomSettings) => void;
   'lobby:room-list': (rooms: RoomInfo[]) => void;
-  
+
   // --- Игра ---
   'game:started': (data: {
     gameState: SerializedGameState;
     seed: string;
     yourPlayerId: string;
   }) => void;
-  
+
   'game:state-update': (data: {
     gameState: SerializedGameState;
   }) => void;
-  
+
   'game:your-turn': (data: {
     drawnTile: Tile;
   }) => void;
-  
+
   'game:move-committed': (data: {
     playerId: string;
     tile: { x: number; y: number; rotation: number; tileId: string };
     meeple: { featureId: string; x: number; y: number } | null;
   }) => void;
-  
+
   'game:regions-completed': (data: {
     regions: Array<{
       rootKey: string;
@@ -135,7 +154,7 @@ export interface ServerToClientEvents {
       featureKeys: string[];
     }>;
   }) => void;
-  
+
   'game:next-turn': (data: {
     nextPlayerId: string;
     turnIndex: number;
@@ -143,29 +162,29 @@ export interface ServerToClientEvents {
 
   'game:final-scoring': (data: {
     regions: CompletedRegion[];
-}) => void;
-  
+  }) => void;
+
   'game:over': (data: {
     finalScores: Player[];
   }) => void;
-  
+
   'game:timer-update': (data: {
     remainingSeconds: number;
   }) => void;
-  
+
   // --- Ошибки ---
   'error': (data: {
     code: string;
     message: string;
   }) => void;
-  
+
   // --- Reconnection ---
   'reconnect:success': (data: {
     gameState: SerializedGameState;
     yourPlayerId: string;
     currentPhase: string;
   }) => void;
-  
+
   // --- Чат (последняя очередь) ---
   'chat:message': (data: {
     playerId: string;

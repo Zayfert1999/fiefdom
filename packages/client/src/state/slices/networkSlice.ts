@@ -10,6 +10,15 @@ import type {
 import { getSocket, destroySocket } from '@/network/socket';
 import type { GameStore } from '../useGameStore';
 import { registerStateSync, unregisterStateSync } from '@/network/stateSync';
+import {
+  saveConnectionInfo,
+  loadConnectionInfo,
+  clearConnectionInfo,
+  savePlayerName,
+  loadPlayerName,
+} from '@/network/persistence';
+
+
 
 export type LobbyScreen = 'modeSelect' | 'localLobby' | 'networkLobby';
 
@@ -21,6 +30,7 @@ export interface NetworkSlice {
   // === Состояние подключения ===
   isConnected: boolean;
   isReconnecting: boolean;
+  isReconnectingToRoom: boolean;
   connectionError: string | null;
 
   // === Состояние комнаты ===
@@ -33,6 +43,7 @@ export interface NetworkSlice {
   // === Действия: подключение ===
   connectToServer: () => void;
   disconnectFromServer: () => void;
+  attemptAutoReconnect: () => void;
 
   // === Действия: лобби ===
   createRoom: (playerName: string, settings: RoomSettings) => void;
@@ -55,13 +66,15 @@ export interface NetworkSlice {
   _setLobbyPlayers: (players: LobbyPlayer[]) => void;
   _setRoomSettings: (settings: RoomSettings) => void;
   _setHost: (isHost: boolean) => void;
+  _saveConnectionInfo: (playerId: string, roomId: string) => void;
 }
 
-export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set) => ({
+export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set, get) => ({
   // === Начальное состояние ===
   lobbyScreen: 'modeSelect',
   isConnected: false,
   isReconnecting: false,
+  isReconnectingToRoom: false,
   connectionError: null,
   roomId: null,
   playerId: null,
@@ -108,18 +121,55 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   },
 
   // ============================================
+  // 🔄 АВТОВОССТАНОВЛЕНИЕ ПРИ ЗАГРУЗКЕ
+  // ============================================
+  attemptAutoReconnect: () => {
+    const saved = loadConnectionInfo();
+    if (!saved) {
+      console.log('🔍 [Network] Нет сохранённой сессии');
+      return;
+    }
+
+    console.log(`🔄 [Network] Попытка автовосстановления: room=${saved.roomId}, player=${saved.playerId}`);
+    set({ isReconnectingToRoom: true });
+
+    // Подключаемся к серверу
+    get().connectToServer();
+
+    // После подключения отправляем запрос на reconnect
+    // (обработчик 'connect' вызовет это автоматически)
+    const checkAndReconnect = () => {
+      const socket = getSocket();
+      if (socket.connected) {
+        console.log(`📤 [Network] Отправка запроса на reconnect`);
+        socket.emit('lobby:reconnect', {
+          playerId: saved.playerId,
+          roomId: saved.roomId,
+          playerName: saved.playerName,
+        });
+      } else {
+        // Ждём подключения
+        setTimeout(checkAndReconnect, 200);
+      }
+    };
+    checkAndReconnect();
+  },
+
+  // ============================================
   // 🏠 ЛОББИ
   // ============================================
 
   createRoom: (playerName, settings) => {
     const socket = getSocket();
     console.log(`🏠 [Network] Создание комнаты: ${playerName}`, settings);
+    savePlayerName(playerName);
     socket.emit('lobby:create-room', { playerName, settings });
   },
 
   joinRoom: (roomId, playerName) => {
     const socket = getSocket();
     console.log(`🚪 [Network] Присоединение к комнате ${roomId}: ${playerName}`);
+    savePlayerName(playerName);
     socket.emit('lobby:join-room', { roomId, playerName });
   },
 
@@ -127,12 +177,17 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
     const socket = getSocket();
     console.log(`👋 [Network] Выход из комнаты`);
     socket.emit('lobby:leave-room');
+    // Очищаем данные комнаты при выходе
+    clearConnectionInfo();
+
     set({
       roomId: null,
       playerId: null,
       roomSettings: null,
       networkLobbyPlayers: [],
       isHost: false,
+      isReconnectingToRoom: false,  // 🌟 Сбрасываем флаг
+      lobbyScreen: 'modeSelect',
     });
   },
 
@@ -168,8 +223,25 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   _setConnected: (connected) => set({ isConnected: connected }),
   _setReconnecting: (reconnecting) => set({ isReconnecting: reconnecting }),
   _setConnectionError: (error) => set({ connectionError: error }),
-  _setRoomInfo: (roomId, playerId) => set({ roomId, playerId }),
+  _setRoomInfo: (roomId, playerId) => {
+    console.log(`📥 [Network] _setRoomInfo вызван: room=${roomId}, player=${playerId}`);  // 🌟 ЛОГ
+    set({ roomId, playerId });
+    const playerName = loadPlayerName();
+    console.log(`💾 [Network] Загруженное имя: "${playerName}"`);  // 🌟 ЛОГ
+    if (playerName) {
+      saveConnectionInfo(playerId, roomId, playerName);
+      console.log(`💾 [Network] Данные комнаты сохранены в localStorage`);  // 🌟 ЛОГ
+    } else {
+      console.warn(`⚠️ [Network] Имя не найдено — данные НЕ сохранены`);  // 🌟 ЛОГ
+    }
+  },
   _setLobbyPlayers: (players) => set({ networkLobbyPlayers: players }),
   _setRoomSettings: (settings) => set({ roomSettings: settings }),
   _setHost: (isHost) => set({ isHost }),
+  _saveConnectionInfo: (playerId, roomId) => {
+    const playerName = loadPlayerName();  // 🌟 Используем импортированную функцию
+    if (playerName) {
+      saveConnectionInfo(playerId, roomId, playerName);
+    }
+  },
 });

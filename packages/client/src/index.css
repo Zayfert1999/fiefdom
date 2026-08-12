@@ -11,3 +11,7 @@ html, body {
 * {
   box-sizing: border-box;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -13,6 +13,7 @@ import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ModeSelector } from '@/components/ModeSelector';
+import { ReconnectingOverlay } from '@/components/ReconnectingOverlay';
 
 // Ленивый импорт
 const Lobby = lazy(() => import('@/components/Lobby').then(m => ({ default: m.Lobby })));
@@ -32,8 +33,10 @@ export default function App() {
   const board = useGameStore(s => s.board);
   const previewTile = useGameStore(s => s.previewTile);
 
+
   // 🎯 ДЕЙСТВИЯ — стабильные ссылки (Zustand так делает)
   const drawTile = useGameStore(s => s.drawTile);
+  const attemptAutoReconnect = useGameStore(s => s.attemptAutoReconnect);
 
   // ============================================
   // 🔒 Блокировка контекстного меню
@@ -57,6 +60,17 @@ export default function App() {
       window.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
+
+  // ============================================
+  // При первой загрузке пытаемся восстановиться
+  // ============================================
+  useEffect(() => {
+    // Небольшая задержка, чтобы store инициализировался
+    const timer = setTimeout(() => {
+      attemptAutoReconnect();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [attemptAutoReconnect]);
 
   // ============================================
   // 🎴 АВТОВЫДАЧА ТАЙЛА
@@ -150,46 +164,46 @@ export default function App() {
   // 🌐 ЛОББИ
   // ============================================
   if (phase === 'lobby') {
-      if (lobbyScreen === 'modeSelect') {
-        return (
-          <ErrorBoundary name="ModeSelector">
-            <ModeSelector />
-          </ErrorBoundary>
-        );
-      }
-
-      if (lobbyScreen === 'networkLobby') {
-        return (
-          <Suspense fallback={null}>
-            <ErrorBoundary name="NetworkLobby">
-              <NetworkLobby />
-            </ErrorBoundary>
-          </Suspense>
-        );
-      }
-
-      if (lobbyScreen === 'localLobby') {
-        return (
-          <Suspense fallback={null}>
-            <ErrorBoundary name="Lobby">
-              <Lobby />
-            </ErrorBoundary>
-          </Suspense>
-        );
-      }
+    if (lobbyScreen === 'modeSelect') {
+      return (
+        <ErrorBoundary name="ModeSelector">
+          <ModeSelector />
+        </ErrorBoundary>
+      );
     }
+
+    if (lobbyScreen === 'networkLobby') {
+      return (
+        <Suspense fallback={null}>
+          <ErrorBoundary name="NetworkLobby">
+            <NetworkLobby />
+          </ErrorBoundary>
+        </Suspense>
+      );
+    }
+
+    if (lobbyScreen === 'localLobby') {
+      return (
+        <Suspense fallback={null}>
+          <ErrorBoundary name="Lobby">
+            <Lobby />
+          </ErrorBoundary>
+        </Suspense>
+      );
+    }
+  }
 
   // ============================================
   // 🎨 РЕНДЕР
   // ============================================
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
+      <ReconnectingOverlay />
       
-      <ConnectionStatus />
-
       {/* 🖼️ Верхняя панель (HUD) */}
       <ErrorBoundary name="HUD">
         <HUD />
+        <ConnectionStatus />
       </ErrorBoundary>
 
       {/* 📊 Панель игроков */}

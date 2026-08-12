@@ -4,8 +4,9 @@
 import type { GameSocket } from './socket';
 import { useGameStore } from '@/state/useGameStore';
 import { RegionManager } from '@carcassonne/shared/core/regionManager';
-import type { PlacedTile, FeatureType } from '@carcassonne/shared/core/types'; 
+import type { PlacedTile, FeatureType } from '@carcassonne/shared/core/types';
 import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
+import { clearConnectionInfo } from '@/network/persistence';
 
 /**
  * Регистрирует все обработчики серверных событий.
@@ -119,6 +120,49 @@ export function registerStateSync(socket: GameSocket): void {
   });
 
   // ============================================
+  // 🏠 СОБЫТИЯ ВОССТАНОВЛЕНИЯ
+  // ============================================
+
+  socket.on('lobby:reconnect-success', ({ roomId, playerId, players, settings, isHost, gameState }) => {
+    console.log(`✅ [StateSync] Успешное восстановление в комнате ${roomId}`);
+    const store = useGameStore.getState();
+
+    store._setRoomInfo(roomId, playerId);
+    store._setLobbyPlayers(players);
+    store._setRoomSettings(settings);
+    store._setHost(isHost);
+
+    // Сохраняем снова (для надёжности)
+    store._saveConnectionInfo(playerId, roomId);
+
+    // Если игра уже началась — восстанавливаем состояние
+    if (gameState) {
+      console.log(`🎮 [StateSync] Игра уже началась — восстанавливаем состояние`);
+      applyServerState(gameState);
+      // Переходим сразу в игровой экран
+      // (lobbyScreen остаётся 'networkLobby', но phase='playing' переопределяет рендер)
+    } else {
+      // В лобби — переключаемся на waiting
+      store.setLobbyScreen('networkLobby');
+    }
+
+    useGameStore.setState({ isReconnectingToRoom: false });
+  });
+
+  socket.on('lobby:reconnect-failed', ({ reason }) => {
+    console.warn(`❌ [StateSync] Восстановление не удалось: ${reason}`);
+    const store = useGameStore.getState();
+
+    // Очищаем невалидные данные
+    clearConnectionInfo();
+    store.leaveRoom();
+    useGameStore.setState({ isReconnectingToRoom: false });
+
+    // Можно показать toast/alert пользователю
+    alert(`Не удалось восстановить игру: ${reason}`);
+  });
+
+  // ============================================
   // 🎮 СОБЫТИЯ ИГРЫ
   // ============================================
 
@@ -183,12 +227,12 @@ export function registerStateSync(socket: GameSocket): void {
   socket.on('game:final-scoring', ({ regions }) => {
     console.log(`🏆 [StateSync] Финальный подсчёт: ${regions.length} регионов`);
     useGameStore.getState().processCompletedRegionsInStore(
-        regions.map(r => ({
-            ...r,
-            type: r.type as FeatureType,
-        }))
+      regions.map(r => ({
+        ...r,
+        type: r.type as FeatureType,
+      }))
     );
-});
+  });
 
   socket.on('game:over', ({ finalScores }) => {
     console.log(`🏁 [StateSync] Игра окончена!`);

@@ -3,7 +3,8 @@
 
 import type { Socket } from 'socket.io';
 import type { Player } from '@carcassonne/shared/core/types';
-import type { RoomSettings, RoomInfo } from '@carcassonne/shared/protocol/events';
+import type { RoomSettings, RoomInfo, LobbyPlayer } from '@carcassonne/shared/protocol/events';
+import type { SerializedGameState } from '@carcassonne/shared/core/serialization';  // 🌟 НОВОЕ
 import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
 import { generateGameSeed } from '@carcassonne/shared/prng/seedRandom';
 import { PlayerConnection } from '../state/PlayerConnection';
@@ -43,6 +44,21 @@ export class Room {
     this.players.set(conn.id, conn);
     conn.socket?.join(this.id); // Socket.IO room
     logger.info('[Room]', `Игрок ${conn.name} присоединился к ${this.id} (цвет: ${freeColor})`);
+  }
+
+  /**.
+ * Вызывается при socket disconnect (перезагрузка страницы, потеря связи).
+ * Игрок может reconnect в течение DISCONNECT_TIMEOUT.
+ */
+  markPlayerDisconnected(playerId: string): void {
+    const conn = this.players.get(playerId);
+    if (!conn) return;
+
+    conn.markDisconnected();
+    logger.info('[Room]', `⚠️ Игрок ${conn.name} отключился (комната ${this.id}) — ожидание reconnect`);
+
+    // Уведомляем остальных игроков
+    this.broadcast('lobby:player-disconnected', { playerId });
   }
 
   removePlayer(playerId: string): void {
@@ -302,5 +318,76 @@ export class Room {
 
   dispose(): void {
     this.turnTimer.stop();
+  }
+
+  /**
+ * 🌟 Попытка восстановления игрока в комнате.
+ * Возвращает успех и данные для отправки клиенту.
+ */
+  reconnectPlayer(
+    oldPlayerId: string,
+    playerName: string,
+    newSocket: Socket
+  ): {
+    success: boolean;
+    reason?: string;
+    data?: {
+      roomId: string;
+      playerId: string;
+      players: LobbyPlayer[];
+      settings: RoomSettings;
+      isHost: boolean;
+      gameState?: SerializedGameState;
+    };
+  } {
+    const conn = this.players.get(oldPlayerId);
+
+    if (!conn) {
+      logger.warn('[Room]', `❌ Reconnect: игрок ${oldPlayerId} не найден в комнате ${this.id}`);
+      return { success: false, reason: 'Игрок не найден в комнате' };
+    }
+
+    if (conn.player.name !== playerName) {
+      logger.warn('[Room]', `❌ Reconnect: имя не совпадает`);
+      return { success: false, reason: 'Имя игрока не совпадает' };
+    }
+
+    // 🌟 Обновляем socket
+    newSocket.join(this.id);
+    conn.markReconnected(newSocket);
+    newSocket.data.playerId = oldPlayerId;
+    newSocket.data.roomId = this.id;
+
+    logger.info('[Room]', `✅ Игрок ${playerName} восстановлен в комнате ${this.id}`);
+
+    // Собираем данные для отправки
+    const players = Array.from(this.players.values())
+      .map(c => c.toLobbyPlayer(c.id === this.hostId));
+
+    const data: any = {
+      roomId: this.id,
+      playerId: oldPlayerId,
+      players,
+      settings: this.settings,
+      isHost: this.hostId === oldPlayerId,
+    };
+
+    // 🌟 Если игра уже началась — отправляем состояние
+    if (this.gameStarted) {
+      data.gameState = this.gameState.serializeForPlayer(oldPlayerId);
+
+      // 🌟 Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
+      if (this.gameState.currentPlayer.id === oldPlayerId && this.gameState.drawnTile) {
+        // Через setTimeout, чтобы client успел применить state-update
+        setTimeout(() => {
+          conn.emit('game:your-turn', { drawnTile: this.gameState.drawnTile! });
+        }, 100);
+      }
+    }
+
+    // 🌟 Уведомляем остальных игроков
+    this.broadcast('lobby:player-reconnected', { playerId: oldPlayerId });
+
+    return { success: true, data };
   }
 }

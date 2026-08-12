@@ -14,6 +14,8 @@ export class PlayerConnection {
   public isReady: boolean = false;
   /** Флаг отключения (для ожидания reconnect) */
   public isDisconnected: boolean = false;
+  /** Отметка о последнем disconnect (для cleanup) */
+  public disconnectedAt: number | null = null;
 
   constructor(player: Player, socket: Socket) {
     this.player = player;
@@ -44,5 +46,17 @@ export class PlayerConnection {
       isReady: this.isReady,
       isHost,
     };
+  }
+
+  markDisconnected(): void {
+    this.isDisconnected = true;
+    this.disconnectedAt = Date.now();
+    this.socket = null;
+  }
+
+  markReconnected(socket: Socket): void {
+    this.isDisconnected = false;
+    this.disconnectedAt = null;
+    this.socket = socket;
   }
 }

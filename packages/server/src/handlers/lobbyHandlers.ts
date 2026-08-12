@@ -102,7 +102,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   });
 
   // ============================================
-  // 👋 ВЫХОД ИЗ КОМНАТЫ
+  // 👋 ЯВНЫЙ ВЫХОД ИЗ КОМНАТЫ (кнопка "Выйти")
   // ============================================
   const handleLeaveRoom = () => {
     const { roomId, playerId } = socket.data;
@@ -111,7 +111,12 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     const room = roomManager.getRoom(roomId);
     if (!room) return;
 
+    logger.info('[Lobby]', `👋 Игрок ${playerId} вышел из ${roomId}`);
+
+    // Полное удаление игрока
     room.removePlayer(playerId);
+
+    // Уведомляем остальных
     socket.to(roomId).emit('lobby:player-left', {
       playerId,
       newHostId: room.hostId,
@@ -121,12 +126,42 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     if (room.players.size === 0) {
       room.dispose();
       roomManager.removeRoom(roomId);
+      logger.info('[Lobby]', `🗑️ Комната ${roomId} удалена (пуста)`);
     }
-    logger.info('[Lobby]', `Игрок ${playerId} вышел из ${roomId}`);
+
+    // Очищаем данные socket
+    delete socket.data.roomId;
+    delete socket.data.playerId;
+  };
+
+  // ============================================
+  // 🔌 DISCONNECT (перезагрузка страницы, потеря связи)
+  // ============================================
+  const handleDisconnect = (reason: string) => {
+    const { roomId, playerId } = socket.data;
+    logger.info('[Server]', `❌ Клиент отключился: ${socket.id} (причина: ${reason})`);
+
+    if (!roomId || !playerId) return;
+
+    const room = roomManager.getRoom(roomId);
+    if (!room) return;
+
+    // 🌟 НЕ удаляем игрока — только помечаем как отключённого
+    // Это позволяет reconnect в течение таймаута cleanup
+    room.markPlayerDisconnected(playerId);
+
+    // 🌟 Проверяем, все ли игроки отключились
+    const allDisconnected = Array.from(room.players.values())
+      .every(p => p.isDisconnected);
+
+    if (allDisconnected) {
+      logger.info('[Server]', `⏱️ Все игроки отключились в комнате ${roomId} — ожидание cleanup`);
+      // Cleanup произойдёт через таймер RoomManager (5 минут)
+    }
   };
 
   socket.on('lobby:leave-room', handleLeaveRoom);
-  socket.on('disconnect', handleLeaveRoom);
+  socket.on('disconnect', handleDisconnect);
 
   // ============================================
   // ✅ ГОТОВНОСТЬ
@@ -155,4 +190,28 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     }
     room.startGame();
   });
+
+  // ============================================
+  // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ
+  // ============================================
+  socket.on('lobby:reconnect', (data) => {
+    const { playerId, roomId, playerName } = data;
+    logger.info('[Lobby]', `🔄 Запрос reconnect: ${playerName} → комната ${roomId}`);
+
+    const room = roomManager.getRoom(roomId);
+    if (!room) {
+      socket.emit('lobby:reconnect-failed', { reason: 'Комната не найдена (возможно, была удалена)' });
+      return;
+    }
+
+    const result = room.reconnectPlayer(playerId, playerName, socket);
+
+    if (result.success && result.data) {
+      socket.emit('lobby:reconnect-success', result.data);
+    } else {
+      socket.emit('lobby:reconnect-failed', { reason: result.reason || 'Неизвестная ошибка' });
+    }
+  });
+
 }
+

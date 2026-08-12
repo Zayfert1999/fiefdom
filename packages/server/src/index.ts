@@ -41,9 +41,6 @@ io.on('connection', (socket) => {
   registerLobbyHandlers(io, socket as any, roomManager);
   registerGameHandlers(io, socket as any, roomManager);
 
-  socket.on('disconnect', () => {
-    logger.info('[Server]', `❌ Клиент отключился: ${socket.id}`);
-  });
 });
 
 const PORT = process.env.PORT || 3001;

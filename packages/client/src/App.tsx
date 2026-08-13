@@ -1,9 +1,11 @@
 // App.tsx
-import { useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { getValidPlacementCells } from '@carcassonne/shared/core/tileUtils';
 import { HOTKEY_DEFINITIONS } from '@carcassonne/shared/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
+import { getSocket } from '@/network/socket';  // 🌟 НОВОЕ
+import { loadConnectionInfo } from '@/network/persistence';
 
 // Статические импорты 
 import { Board } from '@/renderer/Board';
@@ -12,7 +14,7 @@ import { PlayersPanel } from '@/components/PlayersPanel';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
-import { ModeSelector } from '@/components/ModeSelector';
+import { MainMenu } from '@/components/MainMenu';
 import { ReconnectingOverlay } from '@/components/ReconnectingOverlay';
 
 // Ленивый импорт
@@ -36,7 +38,8 @@ export default function App() {
 
   // 🎯 ДЕЙСТВИЯ — стабильные ссылки (Zustand так делает)
   const drawTile = useGameStore(s => s.drawTile);
-  const attemptAutoReconnect = useGameStore(s => s.attemptAutoReconnect);
+  const connectToServer = useGameStore(s => s.connectToServer);
+
 
   // ============================================
   // 🔒 Блокировка контекстного меню
@@ -61,16 +64,67 @@ export default function App() {
     };
   }, []);
 
-  // ============================================
-  // При первой загрузке пытаемся восстановиться
-  // ============================================
+  // 🌟 Защита от повторных вызовов в StrictMode
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    // Небольшая задержка, чтобы store инициализировался
-    const timer = setTimeout(() => {
-      attemptAutoReconnect();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [attemptAutoReconnect]);
+    // Защита от двойного вызова в StrictMode
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    console.log('🚀 [App] Инициализация — подключение к серверу');
+    connectToServer();
+
+    // 🌟 Проверяем активные игры ПОСЛЕ подключения
+    const checkSession = () => {
+      const saved = loadConnectionInfo();
+      if (!saved) {
+        console.log('🔍 [App] Нет сохранённой сессии');
+        return;
+      }
+
+      console.log(`🔍 [App] Проверка активной игры для ${saved.playerId}`);
+
+      const socket = getSocket();
+      if (!socket) {
+        console.warn('⚠️ [App] Сокет не инициализирован');
+        return;
+      }
+
+      const emitCheckActive = () => {
+        console.log(`📤 [App] Отправка session:check-active для ${saved.playerId}`);
+        socket.emit('session:check-active', {
+          playerId: saved.playerId,
+        });
+      };
+
+      if (socket.connected) {
+        // Уже подключён — сразу отправляем
+        emitCheckActive();
+      } else {
+        // Ждём события connect
+        const onConnect = () => {
+          emitCheckActive();
+          socket.off('connect', onConnect);
+        };
+        socket.on('connect', onConnect);
+
+        // Защита: если подключение не удалось в течение 5 сек — отменяем
+        setTimeout(() => {
+          socket.off('connect', onConnect);
+          console.warn('⚠️ [App] Timeout: сокет не подключился за 5 сек');
+        }, 5000);
+      }
+    };
+
+    // Небольшая задержка для инициализации store
+    const timer = setTimeout(checkSession, 100);
+
+    return () => {
+      clearTimeout(timer);
+      initializedRef.current = false;
+    };
+  }, [connectToServer]);
 
   // ============================================
   // 🎴 АВТОВЫДАЧА ТАЙЛА
@@ -167,7 +221,7 @@ export default function App() {
     if (lobbyScreen === 'modeSelect') {
       return (
         <ErrorBoundary name="ModeSelector">
-          <ModeSelector />
+          <MainMenu />
         </ErrorBoundary>
       );
     }
@@ -199,7 +253,7 @@ export default function App() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
       <ReconnectingOverlay />
-      
+
       {/* 🖼️ Верхняя панель (HUD) */}
       <ErrorBoundary name="HUD">
         <HUD />

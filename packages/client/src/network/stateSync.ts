@@ -69,6 +69,12 @@ export function registerStateSync(socket: GameSocket): void {
     useGameStore.getState()._setConnectionError(error.message);
   });
 
+  socket.on('session:active-games', ({ game }) => {
+    console.log(`🔍 [StateSync] Активная игра: ${game ? game.roomId : 'нет'}`);
+    const store = useGameStore.getState();
+    store.setActiveGame(game);
+  });
+
   // ============================================
   // 🏠 СОБЫТИЯ ЛОББИ
   // ============================================

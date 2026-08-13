@@ -1,6 +1,6 @@
 // core/regionManager.ts
 import type { FeatureType } from './types';
-import type { SerializedRegionManager, SerializedRegionMetadata, } from './serialization.ts';
+import type { SerializedRegionManager, SerializedRegionMetadata, } from './serialization';
 
 export type FeatureKey = string;
 

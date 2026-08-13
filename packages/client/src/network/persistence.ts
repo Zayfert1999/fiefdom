@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   PLAYER_ID: 'carcassonne_player_id',
   ROOM_ID: 'carcassonne_room_id',
   PLAYER_NAME: 'carcassonne_player_name',
+  PLAYER_COLOR: 'carcassonne_player_color',
 } as const;
 
 export function saveConnectionInfo(playerId: string, roomId: string, playerName: string): void {
@@ -55,5 +56,21 @@ export function loadPlayerName(): string {
     return localStorage.getItem(STORAGE_KEYS.PLAYER_NAME) || '';
   } catch {
     return '';
+  }
+}
+
+export function savePlayerColor(color: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PLAYER_COLOR, color);
+  } catch (e) {
+    console.warn('⚠️ [Persistence] Не удалось сохранить цвет:', e);
+  }
+}
+
+export function loadPlayerColor(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.PLAYER_COLOR) || '#ff5555';
+  } catch {
+    return '#ff5555';
   }
 }

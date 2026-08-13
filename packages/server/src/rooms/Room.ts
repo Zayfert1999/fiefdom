@@ -35,15 +35,32 @@ export class Room {
   // 👥 УПРАВЛЕНИЕ ИГРОКАМИ
   // ============================================
 
-  addPlayer(conn: PlayerConnection): void {
-    // 🌟 Назначаем первый свободный цвет
-    const usedColors = new Set(Array.from(this.players.values()).map(p => p.player.color));
-    const freeColor = AVAILABLE_COLORS.find(c => !usedColors.has(c)) ?? '#ffffff';
-    conn.player.color = freeColor;
+  addPlayer(conn: PlayerConnection, preferredColor?: string): void {
+    const usedColors = new Set(
+      Array.from(this.players.values()).map(p => p.player.color)
+    );
+
+    // 🌟 Проверяем предпочтительный цвет
+    let assignedColor: string;
+    if (preferredColor && !usedColors.has(preferredColor)) {
+      assignedColor = preferredColor;
+      logger.info('[Room]', `Игроку ${conn.name} назначен предпочтительный цвет: ${preferredColor}`);
+    } else {
+      const freeColor = AVAILABLE_COLORS.find((c: string) => !usedColors.has(c));
+      assignedColor = freeColor ?? '#ffffff';
+
+      if (preferredColor) {
+        logger.info('[Room]', `Цвет ${preferredColor} занят, назначен: ${assignedColor}`);
+      } else {
+        logger.info('[Room]', `Игроку ${conn.name} назначен цвет: ${assignedColor}`);
+      }
+    }
+
+    conn.player.color = assignedColor;
 
     this.players.set(conn.id, conn);
-    conn.socket?.join(this.id); // Socket.IO room
-    logger.info('[Room]', `Игрок ${conn.name} присоединился к ${this.id} (цвет: ${freeColor})`);
+    conn.socket?.join(this.id);
+    logger.info('[Room]', `Игрок ${conn.name} присоединился к ${this.id} (цвет: ${assignedColor})`);
   }
 
   /**.
@@ -83,6 +100,10 @@ export class Room {
   get canStart(): boolean {
     return this.players.size >= 2 && !this.gameStarted;
   }
+
+  get isGameStarted(): boolean {
+    return this.gameStarted;
+}
 
   // ============================================
   // 📡 РАССЫЛКА
@@ -321,12 +342,13 @@ export class Room {
   }
 
   /**
- * 🌟 Попытка восстановления игрока в комнате.
- * Возвращает успех и данные для отправки клиенту.
- */
+   * 🌟 Восстановление игрока в комнате.
+   * 
+   * Имя и цвет берутся из существующих данных PlayerConnection,
+   * верификация только по playerId.
+   */
   reconnectPlayer(
     oldPlayerId: string,
-    playerName: string,
     newSocket: Socket
   ): {
     success: boolean;
@@ -347,18 +369,18 @@ export class Room {
       return { success: false, reason: 'Игрок не найден в комнате' };
     }
 
-    if (conn.player.name !== playerName) {
-      logger.warn('[Room]', `❌ Reconnect: имя не совпадает`);
-      return { success: false, reason: 'Имя игрока не совпадает' };
-    }
+    // Имя и цвет уже есть в conn.player — не проверяем
 
-    // 🌟 Обновляем socket
+    // Восстанавливаем подключение
     newSocket.join(this.id);
     conn.markReconnected(newSocket);
     newSocket.data.playerId = oldPlayerId;
     newSocket.data.roomId = this.id;
 
-    logger.info('[Room]', `✅ Игрок ${playerName} восстановлен в комнате ${this.id}`);
+    logger.info('[Room]', `✅ Игрок ${conn.player.name} восстановлен в комнате ${this.id}`);
+
+    // Уведомляем остальных игроков
+    this.broadcast('lobby:player-reconnected', { playerId: oldPlayerId });
 
     // Собираем данные для отправки
     const players = Array.from(this.players.values())
@@ -372,21 +394,17 @@ export class Room {
       isHost: this.hostId === oldPlayerId,
     };
 
-    // 🌟 Если игра уже началась — отправляем состояние
+    // Если игра уже началась — отправляем состояние
     if (this.gameStarted) {
       data.gameState = this.gameState.serializeForPlayer(oldPlayerId);
 
-      // 🌟 Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
+      // Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
       if (this.gameState.currentPlayer.id === oldPlayerId && this.gameState.drawnTile) {
-        // Через setTimeout, чтобы client успел применить state-update
         setTimeout(() => {
           conn.emit('game:your-turn', { drawnTile: this.gameState.drawnTile! });
         }, 100);
       }
     }
-
-    // 🌟 Уведомляем остальных игроков
-    this.broadcast('lobby:player-reconnected', { playerId: oldPlayerId });
 
     return { success: true, data };
   }

@@ -94,4 +94,54 @@ export class RoomManager {
     clearInterval(this.cleanupInterval);
   }
 
+  /**
+ * Находим последнюю активную игру игрока.
+ * Возвращаем имя и цвет из данных сервера.
+ */
+  findLastActiveGameForPlayer(playerId: string): {
+    roomId: string;
+    playerName: string;
+    playerColor: string;
+    isHost: boolean;
+    gameStarted: boolean;
+    playerCount: number;
+  } | null {
+    let lastGame: {
+      roomId: string;
+      playerName: string;
+      playerColor: string;
+      isHost: boolean;
+      gameStarted: boolean;
+      playerCount: number;
+      disconnectedAt: number;
+    } | null = null;
+
+    for (const [roomId, room] of this.rooms) {
+      const conn = room.players.get(playerId);
+      if (!conn) continue;
+
+      const disconnectedAt = conn.disconnectedAt ?? 0;
+
+      if (!lastGame || disconnectedAt > lastGame.disconnectedAt) {
+        lastGame = {
+          roomId,
+          playerName: conn.player.name,
+          playerColor: conn.player.color,
+          isHost: room.hostId === playerId,
+          gameStarted: room.isGameStarted,
+          playerCount: Array.from(room.players.values())
+            .filter(p => !p.isDisconnected).length,
+          disconnectedAt,
+        };
+      }
+    }
+
+    if (lastGame) {
+      const { disconnectedAt, ...result } = lastGame;
+      return result;
+    }
+
+    return null;
+  }
+
 }

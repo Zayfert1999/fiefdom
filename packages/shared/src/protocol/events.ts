@@ -45,17 +45,18 @@ export interface ClientToServerEvents {
   'lobby:create-room': (data: {
     playerName: string;
     settings: RoomSettings;
+    preferredColor?: string;
   }) => void;
 
   'lobby:join-room': (data: {
     roomId: string;
     playerName: string;
+    preferredColor?: string;
   }) => void;
 
   'lobby:reconnect': (data: {
     playerId: string;
     roomId: string;
-    playerName: string;
   }) => void;
 
   'lobby:leave-room': () => void;
@@ -84,6 +85,11 @@ export interface ClientToServerEvents {
 
   // --- Чат (последняя очередь) ---
   'chat:message': (text: string) => void;
+
+  'session:check-active': (data: {
+    playerId: string;
+}) => void;
+
 }
 
 // ============================================
@@ -191,5 +197,16 @@ export interface ServerToClientEvents {
     playerName: string;
     text: string;
     timestamp: number;
+  }) => void;
+
+  'session:active-games': (data: {
+    game: {
+      roomId: string;
+      playerName: string;
+      playerColor: string;
+      isHost: boolean;
+      gameStarted: boolean;
+      playerCount: number;
+    } | null;
   }) => void;
 }

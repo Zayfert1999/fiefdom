@@ -15,11 +15,13 @@ export const CreateRoomSchema = z.object({
     turnTimerSeconds: z.number().min(0).max(300),
     maxPlayers: z.number().min(2).max(5),
   }),
+  preferredColor: z.string().optional(),
 });
 
 export const JoinRoomSchema = z.object({
   roomId: z.string().length(6),
   playerName: z.string().min(1).max(20),
+  preferredColor: z.string().optional(),
 });
 
 export const SetReadySchema = z.boolean();

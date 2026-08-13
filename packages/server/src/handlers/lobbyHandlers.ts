@@ -1,5 +1,5 @@
 // packages/server/src/handlers/lobbyHandlers.ts
-// 🌟 Обработчики событий лобби (create/join/leave/ready/start)
+// 🌟 Обработчики событий лобби (create/join/leave/ready/start/reconnect/session-check)
 
 import type { Server, Socket } from 'socket.io';
 import type { RoomManager } from '../rooms/RoomManager';
@@ -9,7 +9,37 @@ import { Player } from '@carcassonne/shared/core/types';
 import { CreateRoomSchema, JoinRoomSchema } from '@carcassonne/shared/protocol/schemas';
 import { logger } from '../utils/logger';
 
+// ============================================
+// 🌟 ХЕЛПЕРЫ
+// ============================================
+
+const MAX_NAME_LENGTH = 20;
+const DEFAULT_NAME = 'Игрок';
+
+/**
+ * Валидация имени: пустое или слишком длинное → "Игрок"
+ */
+function validatePlayerName(name: string): string {
+  const trimmed = name?.trim() || '';
+  if (trimmed.length === 0 || trimmed.length > MAX_NAME_LENGTH) {
+    return DEFAULT_NAME;
+  }
+  return trimmed;
+}
+
+/**
+ * Генерация уникального ID игрока
+ */
+function generatePlayerId(): string {
+  return `player_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+// ============================================
+// 🌟 РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
+// ============================================
+
 export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: RoomManager): void {
+  
   // ============================================
   // 🏠 СОЗДАНИЕ КОМНАТЫ
   // ============================================
@@ -21,13 +51,22 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
-    const { playerName, settings } = parsed.data;
+    // 🌟 Берём preferredColor (опциональный)
+    const { playerName, settings, preferredColor } = parsed.data as {
+      playerName: string;
+      settings: any;
+      preferredColor?: string;
+    };
+    
+    // 🌟 Валидация имени
+    const validatedName = validatePlayerName(playerName);
+    
     const roomId = roomManager.generateRoomId();
 
-    // 🌟 Создаём профиль игрока-хоста
+    // Создаём профиль игрока-хоста (цвет будет назначен в addPlayer)
     const hostPlayer: Player = {
-      id: `player_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      name: playerName,
+      id: generatePlayerId(),
+      name: validatedName,
       color: '', // назначит Room.addPlayer
       meepleCount: 8,
       score: 0,
@@ -38,16 +77,31 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     socket.data.roomId = roomId;
 
     const room = new Room(roomId, settings, hostConn);
+    
+    // 🌟 Переопределяем цвет через addPlayer с preferredColor
+    // (хост уже добавлен в конструкторе Room, но цвет может быть другим)
+    // Если preferredColor есть и свободен — используем его
+    if (preferredColor) {
+      const usedColors = new Set(
+        Array.from(room.players.values()).map(p => p.player.color)
+      );
+      if (!usedColors.has(preferredColor)) {
+        hostPlayer.color = preferredColor;
+        logger.info('[Lobby]', `Хосту назначен предпочтительный цвет: ${preferredColor}`);
+      }
+    }
+    
     roomManager.addRoom(room);
 
     socket.emit('lobby:room-created', { roomId, playerId: hostPlayer.id });
     socket.emit('lobby:room-joined', {
       roomId,
       playerId: hostPlayer.id,
-      players: [hostConn.toLobbyPlayer(true)], // 🌟 Хост — первый игрок
+      players: [hostConn.toLobbyPlayer(true)],
       settings,
     });
-    logger.info('[Lobby]', `${playerName} создал комнату ${roomId} (private=${settings.isPrivate})`);
+    
+    logger.info('[Lobby]', `${validatedName} создал комнату ${roomId} (private=${settings.isPrivate}, color=${hostPlayer.color})`);
   });
 
   // ============================================
@@ -60,7 +114,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
-    const { roomId, playerName } = parsed.data;
+    // 🌟 Берём preferredColor (опциональный)
+    const { roomId, playerName, preferredColor } = parsed.data as {
+      roomId: string;
+      playerName: string;
+      preferredColor?: string;
+    };
+    
     const room = roomManager.getRoom(roomId);
 
     if (!room) {
@@ -72,9 +132,12 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
+    // 🌟 Валидация имени
+    const validatedName = validatePlayerName(playerName);
+
     const newPlayer: Player = {
-      id: `player_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      name: playerName,
+      id: generatePlayerId(),
+      name: validatedName,
       color: '',
       meepleCount: 8,
       score: 0,
@@ -84,9 +147,10 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     socket.data.playerId = newPlayer.id;
     socket.data.roomId = roomId;
 
-    room.addPlayer(newConn);
+    // 🌟 Передаём preferredColor в addPlayer
+    room.addPlayer(newConn, preferredColor);
 
-    // 🌟 Новому игроку — полный список + настройки
+    // Новому игроку — полный список + настройки
     const players = Array.from(room.players.values())
       .map(c => c.toLobbyPlayer(c.id === room.hostId));
     socket.emit('lobby:room-joined', {
@@ -96,9 +160,9 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       settings: room.settings,
     });
 
-    // 🌟 Остальным — что пришёл новый
+    // Остальным — что пришёл новый
     socket.to(roomId).emit('lobby:player-joined', newConn.toLobbyPlayer(false));
-    logger.info('[Lobby]', `${playerName} присоединился к ${roomId}`);
+    logger.info('[Lobby]', `${validatedName} присоединился к ${roomId} (color=${newPlayer.color})`);
   });
 
   // ============================================
@@ -146,17 +210,15 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     const room = roomManager.getRoom(roomId);
     if (!room) return;
 
-    // 🌟 НЕ удаляем игрока — только помечаем как отключённого
-    // Это позволяет reconnect в течение таймаута cleanup
+    // НЕ удаляем игрока — только помечаем как отключённого
     room.markPlayerDisconnected(playerId);
 
-    // 🌟 Проверяем, все ли игроки отключились
+    // Проверяем, все ли игроки отключились
     const allDisconnected = Array.from(room.players.values())
       .every(p => p.isDisconnected);
 
     if (allDisconnected) {
       logger.info('[Server]', `⏱️ Все игроки отключились в комнате ${roomId} — ожидание cleanup`);
-      // Cleanup произойдёт через таймер RoomManager (5 минут)
     }
   };
 
@@ -192,26 +254,57 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   });
 
   // ============================================
-  // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ
+  // 🔍 ПРОВЕРКА АКТИВНЫХ ИГР (новая кнопка "Продолжить")
+  // ============================================
+  socket.on('session:check-active', (data) => {
+    const { playerId } = data;
+    
+    if (!playerId) {
+      socket.emit('session:active-games', { game: null });
+      return;
+    }
+    
+    logger.info('[Session]', `🔍 Проверка активных игр для ${playerId}`);
+    
+    // Ищем последнюю активную игру для игрока
+    const lastGame = roomManager.findLastActiveGameForPlayer(playerId);
+    
+    if (lastGame) {
+      logger.info('[Session]', `Найдена последняя игра: комната ${lastGame.roomId}`);
+    } else {
+      logger.info('[Session]', 'Активных игр не найдено');
+    }
+    
+    socket.emit('session:active-games', {
+      game: lastGame,
+    });
+  });
+
+  // ============================================
+  // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ (только по playerId)
   // ============================================
   socket.on('lobby:reconnect', (data) => {
-    const { playerId, roomId, playerName } = data;
-    logger.info('[Lobby]', `🔄 Запрос reconnect: ${playerName} → комната ${roomId}`);
+    // 🌟 ИСПРАВЛЕНО: только playerId и roomId, без playerName
+    const { playerId, roomId } = data;
+    logger.info('[Lobby]', `🔄 Запрос reconnect: ${playerId} → комната ${roomId}`);
 
     const room = roomManager.getRoom(roomId);
     if (!room) {
-      socket.emit('lobby:reconnect-failed', { reason: 'Комната не найдена (возможно, была удалена)' });
+      socket.emit('lobby:reconnect-failed', { 
+        reason: 'Комната не найдена (возможно, была удалена)' 
+      });
       return;
     }
 
-    const result = room.reconnectPlayer(playerId, playerName, socket);
+    // 🌟 Передаём только playerId (имя и цвет уже есть в PlayerConnection)
+    const result = room.reconnectPlayer(playerId, socket);
 
     if (result.success && result.data) {
       socket.emit('lobby:reconnect-success', result.data);
     } else {
-      socket.emit('lobby:reconnect-failed', { reason: result.reason || 'Неизвестная ошибка' });
+      socket.emit('lobby:reconnect-failed', { 
+        reason: result.reason || 'Неизвестная ошибка' 
+      });
     }
   });
-
 }
-

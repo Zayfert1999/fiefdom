@@ -75,7 +75,7 @@ export const Lobby = () => {
           marginBottom: '32px',
           fontWeight: '700',
         }}>
-          🎮 Carcassonne
+          Локальная игра
         </h1>
 
         {/* Список игроков */}

@@ -46,8 +46,8 @@ export interface NetworkSlice {
   attemptAutoReconnect: () => void;
 
   // === Действия: лобби ===
-  createRoom: (playerName: string, settings: RoomSettings) => void;
-  joinRoom: (roomId: string, playerName: string) => void;
+  createRoom: (playerName: string, settings: RoomSettings, preferredColor?: string) => void;
+  joinRoom: (roomId: string, playerName: string, preferredColor?: string) => void;
   leaveRoom: () => void;
   setReady: (ready: boolean) => void;
   startNetworkGame: () => void;
@@ -145,7 +145,6 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
         socket.emit('lobby:reconnect', {
           playerId: saved.playerId,
           roomId: saved.roomId,
-          playerName: saved.playerName,
         });
       } else {
         // Ждём подключения
@@ -159,18 +158,18 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   // 🏠 ЛОББИ
   // ============================================
 
-  createRoom: (playerName, settings) => {
+  createRoom: (playerName, settings, preferredColor) => {
     const socket = getSocket();
-    console.log(`🏠 [Network] Создание комнаты: ${playerName}`, settings);
+    console.log(`🏠 [Network] Создание комнаты: ${playerName} (цвет: ${preferredColor})`, settings);
     savePlayerName(playerName);
-    socket.emit('lobby:create-room', { playerName, settings });
+    socket.emit('lobby:create-room', { playerName, settings, preferredColor });
   },
 
-  joinRoom: (roomId, playerName) => {
+  joinRoom: (roomId, playerName, preferredColor) => {
     const socket = getSocket();
-    console.log(`🚪 [Network] Присоединение к комнате ${roomId}: ${playerName}`);
+    console.log(`🚪 [Network] Присоединение к комнате ${roomId}: ${playerName} (цвет: ${preferredColor})`);
     savePlayerName(playerName);
-    socket.emit('lobby:join-room', { roomId, playerName });
+    socket.emit('lobby:join-room', { roomId, playerName, preferredColor });
   },
 
   leaveRoom: () => {

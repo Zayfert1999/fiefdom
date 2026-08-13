@@ -32,6 +32,7 @@ export interface GameSlice {
 
 
     //Методы лобби
+    initLocalLobby: (profileName: string, profileColor: string) => void;
     addPlayer: () => void;
     removePlayer: (id: string) => void;
     renamePlayer: (id: string, newName: string) => void;
@@ -73,10 +74,7 @@ export interface GameSlice {
 
 export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set, get) => ({
     // Начальное состояние
-    lobbyPlayers: [
-        { id: 'p1', name: 'Игрок 1', color: '#ff5555' },
-        { id: 'p2', name: 'Игрок 2', color: '#5555ff' },
-    ],
+    lobbyPlayers: [],
     deck: [],
     totalTiles: 0,
     board: new Map(),
@@ -96,6 +94,19 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     // Лобби
     // ============================================
+    initLocalLobby: (profileName, profileColor) => {
+    console.log(`🎮 [GameSlice] Инициализация локального лобби: ${profileName} (${profileColor})`);
+    
+    set({
+        lobbyPlayers: [
+            // 🌟 Первый игрок — из профиля (главное меню)
+            { id: 'p1', name: profileName, color: profileColor },
+            // 🌟 Второй игрок — по умолчанию, первый свободный цвет
+            { id: 'p2', name: 'Игрок 2', color: AVAILABLE_COLORS.find(c => c !== profileColor) || '#5555ff' },
+        ],
+    });
+},
+
     addPlayer: () => {
         const state = get();
         if (state.lobbyPlayers.length >= 5) {
@@ -162,10 +173,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         // Сбрасываем всё игровое состояние
         set({
-            lobbyPlayers: [
-                { id: 'p1', name: 'Игрок 1', color: '#ff5555' },
-                { id: 'p2', name: 'Игрок 2', color: '#5555ff' },
-            ],
+            lobbyPlayers: [],
             deck: [],
             totalTiles: 0,
             board: new Map(),

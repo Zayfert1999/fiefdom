@@ -3,13 +3,15 @@
 
 import { useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { registerStateSync } from '@/network/stateSync';
-import { getSocket } from '@/network/socket';
 import { useEffect } from 'react';
 
 export const NetworkLobby = () => {
   const [screen, setScreen] = useState<'main' | 'create' | 'join' | 'waiting'>('main');
-  const [playerName, setPlayerName] = useState('');
+
+  // 🌟 Используем имя и цвет из uiSlice (главное меню)
+  const profileName = useGameStore(s => s.playerName);
+  const profileColor = useGameStore(s => s.playerColor)
+
   const [roomId, setRoomId] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [turnTimer, setTurnTimer] = useState(60);
@@ -37,17 +39,17 @@ export const NetworkLobby = () => {
   }, [currentRoomId, screen]);
 
   const handleCreateRoom = () => {
-    if (!playerName.trim()) return;
-    createRoom(playerName.trim(), {
+    if (!profileName.trim()) return;
+    createRoom(profileName.trim(), {
       isPrivate,
       turnTimerSeconds: turnTimer,
       maxPlayers: 5,
-    });
+    }, profileColor);
   };
 
   const handleJoinRoom = () => {
-    if (!playerName.trim() || !roomId.trim()) return;
-    joinRoom(roomId.trim().toUpperCase(), playerName.trim());
+    if (!profileName.trim() || !roomId.trim()) return;
+    joinRoom(roomId.trim().toUpperCase(), profileName.trim(), profileColor);
   };
 
   // ============================================
@@ -88,9 +90,9 @@ export const NetworkLobby = () => {
             🚪 Присоединиться по коду
           </button>
 
-            <button onClick={() => useGameStore.getState().setLobbyScreen('modeSelect')} style={secondaryBtnStyle}>
+          <button onClick={() => useGameStore.getState().setLobbyScreen('modeSelect')} style={secondaryBtnStyle}>
             ← Назад
-            </button>
+          </button>
         </div>
       </div>
     );
@@ -105,14 +107,11 @@ export const NetworkLobby = () => {
         <div style={cardStyle}>
           <h2 style={titleStyle}>🏠 Создать комнату</h2>
 
-          <input
-            type="text"
-            placeholder="Ваше имя"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            maxLength={20}
-            style={inputStyle}
-          />
+          {/* 🌟 Показываем имя и цвет из профиля */}
+          <div style={profilePreviewStyle}>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: profileColor }} />
+            <span style={{ color: '#fff' }}>{profileName}</span>
+          </div>
 
           <label style={checkboxStyle}>
             <input
@@ -135,7 +134,7 @@ export const NetworkLobby = () => {
             />
           </label>
 
-          <button onClick={handleCreateRoom} disabled={!playerName.trim()} style={primaryBtnStyle}>
+          <button onClick={handleCreateRoom} disabled={!profileName.trim()} style={primaryBtnStyle}>
             Создать
           </button>
 
@@ -156,14 +155,11 @@ export const NetworkLobby = () => {
         <div style={cardStyle}>
           <h2 style={titleStyle}>🚪 Присоединиться</h2>
 
-          <input
-            type="text"
-            placeholder="Ваше имя"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            maxLength={20}
-            style={inputStyle}
-          />
+          {/* 🌟 Показываем имя и цвет из профиля */}
+          <div style={profilePreviewStyle}>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: profileColor }} />
+            <span style={{ color: '#fff' }}>{profileName}</span>
+          </div>
 
           <input
             type="text"
@@ -176,7 +172,7 @@ export const NetworkLobby = () => {
 
           <button
             onClick={handleJoinRoom}
-            disabled={!playerName.trim() || roomId.length !== 6}
+            disabled={!profileName.trim() || roomId.length !== 6}
             style={primaryBtnStyle}
           >
             Присоединиться
@@ -347,4 +343,14 @@ const playerRowStyle: React.CSSProperties = {
   padding: '10px 14px',
   background: 'rgba(255, 255, 255, 0.05)',
   borderRadius: '8px',
+};
+
+const profilePreviewStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  padding: '12px 16px',
+  background: 'rgba(255, 255, 255, 0.05)',
+  borderRadius: '8px',
+  marginBottom: '8px',
 };

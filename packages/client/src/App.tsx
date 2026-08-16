@@ -18,7 +18,7 @@ import { MainMenu } from '@/components/MainMenu';
 import { ReconnectingOverlay } from '@/components/ReconnectingOverlay';
 
 // Ленивый импорт
-const Lobby = lazy(() => import('@/components/Lobby').then(m => ({ default: m.Lobby })));
+const LocalLobby = lazy(() => import('@/components/LocalLobby').then(m => ({ default: m.Lobby })));
 const GameOverScreen = lazy(() => import('@/components/GameOverScreen').then(m => ({ default: m.GameOverScreen })));
 const DebugPanel = lazy(() => import('@/components/DebugPanel').then(m => ({ default: m.DebugPanel })));
 const NetworkLobby = lazy(() => import('@/components/NetworkLobby').then(m => ({ default: m.NetworkLobby })));
@@ -240,7 +240,7 @@ export default function App() {
       return (
         <Suspense fallback={null}>
           <ErrorBoundary name="Lobby">
-            <Lobby />
+            <LocalLobby />
           </ErrorBoundary>
         </Suspense>
       );

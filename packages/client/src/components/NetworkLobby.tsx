@@ -1,20 +1,25 @@
 // packages/client/src/components/NetworkLobby.tsx
 // 🌟 Сетевое лобби: создание/присоединение к комнате, ожидание игроков
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { useEffect } from 'react';
+import { SessionSettings } from '@/components/lobby/SessionSettings';
+
+// 🌟 Единый CSS-модуль для всех лобби
+import styles from '@/components/lobby.module.css';
 
 export const NetworkLobby = () => {
   const [screen, setScreen] = useState<'main' | 'create' | 'join' | 'waiting'>('main');
 
   // 🌟 Используем имя и цвет из uiSlice (главное меню)
   const profileName = useGameStore(s => s.playerName);
-  const profileColor = useGameStore(s => s.playerColor)
+  const profileColor = useGameStore(s => s.playerColor);
 
   const [roomId, setRoomId] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [turnTimer, setTurnTimer] = useState(60);
+  const [showRegions, setShowRegions] = useState(true);
+  const [showDeadCells, setShowDeadCells] = useState(true);
+  const [enabledDeckView, setEnabledDeckView] = useState(true);
 
   const isConnected = useGameStore(s => s.isConnected);
   const connectionError = useGameStore(s => s.connectionError);
@@ -29,7 +34,7 @@ export const NetworkLobby = () => {
   const leaveRoom = useGameStore(s => s.leaveRoom);
   const setReady = useGameStore(s => s.setReady);
   const startNetworkGame = useGameStore(s => s.startNetworkGame);
-
+  const kickPlayer = useGameStore(s => s.kickPlayer);
 
   // 🌟 Если уже в комнате — показываем экран ожидания
   useEffect(() => {
@@ -38,12 +43,21 @@ export const NetworkLobby = () => {
     }
   }, [currentRoomId, screen]);
 
+  // 🌟 Возврат в главное меню
+  const handleBackToMainMenu = () => {
+    useGameStore.getState().setLobbyScreen('modeSelect');
+  };
+
   const handleCreateRoom = () => {
     if (!profileName.trim()) return;
     createRoom(profileName.trim(), {
       isPrivate,
       turnTimerSeconds: turnTimer,
       maxPlayers: 5,
+      // 🌟 Передаём настройки сессии по умолчанию
+      showRegions,
+      showDeadCells,
+      enabledDeckView,
     }, profileColor);
   };
 
@@ -57,13 +71,13 @@ export const NetworkLobby = () => {
   // ============================================
   if (!isConnected) {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          <h2 style={titleStyle}>🌐 Подключение...</h2>
+      <div className={styles.overlay}>
+        <div className={styles.card}>
+          <h2 className={styles.title}>🌐 Подключение...</h2>
           {connectionError && (
-            <p style={{ color: '#e74c3c', textAlign: 'center' }}>
+            <div className={styles.errorBox}>
               Ошибка: {connectionError}
-            </p>
+            </div>
           )}
           <p style={{ color: '#aaa', textAlign: 'center' }}>
             Подключение к серверу...
@@ -78,19 +92,19 @@ export const NetworkLobby = () => {
   // ============================================
   if (screen === 'main') {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          <h1 style={titleStyle}>🌐 Сетевая игра</h1>
+      <div className={styles.overlay}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>🌐 Сетевая игра</h1>
 
-          <button onClick={() => setScreen('create')} style={primaryBtnStyle}>
+          <button onClick={() => setScreen('create')} className={styles.buttonPrimary}>
             🏠 Создать комнату
           </button>
 
-          <button onClick={() => setScreen('join')} style={primaryBtnStyle}>
+          <button onClick={() => setScreen('join')} className={styles.buttonPrimary}>
             🚪 Присоединиться по коду
           </button>
 
-          <button onClick={() => useGameStore.getState().setLobbyScreen('modeSelect')} style={secondaryBtnStyle}>
+          <button onClick={handleBackToMainMenu} className={styles.buttonSecondary}>
             ← Назад
           </button>
         </div>
@@ -103,42 +117,51 @@ export const NetworkLobby = () => {
   // ============================================
   if (screen === 'create') {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          <h2 style={titleStyle}>🏠 Создать комнату</h2>
+      <div className={styles.overlay}>
+        <div className={styles.card}>
+          <h2 className={styles.title}>🏠 Создать комнату</h2>
 
-          {/* 🌟 Показываем имя и цвет из профиля */}
-          <div style={profilePreviewStyle}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: profileColor }} />
-            <span style={{ color: '#fff' }}>{profileName}</span>
-          </div>
-
-          <label style={checkboxStyle}>
+          <label className={styles.settingRow}>
             <input
               type="checkbox"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
+              className={styles.settingCheckbox}
             />
-            Приватная комната (по коду)
+            <span className={styles.settingLabel}>🔒 Приватная комната (по коду)</span>
           </label>
 
-          <label style={labelStyle}>
-            ⏱️ Таймер на ход (секунды):
+          <label className={styles.labelColumn}>
+            <span>⏱️ Таймер на ход (секунды)</span>
             <input
               type="number"
               min={0}
               max={300}
               value={turnTimer}
               onChange={(e) => setTurnTimer(Number(e.target.value))}
-              style={inputStyle}
+              className={styles.input}
             />
           </label>
 
-          <button onClick={handleCreateRoom} disabled={!profileName.trim()} style={primaryBtnStyle}>
+          {/*  Настройки сессии */}
+          <SessionSettings
+            showRegions={showRegions}
+            showDeadCells={showDeadCells}
+            enabledDeckView={enabledDeckView}
+            onToggleRegions={() => setShowRegions(!showRegions)}
+            onToggleDeadCells={() => setShowDeadCells(!showDeadCells)}
+            onToggleDeckView={() => setEnabledDeckView(!enabledDeckView)}
+          />
+
+          <button
+            onClick={handleCreateRoom}
+            disabled={!profileName.trim()}
+            className={styles.buttonPrimary}
+          >
             Создать
           </button>
 
-          <button onClick={() => setScreen('main')} style={secondaryBtnStyle}>
+          <button onClick={() => setScreen('main')} className={styles.buttonSecondary}>
             ← Назад
           </button>
         </div>
@@ -151,15 +174,9 @@ export const NetworkLobby = () => {
   // ============================================
   if (screen === 'join') {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          <h2 style={titleStyle}>🚪 Присоединиться</h2>
-
-          {/* 🌟 Показываем имя и цвет из профиля */}
-          <div style={profilePreviewStyle}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: profileColor }} />
-            <span style={{ color: '#fff' }}>{profileName}</span>
-          </div>
+      <div className={styles.overlay}>
+        <div className={styles.card}>
+          <h2 className={styles.title}>🚪 Присоединиться</h2>
 
           <input
             type="text"
@@ -167,18 +184,24 @@ export const NetworkLobby = () => {
             value={roomId}
             onChange={(e) => setRoomId(e.target.value.toUpperCase())}
             maxLength={6}
-            style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '4px', textAlign: 'center', fontSize: '20px' }}
+            className={styles.input}
+            style={{
+              textTransform: 'uppercase',
+              letterSpacing: '4px',
+              textAlign: 'center',
+              fontSize: '20px',
+            }}
           />
 
           <button
             onClick={handleJoinRoom}
             disabled={!profileName.trim() || roomId.length !== 6}
-            style={primaryBtnStyle}
+            className={styles.buttonPrimary}
           >
             Присоединиться
           </button>
 
-          <button onClick={() => setScreen('main')} style={secondaryBtnStyle}>
+          <button onClick={() => setScreen('main')} className={styles.buttonSecondary}>
             ← Назад
           </button>
         </div>
@@ -194,77 +217,88 @@ export const NetworkLobby = () => {
     const canStart = networkLobbyPlayers.length >= 2 && allReady;
 
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          <h2 style={titleStyle}>⏳ Комната {currentRoomId}</h2>
-          <p style={{ color: '#4a90e2', textAlign: 'center', fontSize: '14px' }}>
-            Сообщите код комнаты друзьям: <strong style={{ fontSize: '18px', letterSpacing: '2px' }}>{currentRoomId}</strong>
+      <div className={styles.overlay}>
+        <div className={styles.card}>
+          <h2 className={styles.title}>⏳ Комната {currentRoomId}</h2>
+
+          {/* Код комнаты для друзей */}
+          <p className={styles.roomCode}>
+            Сообщите код друзьям:{' '}
+            <strong className={styles.roomCodeValue}>{currentRoomId}</strong>
           </p>
 
           {/* Список игроков */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          <div className={styles.playersList}>
             {networkLobbyPlayers.map(player => (
-              <div key={player.id} style={{
-                ...playerRowStyle,
-                // 🌟 Отключённый игрок — полупрозрачный
-                opacity: player.isDisconnected ? 0.5 : 1,
-              }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  backgroundColor: player.color,
-                  filter: player.isDisconnected ? 'grayscale(0.5)' : 'none',
-                }} />
-                <span style={{ color: '#fff', flex: 1 }}>
-                  {player.name} {player.isHost && '👑'} {player.id === playerId && '(вы)'}
-                  {/* 🌟 Индикатор отключения */}
+              <div
+                key={player.id}
+                className={`${styles.playerRow} ${player.isDisconnected ? styles.disconnected : ''}`}
+              >
+                <div
+                  className={styles.playerColor}
+                  style={{ backgroundColor: player.color }}
+                />
+                <span className={styles.playerName}>
+                  {player.name}
+                  {player.isHost && <span className={styles.playerBadge}>👑</span>}
+                  {player.id === playerId && <span className={styles.playerBadge}>(вы)</span>}
                   {player.isDisconnected && (
-                    <span style={{ color: '#e74c3c', marginLeft: '8px', fontSize: '12px' }}>
+                    <span className={styles.playerBadge} style={{ color: '#e74c3c' }}>
                       ⚠️ отключился
                     </span>
                   )}
                 </span>
-                <span style={{ color: player.isReady ? '#2ecc71' : '#e74c3c' }}>
+                <span className={`${styles.playerStatus} ${player.isReady ? styles.ready : styles.notReady}`}>
                   {player.isReady ? '✅ Готов' : '⏳ Не готов'}
                 </span>
+
+                {/* 🌟 Кнопка кика (только для хоста, не для себя) */}
+                {isHost && player.id !== playerId && (
+                  <button
+                    className={styles.removeButton}
+                    onClick={() => kickPlayer(player.id)}
+                    title="Кикнуть игрока"
+                  >
+                    −
+                  </button>
+                )}
               </div>
             ))}
           </div>
 
-          {/* Настройки комнаты */}
+          {/* Информация о комнате */}
           {roomSettings && (
-            <div style={{ color: '#888', fontSize: '13px', marginBottom: '16px', textAlign: 'center' }}>
-              ⏱️ Таймер: {roomSettings.turnTimerSeconds} сек | 🔒 {roomSettings.isPrivate ? 'Приватная' : 'Публичная'}
-            </div>
+            <p className={styles.roomInfo}>
+              ⏱️ Таймер: {roomSettings.turnTimerSeconds} сек |{' '}
+              {roomSettings.isPrivate ? '🔒 Приватная' : '🌐 Публичная'}
+            </p>
           )}
 
-          {/* Кнопки */}
+          {/* Кнопка готовности */}
           <button
             onClick={() => {
               const me = networkLobbyPlayers.find(p => p.id === playerId);
               setReady(!me?.isReady);
             }}
-            style={primaryBtnStyle}
+            className={styles.buttonPrimary}
           >
-            {networkLobbyPlayers.find(p => p.id === playerId)?.isReady ? '❌ Отменить готовность' : '✅ Готов'}
+            {networkLobbyPlayers.find(p => p.id === playerId)?.isReady
+              ? '❌ Отменить готовность'
+              : '✅ Готов'}
           </button>
 
+          {/* Кнопка старта (только хост) */}
           {isHost && (
             <button
               onClick={startNetworkGame}
               disabled={!canStart}
-              style={{
-                ...primaryBtnStyle,
-                background: canStart ? '#2ecc71' : '#555',
-                cursor: canStart ? 'pointer' : 'not-allowed',
-              }}
+              className={styles.buttonSuccess}
             >
               🚀 Начать игру
             </button>
           )}
 
-          <button onClick={leaveRoom} style={secondaryBtnStyle}>
+          <button onClick={leaveRoom} className={styles.buttonSecondary}>
             👋 Покинуть комнату
           </button>
         </div>
@@ -273,100 +307,4 @@ export const NetworkLobby = () => {
   }
 
   return null;
-};
-
-// ============================================
-// 🎨 Стили
-// ============================================
-const containerStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 9999,
-};
-
-const cardStyle: React.CSSProperties = {
-  background: 'rgba(30, 30, 30, 0.95)',
-  borderRadius: '24px',
-  padding: '32px',
-  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-  maxWidth: '420px',
-  width: '90%',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '12px',
-};
-
-const titleStyle: React.CSSProperties = {
-  color: '#fff',
-  fontSize: '24px',
-  textAlign: 'center',
-  margin: '0 0 16px 0',
-};
-
-const inputStyle: React.CSSProperties = {
-  padding: '12px 16px',
-  fontSize: '16px',
-  border: '2px solid rgba(74, 144, 226, 0.4)',
-  borderRadius: '8px',
-  background: 'rgba(255, 255, 255, 0.08)',
-  color: '#fff',
-  outline: 'none',
-};
-
-const checkboxStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  color: '#fff',
-  fontSize: '14px',
-  cursor: 'pointer',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '6px',
-  color: '#fff',
-  fontSize: '14px',
-};
-
-const primaryBtnStyle: React.CSSProperties = {
-  padding: '14px',
-  background: '#4a90e2',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '10px',
-  fontSize: '16px',
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'all 0.2s',
-};
-
-const secondaryBtnStyle: React.CSSProperties = {
-  ...primaryBtnStyle,
-  background: 'rgba(255, 255, 255, 0.1)',
-  color: '#aaa',
-};
-
-const playerRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '10px 14px',
-  background: 'rgba(255, 255, 255, 0.05)',
-  borderRadius: '8px',
-};
-
-const profilePreviewStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  padding: '12px 16px',
-  background: 'rgba(255, 255, 255, 0.05)',
-  borderRadius: '8px',
-  marginBottom: '8px',
 };

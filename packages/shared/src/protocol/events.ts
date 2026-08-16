@@ -66,7 +66,6 @@ export interface ClientToServerEvents {
   'lobby:leave-room': () => void;
   'lobby:set-ready': (ready: boolean) => void;
   'lobby:kick-player': (data: { playerId: string }) => void;
-  'lobby:update-settings': (settings: RoomSettings) => void;
   'lobby:start-game': () => void;  // Только хост
 
   // --- Игра ---

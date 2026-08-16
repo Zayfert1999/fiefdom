@@ -14,6 +14,9 @@ export const CreateRoomSchema = z.object({
     isPrivate: z.boolean(),
     turnTimerSeconds: z.number().min(0).max(300),
     maxPlayers: z.number().min(2).max(5),
+    showRegions: z.boolean().default(true),
+    showDeadCells: z.boolean().default(true),
+    enabledDeckView: z.boolean().default(true),
   }),
   preferredColor: z.string().optional(),
 });

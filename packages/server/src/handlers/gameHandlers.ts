@@ -19,7 +19,7 @@ export function registerGameHandlers(io: Server, socket: Socket, roomManager: Ro
   // ============================================
   // 🎴 УСТАНОВКА ТАЙЛА
   // ============================================
-// 🌟 ИСПРАВЛЕНО: заменяем place-tile и place-meeple на commit-move
+  // 🌟 ИСПРАВЛЕНО: заменяем place-tile и place-meeple на commit-move
   socket.on('game:commit-move', (data) => {
     logger.info('[GameHandler]', `📥 Получено game:commit-move от ${socket.data.playerId}`, data);
 
@@ -30,14 +30,27 @@ export function registerGameHandlers(io: Server, socket: Socket, roomManager: Ro
     }
     const { room, playerId } = ctx;
 
-    // Валидация данных
-    const { tile, meeple } = data;
-    if (!tile || typeof tile.x !== 'number') {
+    // 🌟 ИСПРАВЛЕНО: валидация тайла через Zod
+    const tileParsed = PlaceTileSchema.safeParse(data.tile);
+    if (!tileParsed.success) {
+      logger.warn('[GameHandler]', 'Невалидные данные тайла', tileParsed.error.format());
       socket.emit('error', { code: 'INVALID_DATA', message: 'Неверные данные тайла' });
       return;
     }
 
-    const result = room.handleCommitMove(playerId, tile, meeple);
+    // 🌟 ИСПРАВЛЕНО: валидация мипла (опциональный)
+    let meeple: { featureId: string; x: number; y: number } | null = null;
+    if (data.meeple !== null && data.meeple !== undefined) {
+      const meepleParsed = PlaceMeepleSchema.safeParse(data.meeple);
+      if (!meepleParsed.success) {
+        logger.warn('[GameHandler]', 'Невалидные данные мипла', meepleParsed.error.format());
+        socket.emit('error', { code: 'INVALID_DATA', message: 'Неверные данные мипла' });
+        return;
+      }
+      meeple = meepleParsed.data;
+    }
+
+    const result = room.handleCommitMove(playerId, tileParsed.data, meeple);
 
     if (!result.success) {
       socket.emit('error', { code: result.error!, message: `Ошибка хода: ${result.error}` });

@@ -92,6 +92,12 @@ export function registerStateSync(socket: GameSocket): void {
     store._setLobbyPlayers(players);
     store._setRoomSettings(settings);
     store._setHost(players.find(p => p.id === playerId)?.isHost ?? false);
+    // Применяем настройки сессии
+    useGameStore.setState({
+      showRegions: settings.showRegions,
+      showDeadCells: settings.showDeadCells,
+      enabledDeckView: settings.enabledDeckView,
+    });
   });
 
   socket.on('lobby:player-joined', (player) => {
@@ -121,35 +127,51 @@ export function registerStateSync(socket: GameSocket): void {
     );
   });
 
+  socket.on('lobby:player-kicked', ({ playerId }) => {
+    console.log(`👢 [StateSync] Игрок кикнут: ${playerId}`);
+    const store = useGameStore.getState();
+    store._setLobbyPlayers(
+      store.networkLobbyPlayers.filter(p => p.id !== playerId)
+    );
+  });
+
+  socket.on('lobby:kicked', () => {
+    console.log(`👢 [StateSync] Вас кикнули из комнаты`);
+    const store = useGameStore.getState();
+    store.setReconnectError('Вас кикнули из комнаты');
+    store.leaveRoom();
+    useGameStore.setState({ isReconnectingToRoom: false });
+  });
+
   socket.on('lobby:settings-changed', (settings) => {
     useGameStore.getState()._setRoomSettings(settings);
   });
 
   // ============================================
-// 🔌 ОТКЛЮЧЕНИЕ/ПЕРЕПОДКЛЮЧЕНИЕ ДРУГИХ ИГРОКОВ
-// ============================================
+  // 🔌 ОТКЛЮЧЕНИЕ/ПЕРЕПОДКЛЮЧЕНИЕ ДРУГИХ ИГРОКОВ
+  // ============================================
 
-socket.on('lobby:player-disconnected', ({ playerId }) => {
-  console.log(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
-  const store = useGameStore.getState();
-  // 🌟 Помечаем игрока как отключённого в списке лобби
-  store._setLobbyPlayers(
-    store.networkLobbyPlayers.map(p =>
-      p.id === playerId ? { ...p, isDisconnected: true } : p
-    )
-  );
-});
+  socket.on('lobby:player-disconnected', ({ playerId }) => {
+    console.log(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
+    const store = useGameStore.getState();
+    // 🌟 Помечаем игрока как отключённого в списке лобби
+    store._setLobbyPlayers(
+      store.networkLobbyPlayers.map(p =>
+        p.id === playerId ? { ...p, isDisconnected: true } : p
+      )
+    );
+  });
 
-socket.on('lobby:player-reconnected', ({ playerId }) => {
-  console.log(`✅ [StateSync] Игрок переподключился: ${playerId}`);
-  const store = useGameStore.getState();
-  // 🌟 Снимаем флаг отключения
-  store._setLobbyPlayers(
-    store.networkLobbyPlayers.map(p =>
-      p.id === playerId ? { ...p, isDisconnected: false } : p
-    )
-  );
-});
+  socket.on('lobby:player-reconnected', ({ playerId }) => {
+    console.log(`✅ [StateSync] Игрок переподключился: ${playerId}`);
+    const store = useGameStore.getState();
+    // 🌟 Снимаем флаг отключения
+    store._setLobbyPlayers(
+      store.networkLobbyPlayers.map(p =>
+        p.id === playerId ? { ...p, isDisconnected: false } : p
+      )
+    );
+  });
 
   // ============================================
   // 🏠 СОБЫТИЯ ВОССТАНОВЛЕНИЯ
@@ -163,6 +185,13 @@ socket.on('lobby:player-reconnected', ({ playerId }) => {
     store._setLobbyPlayers(players);
     store._setRoomSettings(settings);
     store._setHost(isHost);
+
+    // Применяем настройки сессии
+    useGameStore.setState({
+      showRegions: settings.showRegions,
+      showDeadCells: settings.showDeadCells,
+      enabledDeckView: settings.enabledDeckView,
+    });
 
     // Сохраняем снова (для надёжности)
     store._saveConnectionInfo(playerId, roomId);

@@ -31,7 +31,7 @@ export class PlayerConnection {
   }
 
   /** Отправить событие лично этому игроку */
-  emit(event: string, data: unknown): void {
+  emit(event: string, data?: unknown): void {
     if (this.socket) {
       this.socket.emit(event, data);
     }

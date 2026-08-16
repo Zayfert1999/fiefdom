@@ -15,6 +15,9 @@ export interface RoomSettings {
   isPrivate: boolean;       // Приватная (по коду) или публичная
   turnTimerSeconds: number; // Таймер на ход (0 = без таймера)
   maxPlayers: number;       // Максимум игроков (2-5)
+  showRegions: boolean;
+  showDeadCells: boolean;
+  enabledDeckView: boolean;
 }
 
 /** Информация об игроке в лобби */
@@ -62,6 +65,8 @@ export interface ClientToServerEvents {
 
   'lobby:leave-room': () => void;
   'lobby:set-ready': (ready: boolean) => void;
+  'lobby:kick-player': (data: { playerId: string }) => void;
+  'lobby:update-settings': (settings: RoomSettings) => void;
   'lobby:start-game': () => void;  // Только хост
 
   // --- Игра ---
@@ -89,7 +94,7 @@ export interface ClientToServerEvents {
 
   'session:check-active': (data: {
     playerId: string;
-}) => void;
+  }) => void;
 
 }
 
@@ -129,9 +134,10 @@ export interface ServerToClientEvents {
   'lobby:player-ready': (data: { playerId: string; isReady: boolean }) => void;
   'lobby:settings-changed': (settings: RoomSettings) => void;
   'lobby:room-list': (rooms: RoomInfo[]) => void;
-
   'lobby:player-disconnected': (data: { playerId: string }) => void;
   'lobby:player-reconnected': (data: { playerId: string }) => void;
+  'lobby:player-kicked': (data: { playerId: string }) => void;
+  'lobby:kicked': () => void;
 
   // --- Игра ---
   'game:started': (data: {

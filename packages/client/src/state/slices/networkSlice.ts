@@ -48,6 +48,7 @@ export interface NetworkSlice {
   joinRoom: (roomId: string, playerName: string, preferredColor?: string) => void;
   leaveRoom: () => void;
   setReady: (ready: boolean) => void;
+  kickPlayer: (playerId: string) => void;
   startNetworkGame: () => void;
 
   // === Действия: игра (отправка намерений на сервер) ===
@@ -158,6 +159,12 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
     const socket = getSocket();
     console.log(`✅ [Network] Готовность: ${ready}`);
     socket.emit('lobby:set-ready', ready);
+  },
+
+  kickPlayer: (playerId) => {
+    const socket = getSocket();
+    console.log(`👢 [Network] Кик игрока: ${playerId}`);
+    socket.emit('lobby:kick-player', { playerId });
   },
 
   startNetworkGame: () => {

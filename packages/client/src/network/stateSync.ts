@@ -126,6 +126,32 @@ export function registerStateSync(socket: GameSocket): void {
   });
 
   // ============================================
+// 🔌 ОТКЛЮЧЕНИЕ/ПЕРЕПОДКЛЮЧЕНИЕ ДРУГИХ ИГРОКОВ
+// ============================================
+
+socket.on('lobby:player-disconnected', ({ playerId }) => {
+  console.log(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
+  const store = useGameStore.getState();
+  // 🌟 Помечаем игрока как отключённого в списке лобби
+  store._setLobbyPlayers(
+    store.networkLobbyPlayers.map(p =>
+      p.id === playerId ? { ...p, isDisconnected: true } : p
+    )
+  );
+});
+
+socket.on('lobby:player-reconnected', ({ playerId }) => {
+  console.log(`✅ [StateSync] Игрок переподключился: ${playerId}`);
+  const store = useGameStore.getState();
+  // 🌟 Снимаем флаг отключения
+  store._setLobbyPlayers(
+    store.networkLobbyPlayers.map(p =>
+      p.id === playerId ? { ...p, isDisconnected: false } : p
+    )
+  );
+});
+
+  // ============================================
   // 🏠 СОБЫТИЯ ВОССТАНОВЛЕНИЯ
   // ============================================
 

@@ -190,7 +190,7 @@ export const NetworkLobby = () => {
   // ⏳ ОЖИДАНИЕ В КОМНАТЕ
   // ============================================
   if (screen === 'waiting') {
-    const allReady = networkLobbyPlayers.every(p => p.isReady);
+    const allReady = networkLobbyPlayers.every(p => p.isReady && !p.isDisconnected);
     const canStart = networkLobbyPlayers.length >= 2 && allReady;
 
     return (
@@ -204,10 +204,26 @@ export const NetworkLobby = () => {
           {/* Список игроков */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
             {networkLobbyPlayers.map(player => (
-              <div key={player.id} style={playerRowStyle}>
-                <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: player.color }} />
+              <div key={player.id} style={{
+                ...playerRowStyle,
+                // 🌟 Отключённый игрок — полупрозрачный
+                opacity: player.isDisconnected ? 0.5 : 1,
+              }}>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: player.color,
+                  filter: player.isDisconnected ? 'grayscale(0.5)' : 'none',
+                }} />
                 <span style={{ color: '#fff', flex: 1 }}>
                   {player.name} {player.isHost && '👑'} {player.id === playerId && '(вы)'}
+                  {/* 🌟 Индикатор отключения */}
+                  {player.isDisconnected && (
+                    <span style={{ color: '#e74c3c', marginLeft: '8px', fontSize: '12px' }}>
+                      ⚠️ отключился
+                    </span>
+                  )}
                 </span>
                 <span style={{ color: player.isReady ? '#2ecc71' : '#e74c3c' }}>
                   {player.isReady ? '✅ Готов' : '⏳ Не готов'}

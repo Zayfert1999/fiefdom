@@ -45,6 +45,7 @@ export class PlayerConnection {
       color: this.player.color,
       isReady: this.isReady,
       isHost,
+      isDisconnected: this.isDisconnected,
     };
   }
 

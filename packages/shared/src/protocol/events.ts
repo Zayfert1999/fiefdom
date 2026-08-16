@@ -24,6 +24,7 @@ export interface LobbyPlayer {
   color: string;
   isReady: boolean;
   isHost: boolean;
+  isDisconnected?: boolean;
 }
 
 /** Информация о комнате для списка лобби */
@@ -128,6 +129,9 @@ export interface ServerToClientEvents {
   'lobby:player-ready': (data: { playerId: string; isReady: boolean }) => void;
   'lobby:settings-changed': (settings: RoomSettings) => void;
   'lobby:room-list': (rooms: RoomInfo[]) => void;
+
+  'lobby:player-disconnected': (data: { playerId: string }) => void;
+  'lobby:player-reconnected': (data: { playerId: string }) => void;
 
   // --- Игра ---
   'game:started': (data: {

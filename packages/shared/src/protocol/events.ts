@@ -188,13 +188,6 @@ export interface ServerToClientEvents {
     message: string;
   }) => void;
 
-  // --- Reconnection ---
-  'reconnect:success': (data: {
-    gameState: SerializedGameState;
-    yourPlayerId: string;
-    currentPhase: string;
-  }) => void;
-
   // --- Чат (последняя очередь) ---
   'chat:message': (data: {
     playerId: string;

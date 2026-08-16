@@ -3,19 +3,17 @@ import { useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 
 export const Lobby = () => {
-  const {
-    lobbyPlayers = [],
-    showRegions,
-    showDeadCells,
-    enabledDeckView,
-    addPlayer,
-    removePlayer,
-    renamePlayer,
-    startGame,
-    toggleRegions,
-    toggleDeadCells,
-    toggleDeckView
-  } = useGameStore();
+  const lobbyPlayers = useGameStore(s => s.lobbyPlayers);
+  const showRegions = useGameStore(s => s.showRegions);
+  const showDeadCells = useGameStore(s => s.showDeadCells);
+  const enabledDeckView = useGameStore(s => s.enabledDeckView);
+  const addPlayer = useGameStore(s => s.addPlayer);
+  const removePlayer = useGameStore(s => s.removePlayer);
+  const renamePlayer = useGameStore(s => s.renamePlayer);
+  const startGame = useGameStore(s => s.startGame);
+  const toggleRegions = useGameStore(s => s.toggleRegions);
+  const toggleDeadCells = useGameStore(s => s.toggleDeadCells);
+  const toggleDeckView = useGameStore(s => s.toggleDeckView);
 
   // 🌟 Состояние inline-редактирования
   const [editingId, setEditingId] = useState<string | null>(null);

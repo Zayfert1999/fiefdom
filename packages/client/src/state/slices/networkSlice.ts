@@ -12,7 +12,6 @@ import type { GameStore } from '../useGameStore';
 import { registerStateSync, unregisterStateSync } from '@/network/stateSync';
 import {
   saveConnectionInfo,
-  loadConnectionInfo,
   clearConnectionInfo,
   savePlayerName,
   loadPlayerName,
@@ -43,7 +42,6 @@ export interface NetworkSlice {
   // === Действия: подключение ===
   connectToServer: () => void;
   disconnectFromServer: () => void;
-  attemptAutoReconnect: () => void;
 
   // === Действия: лобби ===
   createRoom: (playerName: string, settings: RoomSettings, preferredColor?: string) => void;
@@ -69,7 +67,7 @@ export interface NetworkSlice {
   _saveConnectionInfo: (playerId: string, roomId: string) => void;
 }
 
-export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set, get) => ({
+export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set) => ({
   // === Начальное состояние ===
   lobbyScreen: 'modeSelect',
   isConnected: false,
@@ -118,40 +116,6 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
       isHost: false,
       lobbyScreen: 'modeSelect',
     });
-  },
-
-  // ============================================
-  // 🔄 АВТОВОССТАНОВЛЕНИЕ ПРИ ЗАГРУЗКЕ
-  // ============================================
-  attemptAutoReconnect: () => {
-    const saved = loadConnectionInfo();
-    if (!saved) {
-      console.log('🔍 [Network] Нет сохранённой сессии');
-      return;
-    }
-
-    console.log(`🔄 [Network] Попытка автовосстановления: room=${saved.roomId}, player=${saved.playerId}`);
-    set({ isReconnectingToRoom: true });
-
-    // Подключаемся к серверу
-    get().connectToServer();
-
-    // После подключения отправляем запрос на reconnect
-    // (обработчик 'connect' вызовет это автоматически)
-    const checkAndReconnect = () => {
-      const socket = getSocket();
-      if (socket.connected) {
-        console.log(`📤 [Network] Отправка запроса на reconnect`);
-        socket.emit('lobby:reconnect', {
-          playerId: saved.playerId,
-          roomId: saved.roomId,
-        });
-      } else {
-        // Ждём подключения
-        setTimeout(checkAndReconnect, 200);
-      }
-    };
-    checkAndReconnect();
   },
 
   // ============================================

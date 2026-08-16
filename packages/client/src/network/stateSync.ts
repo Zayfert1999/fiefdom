@@ -190,8 +190,7 @@ socket.on('lobby:player-reconnected', ({ playerId }) => {
     store.leaveRoom();
     useGameStore.setState({ isReconnectingToRoom: false });
 
-    // Можно показать toast/alert пользователю
-    alert(`Не удалось восстановить игру: ${reason}`);
+    store.setReconnectError(`Не удалось восстановить игру: ${reason}`);
   });
 
   // ============================================

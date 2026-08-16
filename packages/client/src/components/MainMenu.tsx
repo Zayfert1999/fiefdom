@@ -71,9 +71,12 @@ export const MainMenu = () => {
         console.log(`🔄 [MainMenu] Продолжить игру в комнате ${activeGame.roomId}`);
         setIsReconnecting(true);
 
+        useGameStore.setState({ isReconnectingToRoom: true });
+
         const socket = getSocket();
         if (!socket.connected) {
             setIsReconnecting(false);
+            useGameStore.setState({ isReconnectingToRoom: false });
             setReconnectError('Нет подключения к серверу');
             return;
         }
@@ -86,6 +89,7 @@ export const MainMenu = () => {
         // 🌟 Таймаут на случай, если сервер не ответит
         setTimeout(() => {
             setIsReconnecting(false);
+            useGameStore.setState({ isReconnectingToRoom: false });
         }, 5000);
     };
 

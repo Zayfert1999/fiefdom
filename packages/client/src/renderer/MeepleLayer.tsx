@@ -2,15 +2,8 @@
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
 import {TILE_SIZE} from '@carcassonne/shared/core/constants'
+import { darkenColor } from '@/utils/color';
 
-// 🌟 Простая функция затемнения цвета (прямо здесь, без отдельного файла)
-const darken = (hex: string, amount = 0.4): string => {
-  const c = hex.replace('#', '');
-  const r = Math.max(0, Math.floor(parseInt(c.substring(0, 2), 16) * (1 - amount)));
-  const g = Math.max(0, Math.floor(parseInt(c.substring(2, 4), 16) * (1 - amount)));
-  const b = Math.max(0, Math.floor(parseInt(c.substring(4, 6), 16) * (1 - amount)));
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-};
 
 /**
  * 🌟 Отдельный слой для миплов.
@@ -35,7 +28,7 @@ export const MeepleLayer = () => {
           compensation += 90;
         }
 
-        const strokeColor = t.meeple.isCompleting ? 'none' : darken(t.meeple.color);
+        const strokeColor = t.meeple.isCompleting ? 'none' : darkenColor(t.meeple.color, 0.4)
 
         // 🌟 НОВОЕ: определяем, временный ли мипл
         const isTemporary = t.meeple.isTemporary === true;

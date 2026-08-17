@@ -9,12 +9,9 @@ import { loadConnectionInfo } from '@/network/persistence';
 
 // Статические импорты 
 import { Board } from '@/renderer/Board';
-import { HUD } from '@/components/HUD';
-import { PlayersPanel } from '@/components/PlayersPanel';
 import { GameHUD } from '@/components/GameHUD';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { MainMenu } from '@/components/MainMenu';
 import { ReconnectingOverlay } from '@/components/ReconnectingOverlay';
 
@@ -255,7 +252,7 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
       <ReconnectingOverlay />
 
-      {/* 🖼️ Верхняя панель (HUD) */}
+      {/* 🖼️ Единый GameHUD */}
       <ErrorBoundary name="GameHUD">
         <GameHUD />
       </ErrorBoundary>

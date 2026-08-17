@@ -103,7 +103,7 @@ export class Room {
 
   get isGameStarted(): boolean {
     return this.gameStarted;
-}
+  }
 
   // ============================================
   // 📡 РАССЫЛКА
@@ -168,7 +168,7 @@ export class Room {
 
     this.turnTimer.start(
       this.settings.turnTimerSeconds,
-      (remaining) => this.broadcast('game:timer-update', { remainingSeconds: remaining }),
+      (remaining, deadline) => this.broadcast('game:timer-update', { remainingSeconds: remaining, deadline }),
       () => this.handleTimeout()
     );
   }

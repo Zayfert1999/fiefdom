@@ -38,6 +38,7 @@ export interface Player {
     monastery: number,
   };
   score: number;
+  isDisconnected?: boolean;
 }
 
 export interface PlacedMeeple {

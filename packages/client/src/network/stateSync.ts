@@ -233,11 +233,17 @@ export function registerStateSync(socket: GameSocket): void {
 
   socket.on('game:state-update', ({ gameState }) => {
     console.log(`🔄 [StateSync] Получено обновление состояния`);
+    // Сбрасываем таймер
+    useGameStore.getState().setTurnTimerRemaining(null);
+    useGameStore.getState().setTurnDeadline(null);
     applyServerState(gameState);
   });
 
   socket.on('game:your-turn', ({ drawnTile }) => {
     console.log(`🎴 [StateSync] Мой ход! Тайл: ${drawnTile.id}`);
+    // Сбрасываем таймер при начале хода
+    useGameStore.getState().setTurnTimerRemaining(null);
+    useGameStore.getState().setTurnDeadline(null);
     useGameStore.setState({
       drawnTile,
       phase: 'placeTile',
@@ -274,11 +280,19 @@ export function registerStateSync(socket: GameSocket): void {
 
   // 🌟 Передача хода
   socket.on('game:next-turn', ({ nextPlayerId }) => {
+    // Сбрасываем таймер при смене хода
+    useGameStore.getState().setTurnTimerRemaining(null);
+    useGameStore.getState().setTurnDeadline(null);
     console.log(`🔄 [StateSync] Ход передан игроку ${nextPlayerId}`);
     // Состояние придёт через game:state-update
   });
 
-  socket.on('game:timer-update', ({ remainingSeconds }) => {
+  socket.on('game:timer-update', ({ remainingSeconds, deadline }) => {
+    // сохраняем в store для GameHUD
+    useGameStore.getState().setTurnTimerRemaining(remainingSeconds);
+    if (deadline !== undefined) {
+      useGameStore.getState().setTurnDeadline(deadline);
+    }
     if (remainingSeconds <= 5) {
       console.log(`⏰ [StateSync] Осталось ${remainingSeconds} сек`);
     }

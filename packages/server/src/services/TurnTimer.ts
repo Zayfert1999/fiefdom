@@ -14,27 +14,35 @@ export class TurnTimer {
    * @param onTick Колбэк каждую секунду (для отправки остатка клиентам)
    * @param onExpire Колбэк по истечении (авто-действие)
    */
-  start(seconds: number, onTick: (remaining: number) => void, onExpire: () => void): void {
+  start(seconds: number, onTick: (remaining: number, deadline: number) => void, onExpire: () => void): void {
     if (seconds <= 0) {
       logger.info('[Timer]', 'Таймер выключен (0 сек)');
       return;
     }
-    this.stop(); // сбрасываем предыдущий
+
+    this.stop();
 
     let remaining = seconds;
-    logger.info('[Timer]', `Таймер запущен: ${seconds} сек`);
+    // 🌟 Момент окончания хода (timestamp в мс)
+    const deadline = Date.now() + seconds * 1000;
+
+    logger.info('[Timer]', `Таймер запущен: ${seconds} сек, deadline: ${deadline}`);
+
+    // 🌟 Сразу отправляем начальное значение + deadline
+    onTick(remaining, deadline);
 
     this.intervalId = setInterval(() => {
       remaining -= 1;
-      onTick(remaining);
+      onTick(remaining, deadline);
       if (remaining <= 0) {
         this.stop();
         logger.warn('[Timer]', '⏰ Время вышло → авто-действие');
+
         onExpire();
       }
     }, 1000);
 
-    // Страховочный setTimeout на случай сбоя interval
+    // Страховочный setTimeout
     this.timerId = setTimeout(() => {
       this.stop();
       onExpire();

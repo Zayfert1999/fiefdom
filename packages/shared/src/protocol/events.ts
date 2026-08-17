@@ -185,6 +185,7 @@ export interface ServerToClientEvents {
 
   'game:timer-update': (data: {
     remainingSeconds: number;
+    deadline?: number;
   }) => void;
 
   // --- Ошибки ---

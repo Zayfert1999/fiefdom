@@ -34,18 +34,26 @@ export interface UISlice {
   playerColor: string;
   setPlayerName: (name: string) => void;
   setPlayerColor: (color: string) => void;
-  
+
   // === Активная игра (для кнопки "Продолжить") ===
   activeGame: ActiveGame | null;
   setActiveGame: (game: ActiveGame | null) => void;
-  
+
   // === Ошибки reconnect ===
   reconnectError: string | null;
   setReconnectError: (error: string | null) => void;
-  
+
   // === Ping ===
   serverPing: number | null;
   setServerPing: (ping: number | null) => void;
+
+  // === Остаток таймера хода (для кольцевого индикатора) ===
+  turnTimerRemaining: number | null;
+  setTurnTimerRemaining: (remaining: number | null) => void;
+
+  // 🌟 НОВОЕ: timestamp окончания хода
+  turnDeadline: number | null;
+  setTurnDeadline: (deadline: number | null) => void;
 }
 
 export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => ({
@@ -55,6 +63,8 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => 
   activeGame: null,
   reconnectError: null,
   serverPing: null,
+  turnTimerRemaining: null,
+  turnDeadline: null,
 
   setPlayerName: (name) => {
     const validated = validatePlayerName(name);
@@ -77,5 +87,13 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => 
 
   setServerPing: (ping) => {
     set({ serverPing: ping });
+  },
+
+  setTurnTimerRemaining: (remaining) => {
+    set({ turnTimerRemaining: remaining });
+  },
+
+   setTurnDeadline: (deadline) => {
+    set({ turnDeadline: deadline });
   },
 });

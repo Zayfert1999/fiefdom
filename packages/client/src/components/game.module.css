@@ -1,0 +1,258 @@
+/* ============================================
+   🎮 СТИЛИ ИГРОВОГО HUD
+   ============================================ */
+
+/* === 🌟 Компактный блок HUD (по контенту, центрирован) === */
+.gameHud {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px 16px;
+  background: rgba(25, 25, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  /* Ширина по контенту — не задаём width */
+}
+
+/* === Информация об игре (фаза + время + колода) === */
+/* === Единая строка: информация слева, кнопки справа === */
+.topRow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;  /* 🌟 Три зоны: слева, центр, справа */
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+/* === Левая зона (колода) === */
+.deckZone {
+  justify-self: start;  /* 🌟 Прижата к левому краю */
+}
+
+/* === Центральная зона (общее время) === */
+.timerZone {
+  justify-self: center;  /* 🌟 Точно по центру */
+}
+
+/* === Правая зона (кнопки) === */
+.controlsSection {
+  justify-self: end;  /* 🌟 Прижата к правому краю */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* === Общее время игры === */
+.gameTimer {
+  font-size: 14px;
+  color: #ccc;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+/* === Виджет колоды === */
+.deckWidget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deckWidget:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.deckCount {
+  font-weight: 700;
+  color: #fff;
+}
+
+.deckTotal {
+  color: #888;
+  font-size: 12px;
+}
+
+/* === Кнопки управления === */
+.controlButton {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.controlButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.controlButtonDanger:hover {
+  background: rgba(231, 76, 60, 0.2);
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+/* === Индикатор подключения === */
+.connectionDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.connectionDotOffline {
+  background: #ef4444;
+}
+
+.connectionDotReconnecting {
+  background: #fbbf24;
+  animation: timerPulse 1s ease-in-out infinite;
+}
+
+/* === Строки игроков === */
+.playersSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.playersRow {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* === Карточка игрока === */
+.playerCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 3px solid transparent;
+  min-width: 110px;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.playerCardActive {
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.playerCardDisconnected {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+/* === 🌟 Рамка-таймер (тёмный цвет, без перекраски) === */
+.timerBorder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.timerBorderRect {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* 🌟 Пульсация без смены цвета — только при малом времени */
+.timerBorderRectPulse {
+  animation: timerPulse 1s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* === Цветовой индикатор === */
+.playerColor {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* === Имя игрока === */
+.playerName {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  text-align: center;
+}
+
+.playerNameSelf {
+  color: #4a90e2;
+}
+
+/* === Статистика === */
+.playerStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.playerScore {
+  color: #fff;
+  font-weight: 600;
+}
+
+.playerMeeples {
+  color: #aaa;
+}
+
+/* === Бейдж отключения === */
+.disconnectBadge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #191923;
+  z-index: 2;
+}

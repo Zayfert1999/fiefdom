@@ -11,6 +11,7 @@ import { loadConnectionInfo } from '@/network/persistence';
 import { Board } from '@/renderer/Board';
 import { HUD } from '@/components/HUD';
 import { PlayersPanel } from '@/components/PlayersPanel';
+import { GameHUD } from '@/components/GameHUD';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
@@ -255,14 +256,8 @@ export default function App() {
       <ReconnectingOverlay />
 
       {/* 🖼️ Верхняя панель (HUD) */}
-      <ErrorBoundary name="HUD">
-        <HUD />
-        <ConnectionStatus />
-      </ErrorBoundary>
-
-      {/* 📊 Панель игроков */}
-      <ErrorBoundary name="PlayersPanel">
-        <PlayersPanel />
+      <ErrorBoundary name="GameHUD">
+        <GameHUD />
       </ErrorBoundary>
 
       {/* 🤲 Панель действий */}

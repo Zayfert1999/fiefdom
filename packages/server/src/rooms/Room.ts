@@ -110,7 +110,17 @@ export class Room {
   // 🎮 ДЕЛЕГИРОВАНИЕ: ИГРОВОЙ ЦИКЛ
   // ============================================
 
-  /** Начать игру */
+  /** Инициализация игры БЕЗ начала хода */
+  initializeGame(): void {
+    this.gameLoop.initializeGame();
+  }
+
+  /** Начало первого хода */
+  startFirstTurn(): void {
+    this.gameLoop.startFirstTurn();
+  }
+
+  /** Начать игру (полный цикл) */
   startGame(): void {
     this.gameLoop.startGame();
   }

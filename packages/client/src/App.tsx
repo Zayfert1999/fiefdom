@@ -125,17 +125,23 @@ export default function App() {
   }, [connectToServer]);
 
   // ============================================
-  // 🎴 АВТОВЫДАЧА ТАЙЛА
+  // 🎴 АВТОВЫДАЧА ТАЙЛА (ТОЛЬКО ЛОКАЛЬНАЯ ИГРА)
   // ============================================
   useEffect(() => {
-    if (phase === 'startTurn' && !drawnTile) { // 🌟 Добавлена проверка drawnTile === null
-      console.log('🎴 [App] Фаза startTurn → автоматическая выдача тайла');
+    const state = useGameStore.getState();
+
+    // 🌟 СЕТЕВОЙ РЕЖИМ: сервер сам выдаст тайл через game:your-turn
+    // Не делаем локальную выдачу из пустой колоды
+    if (state.roomId !== null) return;
+
+    if (phase === 'startTurn' && !drawnTile) {
+      console.log('🎴 [App] Фаза startTurn → автоматическая выдача тайла (локально)');
       const timer = setTimeout(() => {
         drawTile();
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [phase, drawnTile, drawTile]); // 🌟 Добавлена зависимость drawnTile
+  }, [phase, drawnTile, drawTile]);
 
   // ============================================
   // 🎮 ОБРАБОТЧИКИ ХОТКЕЕВ (вынесены из useHotkeys)

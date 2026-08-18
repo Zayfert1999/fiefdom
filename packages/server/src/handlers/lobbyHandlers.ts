@@ -282,11 +282,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       socket.emit('error', { code: 'NOT_HOST', message: 'Только хост может начать игру' });
       return;
     }
-    room.startGame();
 
-    // 🌟 НОВОЕ: рассылаем game:started каждому игроку
-    // ВАЖНО: serializeForPlayer учитывает приватность drawnTile —
-    // каждый игрок видит только СВОЙ тайл в руке
+    // 🌟 ШАГ 1: Инициализируем игру (БЕЗ beginTurn)
+    room.initializeGame();
+
+    // 🌟 ШАГ 2: Рассылаем game:started каждому игроку
+    // ВАЖНО: это ДО beginTurn(), чтобы game:started пришёл ПЕРЕД game:your-turn
+    // serializeForPlayer учитывает приватность drawnTile (здесь он ещё null)
     for (const conn of room.players.values()) {
       if (conn.isDisconnected) continue;
 
@@ -295,9 +297,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
         gameState: personalGameState,
         seed: room.gameState.seed,
         yourPlayerId: conn.id,
-        gameStartTime: room.gameState.gameStartTime,
+        gameStartTime: room.gameState.gameStartTime!,
       });
     }
+
+    logger.info('[Lobby]', `🎮 Игра началась в комнате ${roomId} (gameStartTime=${room.gameState.gameStartTime})`);
+
+    // 🌟 ШАГ 3: Начинаем первый ход (broadcastState + game:your-turn)
+    room.startFirstTurn();
   });
 
   // ============================================

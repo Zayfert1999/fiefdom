@@ -147,31 +147,50 @@ export function registerStateSync(socket: GameSocket): void {
     useGameStore.getState()._setRoomSettings(settings);
   });
 
-  // ============================================
-  // 🔌 ОТКЛЮЧЕНИЕ/ПЕРЕПОДКЛЮЧЕНИЕ ДРУГИХ ИГРОКОВ
-  // ============================================
+// ============================================
+// 🔌 ОТКЛЮЧЕНИЕ ДРУГИХ ИГРОКОВ (лобби + игра)
+// ============================================
+socket.on('lobby:player-disconnected', ({ playerId }) => {
+  console.log(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
+  const store = useGameStore.getState();
 
-  socket.on('lobby:player-disconnected', ({ playerId }) => {
-    console.log(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
-    const store = useGameStore.getState();
-    // 🌟 Помечаем игрока как отключённого в списке лобби
-    store._setLobbyPlayers(
-      store.networkLobbyPlayers.map(p =>
-        p.id === playerId ? { ...p, isDisconnected: true } : p
-      )
-    );
-  });
+  // 🌟 Обновляем список лобби (для экрана ожидания)
+  store._setLobbyPlayers(
+    store.networkLobbyPlayers.map(p =>
+      p.id === playerId ? { ...p, isDisconnected: true } : p
+    )
+  );
 
-  socket.on('lobby:player-reconnected', ({ playerId }) => {
-    console.log(`✅ [StateSync] Игрок переподключился: ${playerId}`);
-    const store = useGameStore.getState();
-    // 🌟 Снимаем флаг отключения
-    store._setLobbyPlayers(
-      store.networkLobbyPlayers.map(p =>
-        p.id === playerId ? { ...p, isDisconnected: false } : p
-      )
+  // 🌟 ВОЗВРАЩАЕМ: сразу обновляем players для GameHUD (быстрая реакция)
+  // Серверный state-update тоже будет содержать isDisconnected: true,
+  // поэтому флаг не потеряется при следующих обновлениях
+  if (store.players.length > 0) {
+    const players = store.players.map(p =>
+      p.id === playerId ? { ...p, isDisconnected: true } : p
     );
-  });
+    useGameStore.setState({ players });
+  }
+});
+
+socket.on('lobby:player-reconnected', ({ playerId }) => {
+  console.log(`✅ [StateSync] Игрок переподключился: ${playerId}`);
+  const store = useGameStore.getState();
+
+  // 🌟 Обновляем список лобби
+  store._setLobbyPlayers(
+    store.networkLobbyPlayers.map(p =>
+      p.id === playerId ? { ...p, isDisconnected: false } : p
+    )
+  );
+
+  // 🌟 ВОЗВРАЩАЕМ: сразу обновляем players для GameHUD
+  if (store.players.length > 0) {
+    const players = store.players.map(p =>
+      p.id === playerId ? { ...p, isDisconnected: false } : p
+    );
+    useGameStore.setState({ players });
+  }
+});
 
   // ============================================
   // 🏠 СОБЫТИЯ ВОССТАНОВЛЕНИЯ

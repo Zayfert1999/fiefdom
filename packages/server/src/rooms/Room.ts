@@ -63,21 +63,6 @@ export class Room {
     logger.info('[Room]', `Игрок ${conn.name} присоединился к ${this.id} (цвет: ${assignedColor})`);
   }
 
-  /**.
- * Вызывается при socket disconnect (перезагрузка страницы, потеря связи).
- * Игрок может reconnect в течение DISCONNECT_TIMEOUT.
- */
-  markPlayerDisconnected(playerId: string): void {
-    const conn = this.players.get(playerId);
-    if (!conn) return;
-
-    conn.markDisconnected();
-    logger.info('[Room]', `⚠️ Игрок ${conn.name} отключился (комната ${this.id}) — ожидание reconnect`);
-
-    // Уведомляем остальных игроков
-    this.broadcast('lobby:player-disconnected', { playerId });
-  }
-
   removePlayer(playerId: string): void {
     const conn = this.players.get(playerId);
     if (!conn) return;
@@ -116,13 +101,21 @@ export class Room {
     }
   }
 
-  /** 🌟 Разослать состояние с учётом приватности drawnTile */
+  /** 🌟 Разослать состояние с учётом приватности drawnTile + isDisconnected */
   broadcastState(): void {
     for (const conn of this.players.values()) {
       if (conn.isDisconnected) continue;
-      conn.emit('game:state-update', {
-        gameState: this.gameState.serializeForPlayer(conn.id),
-      });
+
+      // 🌟 Сериализуем базовое состояние
+      const gameState = this.gameState.serializeForPlayer(conn.id);
+
+      // 🌟 Обогащаем игроков флагом isDisconnected из PlayerConnection
+      gameState.players = gameState.players.map(p => ({
+        ...p,
+        isDisconnected: this.players.get(p.id)?.isDisconnected ?? false,
+      }));
+
+      conn.emit('game:state-update', { gameState });
     }
   }
 
@@ -342,10 +335,25 @@ export class Room {
   }
 
   /**
-   * 🌟 Восстановление игрока в комнате.
-   * 
-   * Имя и цвет берутся из существующих данных PlayerConnection,
-   * верификация только по playerId.
+ * 🌟 Вызывается при socket disconnect (перезагрузка страницы, потеря связи).
+ * Игрок может reconnect в течение таймаута.
+ */
+  markPlayerDisconnected(playerId: string): void {
+    const conn = this.players.get(playerId);
+    if (!conn) return;
+
+    // Не помечаем повторно
+    if (conn.isDisconnected) return;
+
+    conn.markDisconnected();
+    logger.info('[Room]', `⚠️ Игрок ${conn.name} отключился (комната ${this.id}) — ожидание reconnect`);
+
+    // 🌟 Уведомляем остальных игроков (broadcast уже пропускает отключённых)
+    this.broadcast('lobby:player-disconnected', { playerId });
+  }
+
+  /**
+   * 🌟 Восстановление игрока.
    */
   reconnectPlayer(
     oldPlayerId: string,
@@ -369,8 +377,6 @@ export class Room {
       return { success: false, reason: 'Игрок не найден в комнате' };
     }
 
-    // Имя и цвет уже есть в conn.player — не проверяем
-
     // Восстанавливаем подключение
     newSocket.join(this.id);
     conn.markReconnected(newSocket);
@@ -379,7 +385,7 @@ export class Room {
 
     logger.info('[Room]', `✅ Игрок ${conn.player.name} восстановлен в комнате ${this.id}`);
 
-    // Уведомляем остальных игроков
+    // 🌟 Уведомляем остальных игроков
     this.broadcast('lobby:player-reconnected', { playerId: oldPlayerId });
 
     // Собираем данные для отправки
@@ -396,7 +402,15 @@ export class Room {
 
     // Если игра уже началась — отправляем состояние
     if (this.gameStarted) {
-      data.gameState = this.gameState.serializeForPlayer(oldPlayerId);
+      const gameState = this.gameState.serializeForPlayer(oldPlayerId);
+
+      // 🌟 Обогащаем isDisconnected
+      gameState.players = gameState.players.map(p => ({
+        ...p,
+        isDisconnected: this.players.get(p.id)?.isDisconnected ?? false,
+      }));
+
+      data.gameState = gameState;
 
       // Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
       if (this.gameState.currentPlayer.id === oldPlayerId && this.gameState.drawnTile) {

@@ -25,21 +25,27 @@ export interface Tile {
   features: TileFeature[];
 }
 
-// Игровые сущности
-export interface Player {
+// ПРОФИЛЬ ИГРОКА (мета-данные, не меняются в игре)
+export interface PlayerProfile {
   id: string;
   name: string;
   color: string;
+}
+
+// ИГРОВОЕ СОСТОЯНИЕ (меняется в течение игры)
+export interface PlayerGameState {
   meepleCount: number;
   pointsByCategory: {
-    road: number,
-    city: number,
-    field: number,
-    monastery: number,
+    road: number;
+    city: number;
+    field: number;
+    monastery: number;
   };
   score: number;
-  isDisconnected?: boolean;
 }
+
+// ПОЛНЫЙ ИГРОК (композиция профиля и игрового состояния)
+export type Player = PlayerProfile & PlayerGameState;
 
 export interface PlacedMeeple {
   playerId: string;

@@ -27,6 +27,7 @@ export const GameHUD: React.FC = () => {
     const drawnTile = useGameStore(s => s.drawnTile);
     const roomId = useGameStore(s => s.roomId);
     const playerId = useGameStore(s => s.playerId);
+    const networkLobbyPlayers = useGameStore(s => s.networkLobbyPlayers);
     const isConnected = useGameStore(s => s.isConnected);
     const isReconnecting = useGameStore(s => s.isReconnecting);
     const enabledDeckView = useGameStore(s => s.enabledDeckView);
@@ -184,12 +185,15 @@ export const GameHUD: React.FC = () => {
                             {row.map(({ player, index }) => {
                                 const isActive = currentTurn === index;
                                 const isSelf = roomId !== null && player.id === playerId;
+                                const networkPlayer = networkLobbyPlayers.find(np => np.id === player.id);
+                                const isDisconnected = networkPlayer?.isDisconnected ?? false;
                                 return (
                                     <PlayerCard
                                         key={player.id}
                                         player={player}
                                         isActive={isActive}
                                         isSelf={isSelf}
+                                        isDisconnected={isDisconnected}
                                         timerRemaining={isActive ? turnTimerRemaining : null}
                                         timerTotal={turnTimerTotal}
                                         turnDeadline={isActive ? turnDeadline : null}
@@ -227,13 +231,13 @@ interface PlayerCardProps {
     player: Player;
     isActive: boolean;
     isSelf: boolean;
+    isDisconnected: boolean;
     timerRemaining: number | null;
     timerTotal: number;
     turnDeadline: number | null;
 }
 
-const PlayerCard = ({ player, isActive, isSelf, timerTotal, turnDeadline }: PlayerCardProps) => {
-    const isDisconnected = player.isDisconnected === true;
+const PlayerCard = ({ player, isActive, isSelf, isDisconnected, timerTotal, turnDeadline }: PlayerCardProps) => {
 
     // 🌟 Упрощённая логика: таймер активен если есть deadline и timerTotal > 0
     const hasTimer = turnDeadline !== null && timerTotal > 0;

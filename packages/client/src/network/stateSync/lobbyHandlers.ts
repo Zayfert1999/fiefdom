@@ -115,16 +115,6 @@ export function registerLobbyHandlers(socket: GameSocket): void {
         p.id === playerId ? { ...p, isDisconnected: true } : p
       )
     );
-
-    // Сразу обновляем players для GameHUD (быстрая реакция)
-    // Серверный state-update тоже содержит isDisconnected: true,
-    // поэтому флаг не потеряется при следующих обновлениях
-    if (store.players.length > 0) {
-      const players = store.players.map(p =>
-        p.id === playerId ? { ...p, isDisconnected: true } : p
-      );
-      useGameStore.setState({ players });
-    }
   });
 
   socket.on('lobby:player-reconnected', ({ playerId }) => {
@@ -137,14 +127,6 @@ export function registerLobbyHandlers(socket: GameSocket): void {
         p.id === playerId ? { ...p, isDisconnected: false } : p
       )
     );
-
-    // Сразу обновляем players для GameHUD
-    if (store.players.length > 0) {
-      const players = store.players.map(p =>
-        p.id === playerId ? { ...p, isDisconnected: false } : p
-      );
-      useGameStore.setState({ players });
-    }
   });
 
   // ============================================

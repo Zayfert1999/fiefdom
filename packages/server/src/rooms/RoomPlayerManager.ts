@@ -170,13 +170,6 @@ export class RoomPlayerManager {
     // Если игра уже началась — отправляем состояние
     if (this.gameState.isGameStarted) {
       const gameState = this.gameState.serializeForPlayer(oldPlayerId);
-
-      // Обогащаем isDisconnected
-      gameState.players = gameState.players.map(p => ({
-        ...p,
-        isDisconnected: this.players.get(p.id)?.isDisconnected ?? false,
-      }));
-
       data.gameState = gameState;
 
       // Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно

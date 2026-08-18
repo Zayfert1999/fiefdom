@@ -283,6 +283,21 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
     room.startGame();
+
+    // 🌟 НОВОЕ: рассылаем game:started каждому игроку
+    // ВАЖНО: serializeForPlayer учитывает приватность drawnTile —
+    // каждый игрок видит только СВОЙ тайл в руке
+    for (const conn of room.players.values()) {
+      if (conn.isDisconnected) continue;
+
+      const personalGameState = room.gameState.serializeForPlayer(conn.id);
+      conn.emit('game:started', {
+        gameState: personalGameState,
+        seed: room.gameState.seed,
+        yourPlayerId: conn.id,
+        gameStartTime: room.gameStartTime!,
+      });
+    }
   });
 
   // ============================================

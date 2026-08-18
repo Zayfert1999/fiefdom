@@ -23,6 +23,7 @@ export class Room {
   public gameState = new ServerGameState();
   private turnTimer = new TurnTimer();
   private gameStarted = false;
+  public gameStartTime: number | null = null; //Время начала игры (timestamp в мс)
 
   constructor(id: string, settings: RoomSettings, host: PlayerConnection) {
     this.id = id;
@@ -132,6 +133,7 @@ export class Room {
     const playerProfiles = Array.from(this.players.values()).map(c => c.player);
     this.gameState.initialize(playerProfiles, seed);
     this.gameStarted = true;
+    this.gameStartTime = Date.now();
 
     logger.info('[Room]', `🎮 Игра стартовала в комнате ${this.id}, seed=${seed}`);
     this.beginTurn();
@@ -368,6 +370,7 @@ export class Room {
       settings: RoomSettings;
       isHost: boolean;
       gameState?: SerializedGameState;
+      gameStartTime: number | null;
     };
   } {
     const conn = this.players.get(oldPlayerId);
@@ -398,6 +401,7 @@ export class Room {
       players,
       settings: this.settings,
       isHost: this.hostId === oldPlayerId,
+      gameStartTime: this.gameStartTime,
     };
 
     // Если игра уже началась — отправляем состояние

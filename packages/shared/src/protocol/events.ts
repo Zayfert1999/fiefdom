@@ -122,6 +122,7 @@ export interface ServerToClientEvents {
     settings: RoomSettings;
     isHost: boolean;
     gameState?: SerializedGameState;  // Если игра уже началась
+    gameStartTime?: number | null;
   }) => void;
 
   'lobby:reconnect-failed': (data: {
@@ -141,6 +142,7 @@ export interface ServerToClientEvents {
   // --- Игра ---
   'game:started': (data: {
     gameState: SerializedGameState;
+    gameStartTime: number;
     seed: string;
     yourPlayerId: string;
   }) => void;

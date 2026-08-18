@@ -54,6 +54,10 @@ export interface UISlice {
   // 🌟 НОВОЕ: timestamp окончания хода
   turnDeadline: number | null;
   setTurnDeadline: (deadline: number | null) => void;
+
+  // 🌟 НОВОЕ: время начала игры (timestamp)
+  gameStartTime: number | null;
+  setGameStartTime: (time: number | null) => void;
 }
 
 export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => ({
@@ -65,6 +69,7 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => 
   serverPing: null,
   turnTimerRemaining: null,
   turnDeadline: null,
+  gameStartTime: null,
 
   setPlayerName: (name) => {
     const validated = validatePlayerName(name);
@@ -93,7 +98,11 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => 
     set({ turnTimerRemaining: remaining });
   },
 
-   setTurnDeadline: (deadline) => {
+  setTurnDeadline: (deadline) => {
     set({ turnDeadline: deadline });
+  },
+
+  setGameStartTime: (time) => {
+    set({ gameStartTime: time });
   },
 });

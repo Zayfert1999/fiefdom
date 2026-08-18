@@ -34,6 +34,7 @@ export const GameHUD: React.FC = () => {
     const turnDeadline = useGameStore(s => s.turnDeadline);
     const turnTimerTotal = useGameStore(s => s.roomSettings?.turnTimerSeconds ?? 0);
     const exitToLobby = useGameStore(s => s.exitToLobby);
+    const gameStartTime = useGameStore(s => s.gameStartTime);
 
     // ============================================
     // 🎴 Колода
@@ -49,9 +50,25 @@ export const GameHUD: React.FC = () => {
     // ============================================
     const [gameElapsed, setGameElapsed] = useState(0);
     useEffect(() => {
-        const interval = setInterval(() => setGameElapsed(prev => prev + 1), 1000);
+        // 🌟 Если нет времени старта (локальная игра или лобби) — считаем локально
+        if (gameStartTime === null) {
+            const interval = setInterval(() => setGameElapsed(prev => prev + 1), 1000);
+            return () => clearInterval(interval);
+        }
+
+        // 🌟 Сетевая игра: вычисляем от серверного времени старта
+        const updateElapsed = () => {
+            const elapsed = Math.max(0, Math.floor((Date.now() - gameStartTime) / 1000));
+            setGameElapsed(elapsed);
+        };
+
+        // Сразу вычисляем при монтировании
+        updateElapsed();
+
+        // Обновляем каждую секунду
+        const interval = setInterval(updateElapsed, 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [gameStartTime]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -134,7 +151,7 @@ export const GameHUD: React.FC = () => {
                         {roomId !== null && (
                             <span
                                 className={`${styles.connectionDot} ${isReconnecting ? styles.connectionDotReconnecting :
-                                        !isConnected ? styles.connectionDotOffline : ''
+                                    !isConnected ? styles.connectionDotOffline : ''
                                     }`}
                                 title={isReconnecting ? 'Переподключение...' : isConnected ? 'Онлайн' : 'Оффлайн'}
                             />

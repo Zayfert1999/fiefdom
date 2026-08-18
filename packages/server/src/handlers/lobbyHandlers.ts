@@ -295,7 +295,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
         gameState: personalGameState,
         seed: room.gameState.seed,
         yourPlayerId: conn.id,
-        gameStartTime: room.gameStartTime!,
+        gameStartTime: room.gameState.gameStartTime,
       });
     }
   });

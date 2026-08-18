@@ -35,6 +35,12 @@ export class ServerGameState {
   public phase: ServerPhase = 'lobby';
   public seed: string = '';
   public lastPlacedTiles: Record<string, { x: number; y: number; color: string }> = {};
+  // 🌟 НОВОЕ: время начала игры
+  public gameStartTime: number | null = null;
+  // 🌟 НОВОЕ: флаг старта игры
+  public get isGameStarted(): boolean {
+    return this.phase !== 'lobby';
+  }
 
 
   /** Инициализация новой игры */

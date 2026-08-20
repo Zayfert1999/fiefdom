@@ -258,10 +258,12 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
       <ReconnectingOverlay />
 
-      {/* 🖼️ Единый GameHUD */}
-      <ErrorBoundary name="GameHUD">
-        <GameHUD />
-      </ErrorBoundary>
+      {/* 🖼️ Единый GameHUD — НЕ рендерим при gameOver */}
+      {phase !== 'gameOver' && (
+        <ErrorBoundary name="GameHUD">
+          <GameHUD />
+        </ErrorBoundary>
+      )}
 
       {/* 🤲 Панель действий */}
       <ErrorBoundary name="ActionPanel">

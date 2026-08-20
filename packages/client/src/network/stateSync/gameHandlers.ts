@@ -144,6 +144,8 @@ export function registerGameHandlers(socket: GameSocket): void {
       phase: 'gameOver',
       players: finalScores,
     });
+    // Фиксируем время окончания игры
+    useGameStore.getState().setGameEndTime(Date.now());
   });
 
   // ============================================

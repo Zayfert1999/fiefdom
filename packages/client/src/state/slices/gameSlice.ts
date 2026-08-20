@@ -95,17 +95,17 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // Лобби
     // ============================================
     initLocalLobby: (profileName, profileColor) => {
-    console.log(`🎮 [GameSlice] Инициализация локального лобби: ${profileName} (${profileColor})`);
-    
-    set({
-        lobbyPlayers: [
-            // 🌟 Первый игрок — из профиля (главное меню)
-            { id: 'p1', name: profileName, color: profileColor },
-            // 🌟 Второй игрок — по умолчанию, первый свободный цвет
-            { id: 'p2', name: 'Игрок 2', color: AVAILABLE_COLORS.find(c => c !== profileColor) || '#5555ff' },
-        ],
-    });
-},
+        console.log(`🎮 [GameSlice] Инициализация локального лобби: ${profileName} (${profileColor})`);
+
+        set({
+            lobbyPlayers: [
+                // 🌟 Первый игрок — из профиля (главное меню)
+                { id: 'p1', name: profileName, color: profileColor },
+                // 🌟 Второй игрок — по умолчанию, первый свободный цвет
+                { id: 'p2', name: 'Игрок 2', color: AVAILABLE_COLORS.find(c => c !== profileColor) || '#5555ff' },
+            ],
+        });
+    },
 
     addPlayer: () => {
         const state = get();
@@ -164,7 +164,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
         // Инициализируем игру с игроками из лобби
         get().initGame(state.lobbyPlayers);
-        set({ phase: 'startTurn' });
+        set({ phase: 'startTurn', gameStartTime: Date.now() });
         console.log(`🎮 [Store] Игра начата с ${state.lobbyPlayers.length} игроками`);
     },
 
@@ -189,7 +189,11 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             debugSelectedTile: null,
             completionAnimations: [],
             lastPlacedTiles: new Map(),
+            gameStartTime: null,
+            gameEndTime: null,
         });
+        // Возвращаемся в главное меню
+        get().setLobbyScreen('modeSelect');
     },
 
     // ============================================
@@ -601,6 +605,9 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 drawnTile: null,
                 phase: 'gameOver'
             });
+
+            // Фиксируем время окончания игры (для локальной игры)
+            get().setGameEndTime(Date.now());
             console.log(`🏁 [Store] Переход в фазу gameOver`);
         }, totalAnimationTime);
     },

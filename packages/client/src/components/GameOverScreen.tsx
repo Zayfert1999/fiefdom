@@ -1,21 +1,47 @@
-// components/GameOverScreen.tsx
-import { useState } from 'react';
-import { useGameStore } from '@/state/useGameStore';
+// packages/client/src/components/GameOverScreen.tsx
+// 🏁 Экран конца игры: победитель, статистика, продолжительность матча.
+// Свёрнутая плашка заменяет GameHUD в конце игры.
 
+import { useState, useMemo } from 'react';
+import { useGameStore } from '@/state/useGameStore';
+import styles from '@/components/styles/modal.module.css';
 import ChevronUpIcon from '@/assets/svg/icon/chevron-up-icon.svg?react';
 import ChevronDownIcon from '@/assets/svg/icon/chevron-down-icon.svg?react';
 
-// 🌟 Импорт CSS-модуля
-import styles from '@/components/styles/GameOverScreen.module.css';
-
 export const GameOverScreen = () => {
+  // ============================================
+  // 🎯 Селекторы
+  // ============================================
   const players = useGameStore(s => s.players);
-  const exitToLobby = useGameStore(s => s.exitToLobby); 
+  const exitToLobby = useGameStore(s => s.exitToLobby);
+  const gameStartTime = useGameStore(s => s.gameStartTime);
+  const gameEndTime = useGameStore(s => s.gameEndTime);
 
-  // 🌟 Состояние свёрнутости
+  // ============================================
+  // ⏱️ Продолжительность матча (зафиксирована при конце игры)
+  // ============================================
+  const matchDuration = useMemo(() => {
+    if (gameStartTime === null || gameEndTime === null) return 0;
+    return Math.max(0, Math.floor((gameEndTime - gameStartTime) / 1000));
+  }, [gameStartTime, gameEndTime]);
+
+  // ============================================
+  // ⏱️ Форматирование времени (мм:сс)
+  // ============================================
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // ============================================
+  // 👁️ Состояние свёрнутости
+  // ============================================
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // 🌟 Сортируем игроков по очкам
+  // ============================================
+  // 🏆 Сортировка игроков по очкам
+  // ============================================
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
   const winner = sortedPlayers[0];
   const isDraw = sortedPlayers.length > 1 && sortedPlayers[0].score === sortedPlayers[1].score;
@@ -27,9 +53,11 @@ export const GameOverScreen = () => {
     { key: 'monastery' as const, emoji: '⛪', label: 'Монастыри' },
   ];
 
-  // 🌟 Обработчик выхода в лобби с логированием
+  // ============================================
+  // 🚪 Обработчик выхода в лобби
+  // ============================================
   const handleExitToLobby = () => {
-    console.log('[GameOverScreen] Инициализация выхода в лобби');
+    console.log('[GameOverScreen] Инициация выхода в лобби');
     if (window.confirm('Выйти в лобби? Результаты текущей игры будут потеряны.')) {
       console.log('[GameOverScreen] Подтвержден выход в лобби, вызов exitToLobby()');
       exitToLobby();
@@ -39,20 +67,19 @@ export const GameOverScreen = () => {
   };
 
   // ============================================
-  // 📦 СВЁРНУТАЯ ПЛАШКА (полностью кликабельна)
+  // 📦 СВЁРНУТАЯ ПЛАШКА (заменяет GameHUD)
   // ============================================
   if (isCollapsed) {
     const winnerNames = isDraw
       ? sortedPlayers.filter(p => p.score === winner.score).map(p => p.name).join(', ')
       : winner.name;
-
     const drawWinnersCount = isDraw
       ? sortedPlayers.filter(p => p.score === winner.score).length
       : 0;
 
     return (
       <div
-        className={styles.collapsedContainer}
+        className={styles.gameOverCollapsed}
         onClick={() => {
           console.log('[GameOverScreen] Клик по свёрнутой плашке -> разворачивание статистики');
           setIsCollapsed(false);
@@ -87,7 +114,14 @@ export const GameOverScreen = () => {
           </div>
         </div>
 
-        {/* 🌟 Чисто визуальный индикатор разворачивания (стрелка вниз) */}
+        {/* ⏱️ Время матча */}
+        {gameStartTime !== null && gameEndTime !== null && (
+          <div className={styles.collapsedDuration}>
+            ⏱️ {formatTime(matchDuration)}
+          </div>
+        )}
+
+        {/* 🌟 Визуальный индикатор разворачивания (стрелка вниз) */}
         <div className={styles.collapsedChevron} aria-hidden="true">
           <ChevronDownIcon />
         </div>
@@ -99,11 +133,15 @@ export const GameOverScreen = () => {
   // 🎬 РАЗВЁРНУТЫЙ ЭКРАН
   // ============================================
   return (
-    <div className={styles.overlay}>
-      <div className={styles.container}>
-        {/* 🏆 Заголовок с кнопкой сворачивания */}
-        <div className={styles.header}>
-          <h1 className={styles.title}>🏁 Игра окончена!</h1>
+    <div className={styles.gameOverOverlay}>
+      <div className={styles.gameOverContainer}>
+        {/* Заголовок с кнопкой сворачивания */}
+        <div className={styles.gameOverHeader}>
+          {/* Spacer слева (для симметричного центрирования) */}
+          <div style={{ width: '36px' }} />
+
+          <h1 className={styles.gameOverTitle}>🏁 Игра окончена!</h1>
+
           <button
             onClick={() => {
               console.log('[GameOverScreen] Сворачивание экрана статистики');
@@ -137,20 +175,27 @@ export const GameOverScreen = () => {
           )}
         </div>
 
+        {/* ⏱️ Продолжительность матча */}
+        {gameStartTime !== null && (
+          <div className={styles.matchDuration}>
+            ⏱️ Продолжительность матча: <span className={styles.matchDurationValue}>{formatTime(matchDuration)}</span>
+          </div>
+        )}
+
         {/* 📊 Таблица статистики */}
         <div className={styles.tableSection}>
           <h3 className={styles.tableTitle}>📊 Статистика очков</h3>
-          <table className={styles.table}>
+          <table className={styles.statsTable}>
             <thead>
               <tr>
-                <th className={styles.th}>Место</th>
-                <th className={styles.th}>Игрок</th>
+                <th>Место</th>
+                <th>Игрок</th>
                 {categories.map(cat => (
-                  <th key={cat.key} className={styles.th} title={cat.label}>
+                  <th key={cat.key} title={cat.label}>
                     {cat.emoji}
                   </th>
                 ))}
-                <th className={`${styles.th} ${styles.totalTh}`}>🏆</th>
+                <th>🏆</th>
               </tr>
             </thead>
             <tbody>
@@ -158,27 +203,26 @@ export const GameOverScreen = () => {
                 const isWinner = idx === 0 && !isDraw;
                 const isDrawWinner = isDraw && player.score === winner.score;
                 const isHighlighted = isWinner || isDrawWinner;
-
                 return (
                   <tr
                     key={player.id}
-                    className={`${styles.tr} ${isHighlighted ? styles.trWinner : ''}`}
+                    className={isHighlighted ? styles.trWinner : ''}
                   >
-                    <td className={styles.td}>
+                    <td>
                       {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
                     </td>
-                    <td 
-                      className={`${styles.td} ${styles.playerTd}`}
-                      style={{ color: player.color }} // 🌟 Динамический стиль остаётся инлайновым
+                    <td
+                      className={styles.playerTd}
+                      style={{ color: player.color }}
                     >
                       {player.name}
                     </td>
                     {categories.map(cat => (
-                      <td key={cat.key} className={styles.td}>
+                      <td key={cat.key}>
                         {player.pointsByCategory[cat.key]}
                       </td>
                     ))}
-                    <td className={`${styles.td} ${styles.totalTd}`}>
+                    <td className={styles.totalTd}>
                       <strong>{player.score}</strong>
                     </td>
                   </tr>
@@ -188,7 +232,7 @@ export const GameOverScreen = () => {
           </table>
         </div>
 
-        {/* 🌟 Кнопка выхода в лобби (доступна только в развёрнутом виде) */}
+        {/* Кнопка выхода в лобби */}
         <button onClick={handleExitToLobby} className={styles.exitBtn}>
           Выйти в лобби
         </button>

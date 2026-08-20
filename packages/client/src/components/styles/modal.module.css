@@ -238,57 +238,285 @@
 }
 
 /* ============================================
-   🔄 СТИЛИ RECONNECTING OVERLAY
+   🏁 СТИЛИ GAME OVER SCREEN
    ============================================ */
 
-/* === Оверлей (затемнение на весь экран) === */
-.reconnectOverlay {
+/* === Свёрнутая плашка (заменяет GameHUD) === */
+.gameOverCollapsed {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(25, 25, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.gameOverCollapsed:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* === Информация в свёрнутой плашке === */
+.collapsedInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emojiIcon {
+  font-size: 24px;
+}
+
+.collapsedLabel {
+  color: #888;
+  font-size: 12px;
+}
+
+.collapsedWinner {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.collapsedScore {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.scoreSuffix {
+  color: #888;
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.collapsedDuration {
+  color: #888;
+  font-size: 13px;
+  font-family: monospace;
+  white-space: nowrap;
+  padding: 0 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.collapsedChevron {
+  color: #888;
+  display: flex;
+  align-items: center;
+}
+
+.collapsedChevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* === Оверлей развёрнутого экрана === */
+.gameOverOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 99999;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
 }
 
-/* === Карточка с информацией === */
-.reconnectCard {
-  background: #1a1a2e;
-  padding: 40px;
+/* === Контейнер развёрнутого экрана === */
+.gameOverContainer {
+  background: rgba(25, 25, 35, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  text-align: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-}
-
-/* === Спиннер загрузки === */
-.reconnectSpinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #4a90e2;
-  border-radius: 50%;
-  animation: spinnerRotate 1s linear infinite;
-  margin: 0 auto 20px;
-}
-
-/* Анимация вращения спиннера */
-@keyframes spinnerRotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  backdrop-filter: blur(8px);
+  padding: 32px;
+  max-width: 700px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
 /* === Заголовок === */
-.reconnectTitle {
-  color: #fff;
-  font-size: 20px;
-  margin: 0 0 8px 0;
+.gameOverHeader {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* === Подзаголовок === */
-.reconnectSubtitle {
+.gameOverTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  text-align: center;
+}
+
+.collapseBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  justify-self: end;
+}
+
+.collapseBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.collapseBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* === Секция победителя === */
+.winnerSection {
+  display: flex;
+  justify-content: center;
+}
+
+.winnerCard {
+  text-align: center;
+  padding: 24px 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.trophy {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.winnerTitle {
+  margin: 0 0 8px 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+.winnerName {
+  margin: 0 0 8px 0;
+  color: #4a90e2;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.winnerScore {
+  margin: 0;
+  color: #ccc;
+  font-size: 16px;
+}
+
+/* === Продолжительность матча === */
+.matchDuration {
+  text-align: center;
   color: #888;
   font-size: 14px;
-  margin: 0;
-  letter-spacing: 2px;
+  font-family: monospace;
+}
+
+.matchDurationValue {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* === Таблица статистики === */
+.tableSection {
+  width: 100%;
+}
+
+.tableTitle {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 16px;
+  text-align: center;
+}
+
+.statsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statsTable th,
+.statsTable td {
+  padding: 10px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.statsTable th {
+  color: #888;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.statsTable td {
+  color: #ccc;
+  font-size: 14px;
+}
+
+/* Строка победителя */
+.trWinner td {
+  background: rgba(74, 144, 226, 0.1);
+}
+
+/* Имя игрока */
+.playerTd {
+  font-weight: 600;
+}
+
+/* Итоговый столбец */
+.totalTd {
+  font-weight: 700;
+  color: #fff;
+}
+
+/* === Кнопка выхода === */
+.exitBtn {
+  width: 100%;
+  padding: 14px;
+  background: rgba(74, 144, 226, 0.15);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  border-radius: 10px;
+  color: #4a90e2;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exitBtn:hover {
+  background: rgba(74, 144, 226, 0.25);
+  border-color: #4a90e2;
+}
+
+.exitBtn:active {
+  transform: scale(0.98);
 }

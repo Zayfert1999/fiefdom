@@ -395,3 +395,47 @@
     color: #fff;
     font-size: 14px;
 }
+
+/* ============================================
+   🔄 СТИЛИ RECONNECTING OVERLAY
+   Переиспользуем .overlay и .card из лобби
+   ============================================ */
+
+/* === Контент карточки восстановления === */
+.reconnectContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* === Спиннер загрузки === */
+.reconnectSpinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: reconnectSpin 1s linear infinite;
+}
+
+/* Анимация вращения спиннера */
+@keyframes reconnectSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === Заголовок восстановления === */
+.reconnectTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+/* === Подзаголовок восстановления === */
+.reconnectSubtitle {
+  margin: 0;
+  color: #888;
+  font-size: 14px;
+  letter-spacing: 2px;
+}

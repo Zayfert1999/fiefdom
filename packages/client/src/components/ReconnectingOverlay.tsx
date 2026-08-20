@@ -1,5 +1,12 @@
+// packages/client/src/components/ReconnectingOverlay.tsx
+// 🔄 Оверлей, показываемый во время попытки восстановления.
+// Используется в двух случаях:
+// 1. Кнопка "Продолжить игру" в MainMenu (isReconnectingToRoom)
+// 2. Обрыв связи во время активной игры (isReconnecting + roomId)
+// Стиль соответствует лобби (lobby.module.css).
+
 import { useGameStore } from '@/state/useGameStore';
-import styles from '@/components/styles/modal.module.css';
+import styles from '@/components/styles/lobby.module.css';
 
 export const ReconnectingOverlay = () => {
   // ============================================
@@ -31,16 +38,19 @@ export const ReconnectingOverlay = () => {
       : 'Подключение к серверу';
 
   return (
-    <div className={styles.reconnectOverlay}>
-      <div className={styles.reconnectCard}>
-        {/* Спиннер загрузки */}
-        <div className={styles.reconnectSpinner} />
+    // 🌟 Используем общие стили лобби: .overlay и .card
+    <div className={styles.overlay}>
+      <div className={styles.card}>
+        <div className={styles.reconnectContent}>
+          {/* Спиннер загрузки */}
+          <div className={styles.reconnectSpinner} />
 
-        {/* Заголовок */}
-        <h2 className={styles.reconnectTitle}>{title}</h2>
+          {/* Заголовок */}
+          <h2 className={styles.reconnectTitle}>{title}</h2>
 
-        {/* Подзаголовок */}
-        <p className={styles.reconnectSubtitle}>{subtitle}</p>
+          {/* Подзаголовок */}
+          <p className={styles.reconnectSubtitle}>{subtitle}</p>
+        </div>
       </div>
     </div>
   );

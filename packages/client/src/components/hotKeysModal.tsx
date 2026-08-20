@@ -11,7 +11,7 @@ import {
   type HotkeyCategory,
   type HotkeyDefinition,
 } from '@carcassonne/shared/core/hotkeys';
-import styles from '@/components/modal.module.css';
+import styles from '@/components/styles/modal.module.css';
 
 interface HotkeysModalProps {
   isOpen: boolean;

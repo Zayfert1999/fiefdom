@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { SessionSettings } from '@/components/lobby/SessionSettings';
 
-import styles from '@/components/lobby.module.css';
+import styles from '@/components/styles/lobby.module.css'
 
 export const Lobby = () => {
   const lobbyPlayers = useGameStore(s => s.lobbyPlayers);

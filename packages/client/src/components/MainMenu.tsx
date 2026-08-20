@@ -7,7 +7,7 @@ import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
 import { getSocket } from '@/network/socket';
 import { loadConnectionInfo } from '@/network/persistence';  // 🌟 Используем persistence
 
-import styles from '@/components/lobby.module.css';
+import styles from '@/components/styles/lobby.module.css';
 
 const MAX_NAME_LENGTH = 20;
 

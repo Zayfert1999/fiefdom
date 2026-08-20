@@ -5,7 +5,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { SessionSettings } from '@/components/lobby/SessionSettings';
 
 // 🌟 Единый CSS-модуль для всех лобби
-import styles from '@/components/lobby.module.css';
+import styles from '@/components/styles/lobby.module.css';
 
 export const NetworkLobby = () => {
   const [screen, setScreen] = useState<'main' | 'create' | 'join' | 'waiting'>('main');

@@ -4,7 +4,7 @@
 
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from '@/renderer/Tile';
-import styles from '@/components/game.module.css';
+import styles from '@/components/styles/game.module.css';
 import CheckIcon from '@/assets/svg/icon/check-icon.svg?react';
 import UndoIcon from '@/assets/svg/icon/undo-icon.svg?react';
 

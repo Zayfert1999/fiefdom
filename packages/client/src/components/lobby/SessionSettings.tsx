@@ -3,7 +3,7 @@
 // Используется в LocalLobby и NetworkLobby.
 // Controlled-компонент: значения и колбэки приходят через пропсы.
 
-import styles from '@/components/lobby.module.css';
+import styles from '@/components/styles/lobby.module.css';
 
 interface SessionSettingsProps {
   // 🌟 Текущие значения

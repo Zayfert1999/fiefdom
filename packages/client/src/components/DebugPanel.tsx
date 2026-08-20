@@ -1,8 +1,24 @@
-// components/DebugPanel.tsx
+// packages/client/src/components/DebugPanel.tsx
+// 🐛 Панель отладки: информация о выбранном тайле, фичах и регионах.
+// Открывается через Ctrl+клик на тайл.
 import { useGameStore } from '@/state/useGameStore';
 import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@carcassonne/shared/core/scoring';
+import styles from '@/components/styles/game.module.css';
+
+// ============================================
+// 🏷️ Конфигурация меток типов фич
+// ============================================
+const FEATURE_TAGS: Record<string, { label: string; className: string }> = {
+  city:      { label: '[City]',      className: styles.debugFeatureTagCity },
+  field:     { label: '[Field]',     className: styles.debugFeatureTagField },
+  monastery: { label: '[Monastery]', className: styles.debugFeatureTagMonastery },
+  road:      { label: '[Road]',      className: styles.debugFeatureTagRoad },
+};
 
 export const DebugPanel = () => {
+  // ============================================
+  // 🎯 Селекторы
+  // ============================================
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
   const board = useGameStore(s => s.board);
   const regionManager = useGameStore(s => s.regionManager);
@@ -11,51 +27,70 @@ export const DebugPanel = () => {
   const debugForceEndGame = useGameStore(s => s.debugForceEndGame);
   const { saveGame, loadGame } = useGameStore();
 
+  // ============================================
+  // 👁️ Видимость панели
+  // ============================================
   if (!debugSelectedTile) return null;
 
   const { x, y } = debugSelectedTile;
   const tile = board.get(`${x},${y}`);
 
+  // ============================================
+  // ⚠️ Тайл не найден (edge case)
+  // ============================================
   if (!tile) {
     return (
-      <div style={panelStyle}>
-        <div style={headerStyle}>
-          <h3 style={{ margin: 0 }}>🐛 Debug Panel</h3>
-          <button onClick={debugForceEndGame} style={endGameBtnStyle} title="Принудительно завершить игру">🏁</button>
+      <div className={styles.debugPanel}>
+        <div className={styles.debugPanelHeader}>
+          <h3 className={styles.debugPanelTitle}>🐛 Debug Panel</h3>
+          <button
+            onClick={debugForceEndGame}
+            className={`${styles.debugIconButton} ${styles.debugIconButtonEnd}`}
+            title="Принудительно завершить игру"
+          >
+            🏁
+          </button>
         </div>
         <p>Тайл не найден в ({x}, {y})</p>
-        <button onClick={() => setDebugSelectedTile(null)} style={btnStyle}>Закрыть</button>
+        <button
+          onClick={() => setDebugSelectedTile(null)}
+          className={styles.debugCloseBtn}
+        >
+          Закрыть
+        </button>
       </div>
     );
   }
 
+  // ============================================
+  // 📦 Основной рендер
+  // ============================================
   return (
-    <div style={panelStyle}>
-      <div style={headerStyle}>
-        <h3 style={{ margin: 0 }}>🐛 Debug Panel</h3>
-        <div style={{ display: 'flex', gap: '6px' }}>
+    <div className={styles.debugPanel}>
+      {/* Заголовок + кнопки действий */}
+      <div className={styles.debugPanelHeader}>
+        <h3 className={styles.debugPanelTitle}>🐛 Debug Panel</h3>
+        <div className={styles.debugPanelButtons}>
           {/* 💾 Сохранить */}
-          <button 
-            onClick={saveGame} 
-            style={saveBtnStyle} 
+          <button
+            onClick={saveGame}
+            className={`${styles.debugIconButton} ${styles.debugIconButtonSave}`}
             title="Сохранить игру"
           >
             💾
           </button>
-          
           {/* 📂 Загрузить */}
-          <button 
-            onClick={loadGame} 
-            style={loadBtnStyle} 
+          <button
+            onClick={loadGame}
+            className={`${styles.debugIconButton} ${styles.debugIconButtonLoad}`}
             title="Загрузить игру"
           >
             📂
           </button>
-          
           {/* 🏁 Принудительно завершить */}
-          <button 
-            onClick={debugForceEndGame} 
-            style={endGameBtnStyle} 
+          <button
+            onClick={debugForceEndGame}
+            className={`${styles.debugIconButton} ${styles.debugIconButtonEnd}`}
             title="Принудительно завершить игру"
           >
             🏁
@@ -63,16 +98,23 @@ export const DebugPanel = () => {
         </div>
       </div>
 
-      <div style={sectionStyle}>
-        <h4>📍 Тайл</h4>
+      {/* 📍 Информация о тайле */}
+      <div className={styles.debugSection}>
+        <h4 className={styles.debugSectionTitle}>📍 Тайл</h4>
         <p><strong>ID:</strong> {tile.templateId}</p>
         <p><strong>Координаты:</strong> ({x}, {y})</p>
         <p><strong>Поворот:</strong> {tile.rotation}°</p>
-        <p><strong>Мипл:</strong> {tile.meeple ? `${players.find(p => p.id === tile.meeple?.playerId)?.name} (${tile.meeple?.color})` : 'Нет'}</p>
+        <p>
+          <strong>Мипл:</strong>{' '}
+          {tile.meeple
+            ? `${players.find(p => p.id === tile.meeple?.playerId)?.name} (${tile.meeple?.color})`
+            : 'Нет'}
+        </p>
       </div>
 
-      <div style={sectionStyle}>
-        <h4>🎯 Фичи и регионы</h4>
+      {/* 🎯 Фичи и регионы */}
+      <div className={styles.debugSection}>
+        <h4 className={styles.debugSectionTitle}>🎯 Фичи и регионы</h4>
         {tile.features.map((feature, idx) => {
           const featureKey = `${x},${y}:${feature.id}`;
           const owners = regionManager.getFeatureOwners(featureKey);
@@ -80,15 +122,17 @@ export const DebugPanel = () => {
           const metadata = rootKey ? regionManager.getMetadata(rootKey) : undefined;
           const regionKeys = metadata ? Array.from(metadata.featureKeys) : [];
 
-          // 🌟 НОВОЕ: Вычисляем текущее состояние монастыря
-          const monasteryState = feature.type === 'monastery' ? calculateMonasteryPoints(board, x, y) : null;
-
-          // 🌟 Специфичная информация для полей
-          const fieldState = feature.type === 'field' && rootKey 
-            ? getAdjacentCitiesForField(board, regionManager, rootKey) 
+          // Вычисляем текущее состояние монастыря
+          const monasteryState = feature.type === 'monastery'
+            ? calculateMonasteryPoints(board, x, y)
             : null;
-          
-          // Считаем статистику по полю
+
+          // Специфичная информация для полей
+          const fieldState = feature.type === 'field' && rootKey
+            ? getAdjacentCitiesForField(board, regionManager, rootKey)
+            : null;
+
+          // Статистика по полю
           let fieldStats = null;
           if (fieldState) {
             const total = fieldState.size;
@@ -99,61 +143,82 @@ export const DebugPanel = () => {
             fieldStats = { total, completed };
           }
 
-          return (
-            <div key={idx} style={featureStyle}>
-              <strong>#{idx + 1} {feature.id}</strong>
-              <p>Тип: {feature.type}</p>
-              <p>Направления: {feature.directions.join(', ')}</p>
-              <p>Владельцы (локально): {owners.length > 0 ? owners.map(id => {
-                const player = players.find(p => p.id === id);
-                return `${player?.name} (${player?.color})`;
-              }).join(', ') : 'Нет'}</p>
+          // Получаем конфигурацию метки для типа фичи
+          const tag = FEATURE_TAGS[feature.type] ?? { label: `[${feature.type}]`, className: '' };
 
-              {/* 🌟 Блок специфичной информации для монастыря */}
+          return (
+            <div key={idx} className={styles.debugFeature}>
+              {/* Заголовок фичи с меткой типа */}
+              <p>
+                <span className={`${styles.debugFeatureTag} ${tag.className}`}>
+                  {tag.label}
+                </span>
+                <strong>#{idx + 1} {feature.id}</strong>
+              </p>
+
+              <p>Направления: {feature.directions.join(', ')}</p>
+              <p>
+                Владельцы (локально):{' '}
+                {owners.length > 0
+                  ? owners.map(id => {
+                      const player = players.find(p => p.id === id);
+                      return `${player?.name} (${player?.color})`;
+                    }).join(', ')
+                  : 'Нет'}
+              </p>
+
+              {/* Специфичная информация для монастыря */}
               {feature.type === 'monastery' && monasteryState && (
-                <p style={{ margin: '2px 0', color: '#d4a373' }}>⛪ Соседей вокруг: {monasteryState.points - 1} / 8</p>
+                <p style={{ color: '#d4a373' }}>
+                  Соседей вокруг: {monasteryState.points - 1} / 8
+                </p>
               )}
 
-              {/* 🌟 Блок специфичной информации для поля */}
+              {/* Специфичная информация для поля */}
               {feature.type === 'field' && fieldStats && (
-                <p style={{ margin: '4px 0', color: '#4CAF50' }}>🌾 Всего/Завершённых городов в регионе: {fieldStats.total}/{fieldStats.completed}</p>
+                <p style={{ color: '#4CAF50' }}>
+                  Всего/Завершённых городов в регионе: {fieldStats.total}/{fieldStats.completed}
+                </p>
               )}
 
               {metadata && (
                 <>
                   <p>Размер региона: {metadata.segments} тайл(ов)</p>
-                  {/* 🌟 Щит показываем только для городов*/}
+
+                  {/* Щит показываем только для городов */}
                   {metadata.type === 'city' && (
-                    <p style={{ color: '#4a90e2' }}>🛡️ Щит: {metadata.hasShield ? 'Да' : 'Нет'}</p>
+                    <p style={{ color: '#4a90e2' }}>
+                      Щит: {metadata.hasShield ? 'Да' : 'Нет'}
+                    </p>
                   )}
+
                   <p style={{ color: metadata.isComplete ? '#4CAF50' : '#FF9800' }}>
                     Статус завершения (DSU): {metadata.isComplete ? 'ЗАВЕРШЁН' : 'НЕ ЗАВЕРШЁН'}
                   </p>
+
                   {metadata.isComplete && <p>Очки в метаданных: {metadata.points}</p>}
-                  
+
                   <div>
                     <p>Владельцы региона и миплы:</p>
-                    {metadata && metadata.meepleCounts.size > 0 ? (
-                      <ul style={{ margin: '2px 0', paddingLeft: '15px' }}>
+                    {metadata.meepleCounts.size > 0 ? (
+                      <ul>
                         {Array.from(metadata.meepleCounts.entries()).map(([playerId, count]) => {
                           const player = players.find(p => p.id === playerId);
                           return (
-                            <li key={playerId} style={{ fontSize: '11px' }}>
+                            <li key={playerId}>
                               {player?.name} ({player?.color}): {count} мипл(ов)
                             </li>
                           );
                         })}
                       </ul>
                     ) : (
-                      <p style={{ margin: '2px 0', fontSize: '11px' }}>Нет миплов</p>
+                      <p style={{ fontSize: '11px' }}>Нет миплов</p>
                     )}
                   </div>
 
                   <details>
-                    <summary style={{ cursor: 'pointer', marginTop: '5px', color: '#aaa' }}>
-                      Ключи региона ({regionKeys.length})
-                    </summary>
-                    <ul style={{ fontSize: '11px', marginTop: '5px', paddingLeft: '15px', color: '#ccc' }}>
+                    <summary>Ключи региона ({regionKeys.length})</summary>
+                    <ul>
                       {regionKeys.map((key, kidx) => (
                         <li key={kidx}>{key}</li>
                       ))}
@@ -166,101 +231,13 @@ export const DebugPanel = () => {
         })}
       </div>
 
-      <button onClick={() => setDebugSelectedTile(null)} style={btnStyle}>
+      {/* Кнопка закрытия */}
+      <button
+        onClick={() => setDebugSelectedTile(null)}
+        className={styles.debugCloseBtn}
+      >
         Закрыть
       </button>
     </div>
   );
-};
-
-// ============================================
-// 🎨 Стили
-// ============================================
-const panelStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: '70px',
-  right: '20px',
-  background: 'rgba(0, 0, 0, 0.95)',
-  border: '2px solid #4a90e2',
-  borderRadius: '8px',
-  padding: '15px',
-  color: '#fff',
-  fontFamily: 'monospace',
-  fontSize: '12px',
-  maxWidth: '400px',
-  maxHeight: '70vh',
-  overflowY: 'auto',
-  zIndex: 1000,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-};
-
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '15px',
-  paddingBottom: '10px',
-  borderBottom: '1px solid #4a90e2',
-};
-
-const endGameBtnStyle: React.CSSProperties = {
-  width: '32px',
-  height: '32px',
-  padding: 0,
-  background: '#27ae60',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '16px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const sectionStyle: React.CSSProperties = {
-  marginBottom: '15px',
-  paddingBottom: '15px',
-  borderBottom: '1px solid #333',
-};
-
-const featureStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  padding: '8px',
-  borderRadius: '4px',
-  marginBottom: '8px',
-};
-
-const btnStyle: React.CSSProperties = {
-  padding: '6px 12px',
-  background: '#e74c3c',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '12px',
-  marginTop: '10px',
-  width: '100%',
-};
-
-const saveBtnStyle: React.CSSProperties = {
-  background: '#2ecc71',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '4px',
-  padding: '4px 8px',
-  cursor: 'pointer',
-  fontSize: '14px',
-  transition: 'background 0.2s',
-};
-
-const loadBtnStyle: React.CSSProperties = {
-  background: '#3498db',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '4px',
-  padding: '4px 8px',
-  cursor: 'pointer',
-  fontSize: '14px',
-  transition: 'background 0.2s',
 };

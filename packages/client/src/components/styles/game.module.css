@@ -264,8 +264,9 @@
 /* === Основной контейнер панели действий === */
 .actionPanel {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   background: rgba(25, 25, 35, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
@@ -343,4 +344,180 @@
   background: rgba(231, 76, 60, 0.15);
   border-color: #e74c3c;
   color: #e74c3c;
+}
+
+/* ============================================
+   🐛 СТИЛИ DEBUG PANEL
+   ============================================ */
+
+/* === Основной контейнер панели === */
+.debugPanel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: rgba(25, 25, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  padding: 16px;
+  color: #fff;
+  font-family: monospace;
+  font-size: 12px;
+  max-width: 400px;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* === Заголовок панели === */
+.debugPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #4a90e2;
+}
+
+.debugPanelTitle {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* === Группа иконок-кнопок в заголовке === */
+.debugPanelButtons {
+  display: flex;
+  gap: 6px;
+}
+
+/* === Маленькая иконка-кнопка === */
+.debugIconButton {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.debugIconButton:hover {
+  transform: scale(1.1);
+}
+
+/* Варианты кнопок по назначению */
+.debugIconButtonSave:hover {
+  background: rgba(46, 204, 113, 0.25);
+}
+
+.debugIconButtonLoad:hover {
+  background: rgba(52, 152, 219, 0.25);
+}
+
+.debugIconButtonEnd:hover {
+  background: rgba(39, 174, 96, 0.25);
+}
+
+/* === Секция информации === */
+.debugSection {
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.debugSectionTitle {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #4a90e2;
+}
+
+.debugSection p {
+  margin: 4px 0;
+}
+
+/* === Карточка фичи === */
+.debugFeature {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.debugFeature p {
+  margin: 2px 0;
+}
+
+.debugFeature details {
+  margin-top: 5px;
+}
+
+.debugFeature summary {
+  cursor: pointer;
+  color: #aaa;
+}
+
+.debugFeature ul {
+  font-size: 11px;
+  margin-top: 5px;
+  padding-left: 15px;
+  color: #ccc;
+}
+
+.debugFeature li {
+  font-size: 11px;
+}
+
+/* === Текстовая метка типа фичи === */
+.debugFeatureTag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* Цвета меток по типу фичи */
+.debugFeatureTagCity {
+  background: rgba(74, 144, 226, 0.2);
+  color: #4a90e2;
+}
+
+.debugFeatureTagField {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+}
+
+.debugFeatureTagMonastery {
+  background: rgba(212, 163, 115, 0.2);
+  color: #d4a373;
+}
+
+.debugFeatureTagRoad {
+  background: rgba(255, 152, 0, 0.2);
+  color: #FF9800;
+}
+
+/* === Кнопка закрытия === */
+.debugCloseBtn {
+  padding: 6px 12px;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 10px;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.debugCloseBtn:hover {
+  background: #c0392b;
 }

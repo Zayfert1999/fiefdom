@@ -6,7 +6,7 @@ import ChevronUpIcon from '@/assets/svg/icon/chevron-up-icon.svg?react';
 import ChevronDownIcon from '@/assets/svg/icon/chevron-down-icon.svg?react';
 
 // 🌟 Импорт CSS-модуля
-import styles from './GameOverScreen.module.css';
+import styles from '@/components/styles/GameOverScreen.module.css';
 
 export const GameOverScreen = () => {
   const players = useGameStore(s => s.players);

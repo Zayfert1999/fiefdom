@@ -236,3 +236,59 @@
 .deckTileCardEmpty .deckTileCount {
   color: #666;
 }
+
+/* ============================================
+   🔄 СТИЛИ RECONNECTING OVERLAY
+   ============================================ */
+
+/* === Оверлей (затемнение на весь экран) === */
+.reconnectOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+/* === Карточка с информацией === */
+.reconnectCard {
+  background: #1a1a2e;
+  padding: 40px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* === Спиннер загрузки === */
+.reconnectSpinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: spinnerRotate 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+/* Анимация вращения спиннера */
+@keyframes spinnerRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === Заголовок === */
+.reconnectTitle {
+  color: #fff;
+  font-size: 20px;
+  margin: 0 0 8px 0;
+}
+
+/* === Подзаголовок === */
+.reconnectSubtitle {
+  color: #888;
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 2px;
+}

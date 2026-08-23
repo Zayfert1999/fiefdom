@@ -2,9 +2,10 @@
 // 🌟 Логика создания и перемешивания колоды
 // Вынесена из gameSlice для переиспользования сервером
 
-import type { Tile } from './types';
+import type { Tile, PlacedTile } from './types';
 import { TILE_DEFINITIONS } from './tileData';
 import { createSeededRandom } from '../prng/seedRandom';
+import { getValidPlacementCells } from './tileUtils'; 
 
 /**
  * Создаёт перемешанную колоду из всех тайлов.
@@ -34,4 +35,52 @@ export function createDeck(seed?: string): Tile[] {
   
     console.log(`🎴 [Deck] Создана колода: ${deck.length} тайлов (seed: ${seed || 'random'})`);
   return deck;
+}
+
+/**
+ * 🌟 Ищет играбельный тайл в колоде.
+ * Перебирает тайлы с конца колоды, проверяя возможность размещения.
+ * Неиграбельные тайлы возвращаются в случайное место колоды.
+ *
+ * Используется и клиентом (локальная игра), и сервером (сетевая игра).
+ *
+ * @param deck Текущая колода тайлов
+ * @param board Текущая доска
+ * @param random Функция генерации случайных чисел (для детерминизма на сервере)
+ * @returns Найденный тайл и обновлённая колода, либо null если играбельных нет
+ */
+export function drawPlayableTile(
+    deck: Tile[],
+    board: Map<string, PlacedTile>,
+    random: () => number = Math.random
+): { drawnTile: Tile | null; newDeck: Tile[] } {
+    const newDeck = [...deck];
+    let attempts = 0;
+    const maxAttempts = newDeck.length;
+
+    while (newDeck.length > 0 && attempts < maxAttempts) {
+        attempts++;
+        const candidate = newDeck.pop()!;
+        const validCells = getValidPlacementCells(candidate, board);
+
+        // 🌟 Нашли играбельный тайл
+        if (validCells.size > 0) {
+            console.log(`🎴 [Deck] Найден играбельный тайл: ${candidate.id} (попытка ${attempts}/${maxAttempts})`);
+            return { drawnTile: candidate, newDeck };
+        }
+
+        // 🌟 Последний тайл в колоде и он неиграбельный
+        if (newDeck.length === 0) {
+            console.log(`🏁 [Deck] Последний тайл нельзя поставить`);
+            break;
+        }
+
+        // 🌟 Возвращаем неиграбельный тайл в случайное место колоды
+        const insertIndex = Math.floor(random() * (newDeck.length + 1));
+        newDeck.splice(insertIndex, 0, candidate);
+    }
+
+    // 🌟 Играбельных тайлов нет → конец игры
+    console.log(`🏁 [Deck] Нет играбельных тайлов → конец игры`);
+    return { drawnTile: null, newDeck };
 }

@@ -6,7 +6,7 @@
 import type { Player, PlacedTile, Tile } from '@carcassonne/shared/core/types';
 import type { FeatureKey } from '@carcassonne/shared/core/regionManager';
 import { RegionManager } from '@carcassonne/shared/core/regionManager';
-import { createDeck } from '@carcassonne/shared/core/deck';
+import { createDeck, drawPlayableTile } from '@carcassonne/shared/core/deck';
 import {
   applyTileToBoardAndRM,
   getTileSides,
@@ -20,6 +20,7 @@ import {
   type CompletedRegion,
 } from '@carcassonne/shared/core/scoring';
 import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
+import { createSeededRandom } from '@carcassonne/shared/prng/seedRandom';
 import { logger } from '../utils/logger';
 
 export type ServerPhase = 'lobby' | 'playing' | 'gameOver';
@@ -82,29 +83,26 @@ export class ServerGameState {
 
   /** Выдать тайл текущему игроку. false → конец игры */
   drawTile(): boolean {
-    // 🌟 Ищем тайл, который можно поставить (как в client gameSlice)
-    let attempts = 0;
-    const maxAttempts = this.deck.length;
-    while (this.deck.length > 0 && attempts < maxAttempts) {
-      attempts++;
-      const candidate = this.deck.pop()!;
-      const validCells = getValidPlacementCells(candidate, this.board);
-      if (validCells.size > 0) {
-        this.drawnTile = candidate;
-        logger.info('[GameState]', `Тайл выдан: ${candidate.id} игроку ${this.currentPlayer.name}`);
-        return true;
-      }
+    // 🌟 ИСПОЛЬЗУЕМ ОБЩУЮ ФУНКЦИЮ ИЗ SHARED
+    // Передаём seed-based PRNG для детерминизма
+    const { drawnTile, newDeck } = drawPlayableTile(
+      this.deck,
+      this.board,
+      // 🌟 Детерминированный PRNG на основе seed
+      createSeededRandom(`${this.seed}-draw-${this.deck.length}`)
+    );
 
-      logger.info('[GameState]', `Тайл ${candidate.id} неиграбелен (попытка ${attempts}/${maxAttempts})`);
+    this.deck = newDeck;
 
-      // Возвращаем неиграбельный тайл в случайное место колоды
-      const insertIndex = Math.floor(Math.random() * (this.deck.length + 1));
-      this.deck.splice(insertIndex, 0, candidate);
+    if (!drawnTile) {
+      logger.info('[GameState]', 'Нет играбельных тайлов → конец игры');
+      this.phase = 'gameOver';
+      return false;
     }
 
-    logger.info('[GameState]', 'Нет играбельных тайлов → конец игры');
-    this.phase = 'gameOver';
-    return false;
+    this.drawnTile = drawnTile;
+    logger.info('[GameState]', `Тайл выдан: ${drawnTile.id} игроку ${this.currentPlayer.name}`);
+    return true;
   }
 
   // 🌟 ИСПРАВЛЕНО: объединяем placeTile и placeMeeple

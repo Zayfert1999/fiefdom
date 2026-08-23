@@ -2,11 +2,11 @@ import type { StateCreator } from 'zustand';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
 import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@carcassonne/shared/core/types';
-import { getTileSides, rotateFeatures, getValidPlacementCells } from '@carcassonne/shared/core/tileUtils';
+import { getTileSides, rotateFeatures } from '@carcassonne/shared/core/tileUtils';
 import { RegionManager } from '@carcassonne/shared/core/regionManager';
 import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@carcassonne/shared/core/scoring';
 import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@carcassonne/shared/core/constants'
-import { createDeck } from '@carcassonne/shared/core/deck';
+import { createDeck, drawPlayableTile } from '@carcassonne/shared/core/deck';
 
 
 export interface GameSlice {
@@ -262,30 +262,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             return;
         }
 
-        const newDeck = [...state.deck];
-        let drawnTile: Tile | null = null;
-        let attempts = 0;
-        const maxAttempts = newDeck.length;
-
-        while (newDeck.length > 0 && attempts < maxAttempts) {
-            attempts++;
-            const candidate = newDeck.pop()!;
-            const validCells = getValidPlacementCells(candidate, state.board);
-
-            if (validCells.size > 0) {
-                drawnTile = candidate;
-                console.log(`🎴 [Store] Выдан тайл ${candidate.id}`);
-                break;
-            }
-
-            if (newDeck.length === 0) {
-                console.log(`🏁 [Store] Последний тайл нельзя поставить.`);
-                break;
-            }
-
-            const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
-            newDeck.splice(insertIndex, 0, candidate);
-        }
+        // 🌟 ИСПОЛЬЗУЕМ ОБЩУЮ ФУНКЦИЮ ИЗ SHARED
+        const { drawnTile, newDeck } = drawPlayableTile(state.deck, state.board);
 
         if (!drawnTile) {
             set({ deck: newDeck, phase: 'gameOver' });

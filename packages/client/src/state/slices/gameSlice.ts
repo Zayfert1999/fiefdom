@@ -250,10 +250,13 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     drawTile: () => {
         const state = get();
+
+        // Валидация фазы
         if (state.phase !== 'startTurn') {
-            console.warn('⚠️ [Store] Неверная фаза для взятия тайла');
+            console.warn(`⚠️ [Store] drawTile вызван не в фазе startTurn (текущая: ${state.phase})`);
             return;
         }
+
         if (state.drawnTile !== null) {
             console.warn('⚠️ [Store] Тайл уже выдан');
             return;
@@ -298,6 +301,13 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     confirmPreview: () => {
         const state = get();
+
+        // 🌟 НОВОЕ: валидация фазы
+        if (state.phase !== 'placeTile') {
+            console.warn(`⚠️ [Store] confirmPreview вызван не в фазе placeTile (текущая: ${state.phase})`);
+            return;
+        }
+
         if (!state.previewTile || !state.previewRegionManager) {
             console.warn('⚠️ [Store] Нет preview-тайла для подтверждения');
             return;
@@ -378,8 +388,10 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     confirmMeeple: () => {
         const state = get();
+
+        // 🌟 НОВОЕ: валидация фазы
         if (state.phase !== 'placeMeeple') {
-            console.warn('⚠️ [Store] Неверная фаза для подтверждения');
+            console.warn(`⚠️ [Store] confirmMeeple вызван не в фазе placeMeeple (текущая: ${state.phase})`);
             return;
         }
 
@@ -747,6 +759,12 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     saveGame: () => {
         const state = get();
 
+        // 🌟 НОВОЕ: запрет сохранения сетевой игры
+        if (state.roomId !== null) {
+            console.warn('⚠️ [GameSlice] Нельзя сохранять сетевую игру');
+            return;
+        }
+
         // 🌟 Преобразуем Map в Record для JSON
         const boardRecord = Object.fromEntries(state.board);
         const lastPlacedRecord = Object.fromEntries(state.lastPlacedTiles);
@@ -773,6 +791,14 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // 📂 ЗАГРУЗКА ИГРЫ
     // ============================================
     loadGame: () => {
+        const state = get();
+
+        // 🌟 НОВОЕ: запрет загрузки в сетевом режиме
+        if (state.roomId !== null) {
+            console.warn('⚠️ [GameSlice] Нельзя загружать игру в сетевом режиме');
+            return;
+        }
+
         const json = localStorage.getItem('carcassonne_save');
         if (!json) {
             console.warn('⚠️ [GameSlice] Нет сохранённой игры');

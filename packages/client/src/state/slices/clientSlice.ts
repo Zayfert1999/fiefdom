@@ -38,6 +38,13 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     // ============================================
     startPreview: (x, y) => {
         const state = get();
+
+        // 🌟 НОВОЕ: валидация фазы
+        if (state.phase !== 'placeTile') {
+            console.warn(`⚠️ [Store] startPreview вызван не в фазе placeTile (текущая: ${state.phase})`);
+            return;
+        }
+
         if (!state.drawnTile || state.phase !== 'placeTile') {
             console.warn('⚠️ [Store] Нельзя начать примерку: нет тайла или неверная фаза');
             return;
@@ -160,8 +167,8 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
             deck,
             previewTile,
             previewRegionManager: previewTileRegionManager,
-            phase: 'placeTile',             
-            moveSnapshot: null,             
+            phase: 'placeTile',
+            moveSnapshot: null,
         });
 
         console.log(`↩️ [Store] Ход откатён, preview восстановлен на (${previewTile.x}, ${previewTile.y})`);
@@ -173,6 +180,8 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     // ============================================
     selectMeepleSpot: (featureId, mx, my) => {
         const state = get();
+
+        // Валидация фазы
         if (state.phase !== 'placeMeeple') {
             console.warn('⚠️ [Store] Неверная фаза для выбора спота');
             return;
@@ -244,6 +253,8 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     // ============================================
     removePlacedMeeple: () => {
         const state = get();
+        
+        // Валидация фазы
         if (state.phase !== 'placeMeeple') {
             console.warn('⚠️ [Store] Неверная фаза для удаления мипла');
             return;

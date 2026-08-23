@@ -62,9 +62,18 @@ export interface UISlice {
   // === timestamp окончания игры ===
   gameEndTime: number | null;
   setGameEndTime: (time: number | null) => void;
+
+  // === Настройки сессии  ===
+  showRegions: boolean;
+  showDeadCells: boolean;
+  enabledDeckView: boolean;
+  toggleRegions: () => void;
+  toggleDeadCells: () => void;
+  toggleDeckView: () => void;
+
 }
 
-export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => ({
+export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set, get) => ({
   // Начальное состояние
   playerName: loadPlayerName() || DEFAULT_NAME,
   playerColor: loadPlayerColor(),
@@ -75,6 +84,11 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => 
   turnDeadline: null,
   gameStartTime: null,
   gameEndTime: null,
+
+  // 🌟 НОВОЕ: Настройки сессии
+  showRegions: true,
+  showDeadCells: true,
+  enabledDeckView: true,
 
   setPlayerName: (name) => {
     const validated = validatePlayerName(name);
@@ -113,5 +127,18 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set) => 
 
   setGameEndTime: (time) => {
     set({ gameEndTime: time });
+  },
+
+  toggleRegions: () => {
+    set((state) => ({ showRegions: !state.showRegions }));
+    console.log(`📦 [UISlice] Показ регионов: ${!get().showRegions ? 'ВКЛ' : 'ВЫКЛ'}`);
+  },
+  toggleDeadCells: () => {
+    set((state) => ({ showDeadCells: !state.showDeadCells }));
+    console.log(`💀 [UISlice] Показ мёртвых клеток: ${!get().showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}`);
+  },
+  toggleDeckView: () => {
+    set((state) => ({ enabledDeckView: !state.enabledDeckView }));
+    console.log(`📦 [UISlice] Показ колоды: ${!get().enabledDeckView ? 'ВКЛ' : 'ВЫКЛ'}`);
   },
 });

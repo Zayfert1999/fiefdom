@@ -195,25 +195,6 @@ export function clearGameState(key: SaveKey): void {
 }
 
 /**
- * 🌟 Проверяет наличие сохранения по ключу.
- * Опционально проверяет, что сохранение валидно.
- */
-export function hasGameState(key: SaveKey, validate: boolean = false): boolean {
-    try {
-        const json = localStorage.getItem(key);
-        if (!json) return false;
-
-        if (!validate) return true;
-
-        // Базовая валидация
-        const data = JSON.parse(json);
-        return !!(data.board && data.players && Array.isArray(data.players));
-    } catch {
-        return false;
-    }
-}
-
-/**
  * 🌟 Возвращает мета-данные сохранения (без полной загрузки).
  * Полезно для отображения в кнопке "Продолжить".
  */
@@ -249,7 +230,7 @@ export function getSaveMeta(key: SaveKey): {
             savedAt: data.savedAt ?? 0,
             gameStartTime: data.gameStartTime ?? null,
         };
-        
+
     } catch {
         return null;
     }

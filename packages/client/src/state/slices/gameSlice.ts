@@ -8,22 +8,15 @@ import {
     saveGameState,
     loadGameState,
     clearGameState,
-    hasGameState,
     type GameStateForSave,
 } from '@/core/gameSaveManager';
 import { RegionManager } from '@carcassonne/shared/core/regionManager';
 import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@carcassonne/shared/core/scoring';
-import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@carcassonne/shared/core/constants'
+import { COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@carcassonne/shared/core/constants'
 import { createDeck, drawPlayableTile } from '@carcassonne/shared/core/deck';
 
 
 export interface GameSlice {
-    //Лобби
-    lobbyPlayers: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[];
-    showRegions: boolean;
-    showDeadCells: boolean;
-    enabledDeckView: boolean;
-
     //Игра
     deck: Tile[];
     totalTiles: number;
@@ -37,18 +30,6 @@ export interface GameSlice {
     completionAnimations: CompletionAnimation[];
     lastPlacedTiles: Map<string, LastPlacedTile>;
 
-
-
-    //Методы лобби
-    initLocalLobby: (profileName: string, profileColor: string) => void;
-    addPlayer: () => void;
-    removePlayer: (id: string) => void;
-    renamePlayer: (id: string, newName: string) => void;
-    startGame: () => void;
-    exitToLobby: () => void;
-    toggleRegions: () => void;
-    toggleDeadCells: () => void;
-    toggleDeckView: () => void;
 
     //Инициализация игры
     initGame: (players: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[]) => void;
@@ -87,7 +68,6 @@ export interface GameSlice {
 
 export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set, get) => ({
     // Начальное состояние
-    lobbyPlayers: [],
     deck: [],
     totalTiles: 0,
     board: new Map(),
@@ -96,118 +76,11 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     drawnTile: null,
     phase: 'lobby',
     regionManager: new RegionManager(),
-    showRegions: true,
-    showDeadCells: true,
-    enabledDeckView: true,
     visibleFeatureTypes: ['field'],
     debugSelectedTile: null,
     completionAnimations: [],
     lastPlacedTiles: new Map(),
 
-    // ============================================
-    // Лобби
-    // ============================================
-    initLocalLobby: (profileName, profileColor) => {
-        console.log(`🎮 [GameSlice] Инициализация локального лобби: ${profileName} (${profileColor})`);
-
-        set({
-            lobbyPlayers: [
-                // 🌟 Первый игрок — из профиля (главное меню)
-                { id: 'p1', name: profileName, color: profileColor },
-                // 🌟 Второй игрок — по умолчанию, первый свободный цвет
-                { id: 'p2', name: 'Игрок 2', color: AVAILABLE_COLORS.find(c => c !== profileColor) || '#5555ff' },
-            ],
-        });
-    },
-
-    addPlayer: () => {
-        const state = get();
-        if (state.lobbyPlayers.length >= 5) {
-            console.warn('⚠️ [GameSlice] Максимум 5 игроков');
-            return;
-        }
-
-        // 🌟 Находим первый свободный цвет
-        const usedColors = new Set(state.lobbyPlayers.map(p => p.color));
-        const freeColor = AVAILABLE_COLORS.find(c => !usedColors.has(c)) || '#ffffff';
-
-        const newId = `p${Date.now()}`;
-        const newName = `Игрок ${state.lobbyPlayers.length + 1}`;
-
-        set({
-            lobbyPlayers: [...state.lobbyPlayers, { id: newId, name: newName, color: freeColor }]
-        });
-        console.log(`✅ [GameSlice] Игрок добавлен: ${newName} (${freeColor})`);
-    },
-
-    removePlayer: (id) => {
-        const state = get();
-        if (state.lobbyPlayers.length <= 2) {
-            console.warn('⚠️ [Store] Минимум 2 игрока');
-            return;
-        }
-
-        set({
-            lobbyPlayers: state.lobbyPlayers.filter(p => p.id !== id)
-        });
-        console.log(`❌ [Store] Игрок удалён: ${id}`);
-    },
-
-    renamePlayer: (id, newName) => {
-        const trimmed = newName.trim();
-        if (!trimmed) {
-            console.warn('⚠️ [GameSlice] Имя не может быть пустым');
-            return;
-        }
-
-        set({
-            lobbyPlayers: get().lobbyPlayers.map(p =>
-                p.id === id ? { ...p, name: trimmed } : p
-            )
-        });
-        console.log(`✏️ [GameSlice] Игрок ${id} переименован в "${trimmed}"`);
-    },
-
-    startGame: () => {
-        const state = get();
-        if (state.lobbyPlayers.length < 2) {
-            console.warn('⚠️ [Store] Нужно минимум 2 игрока');
-            return;
-        }
-
-        // Инициализируем игру с игроками из лобби
-        get().initGame(state.lobbyPlayers);
-        set({ phase: 'startTurn', gameStartTime: Date.now() });
-        console.log(`🎮 [Store] Игра начата с ${state.lobbyPlayers.length} игроками`);
-    },
-
-    exitToLobby: () => {
-        console.log('🚪 [Store] Выход в лобби');
-
-        // Сбрасываем всё игровое состояние
-        set({
-            lobbyPlayers: [],
-            deck: [],
-            totalTiles: 0,
-            board: new Map(),
-            players: [],
-            currentTurn: 0,
-            drawnTile: null,
-            phase: 'lobby',
-            regionManager: new RegionManager(),
-            showRegions: true,
-            showDeadCells: true,
-            enabledDeckView: true,
-            visibleFeatureTypes: ['field'],
-            debugSelectedTile: null,
-            completionAnimations: [],
-            lastPlacedTiles: new Map(),
-            gameStartTime: null,
-            gameEndTime: null,
-        });
-        // Возвращаемся в главное меню
-        get().setLobbyScreen('modeSelect');
-    },
 
     // ============================================
     // 🎮 ИНИЦИАЛИЗАЦИЯ ИГРЫ
@@ -736,31 +609,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     },
 
     // ============================================
-    // 🎨 UI-действия
-    // ============================================
-    toggleRegions: () => {
-        set((state) => ({ showRegions: !state.showRegions }));
-        console.log(`📦 [Store] Показ регионов: ${!get().showRegions ? 'ВКЛ' : 'ВЫКЛ'}`);
-    },
-
-    toggleDeadCells: () => {
-        set((state) => ({ showDeadCells: !state.showDeadCells }));
-        console.log(`💀 [Store] Показ мёртвых клеток: ${!get().showDeadCells ? 'ВКЛ' : 'ВЫКЛ'}`);
-    },
-
-    toggleDeckView: () => {
-        set((state) => ({ enabledDeckView: !state.enabledDeckView }));
-        console.log(`📦 [Store] Показ колоды: ${!get().enabledDeckView ? 'ВКЛ' : 'ВЫКЛ'}`);
-    },
-
-    // ============================================
     // 💾 АВТОСОХРАНЕНИЕ (локальная игра)
     // ============================================
-
-    /**
-     * 🌟 Автосохранение локальной игры.
-     * Вызывается автоматически в конце каждого хода.
-     */
     autoSaveLocalGame: () => {
         const state = get();
         // Сохраняем только локальную игру (не сетевую)

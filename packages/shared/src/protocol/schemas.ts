@@ -27,8 +27,6 @@ export const JoinRoomSchema = z.object({
   preferredColor: z.string().optional(),
 });
 
-export const SetReadySchema = z.boolean();
-
 // ============================================
 // 🎮 Игра
 // ============================================
@@ -56,6 +54,25 @@ export const ReconnectSchema = z.object({
 });
 
 export const ChatMessageSchema = z.string().min(1).max(500);
+
+// ============================================
+// 👢 Кик игрока
+// ============================================
+export const KickPlayerSchema = z.object({
+  playerId: z.string().min(1),
+});
+
+// ============================================
+// ✅ Готовность
+// ============================================
+export const SetReadySchema = z.boolean();
+
+// ============================================
+// 🔍 Проверка активных игр
+// ============================================
+export const CheckActiveSchema = z.object({
+  playerId: z.string().min(1),
+});
 
 // ============================================
 // 🌟 Типы, выведенные из схем (для type-safety)

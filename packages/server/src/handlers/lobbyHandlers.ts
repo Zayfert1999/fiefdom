@@ -6,7 +6,14 @@ import type { RoomManager } from '../rooms/RoomManager';
 import { Room } from '../rooms/Room';
 import { PlayerConnection } from '../state/PlayerConnection';
 import { Player } from '@carcassonne/shared/core/types';
-import { CreateRoomSchema, JoinRoomSchema } from '@carcassonne/shared/protocol/schemas';
+import {
+  CreateRoomSchema,
+  JoinRoomSchema,
+  ReconnectSchema,
+  KickPlayerSchema,
+  SetReadySchema,
+  CheckActiveSchema,
+} from '@carcassonne/shared/protocol/schemas';
 import { logger } from '../utils/logger';
 
 // ============================================
@@ -221,6 +228,12 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   // ✅ ГОТОВНОСТЬ
   // ============================================
   socket.on('lobby:set-ready', (ready: boolean) => {
+    // 🌟 НОВОЕ: валидация через Zod
+    const parsed = SetReadySchema.safeParse(ready);
+    if (!parsed.success) {
+      logger.warn('[Lobby]', 'Невалидные данные set-ready', parsed.error.format());
+      return;
+    }
     const { roomId, playerId } = socket.data;
     const room = roomManager.getRoom(roomId);
     const conn = room?.players.get(playerId);
@@ -235,6 +248,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   // 👢 КИК ИГРОКА (только хост)
   // ============================================
   socket.on('lobby:kick-player', (data) => {
+    // 🌟 НОВОЕ: валидация через Zod
+    const parsed = KickPlayerSchema.safeParse(data);
+    if (!parsed.success) {
+      logger.warn('[Lobby]', 'Невалидные данные kick-player', parsed.error.format());
+      socket.emit('error', { code: 'INVALID_DATA', message: 'Неверные данные' });
+      return;
+    }
+
     const { playerId: kickedId } = data;
     const { roomId, playerId: kickerId } = socket.data;
 
@@ -298,6 +319,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   // 🔍 ПРОВЕРКА АКТИВНЫХ ИГР (новая кнопка "Продолжить")
   // ============================================
   socket.on('session:check-active', (data) => {
+    // 🌟 НОВОЕ: валидация через Zod
+    const parsed = CheckActiveSchema.safeParse(data);
+    if (!parsed.success) {
+      logger.warn('[Session]', 'Невалидные данные check-active', parsed.error.format());
+      socket.emit('session:active-games', { game: null });
+      return;
+    }
     const { playerId } = data;
 
     if (!playerId) {
@@ -325,7 +353,15 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ (только по playerId)
   // ============================================
   socket.on('lobby:reconnect', (data) => {
-    const { playerId, roomId } = data;
+    // Валидация через Zod
+    const parsed = ReconnectSchema.safeParse(data);
+    if (!parsed.success) {
+      logger.warn('[Lobby]', 'Невалидные данные reconnect', parsed.error.format());
+      socket.emit('lobby:reconnect-failed', { reason: 'Неверные данные' });
+      return;
+    }
+
+    const { playerId, roomId } = parsed.data;
     logger.info('[Lobby]', `🔄 Запрос reconnect: ${playerId} → комната ${roomId}`);
 
     const room = roomManager.getRoom(roomId);

@@ -1,0 +1,482 @@
+/* ============================================
+   🎨 ЕДИНЫЙ СТИЛЬ ДЛЯ ЛОББИ
+   Используется в: MainMenu, Lobby, NetworkLobby
+   ============================================ */
+
+/* === Контейнер (оверлей на весь экран) === */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+}
+
+/* === Карточка === */
+.card {
+    background: rgba(30, 30, 30, 0.95);
+    border-radius: 24px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    max-width: 480px;
+    width: 100%;
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* === Заголовки === */
+.title {
+    color: #fff;
+    font-size: 32px;
+    text-align: center;
+    margin: 0 0 8px 0;
+    font-weight: 700;
+    font-family: serif;
+    letter-spacing: 2px;
+}
+
+.subtitle {
+    color: #888;
+    font-size: 14px;
+    text-align: center;
+    margin: 0 0 24px 0;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+}
+
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-size: 18px;
+    margin: 0 0 12px 0;
+}
+
+/* === Секция (группа контента) === */
+.section {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 24px;
+    border-radius: 12px;
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* === Кнопки === */
+.button {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.buttonPrimary {
+    composes: button;
+    background: #4a90e2;
+    color: #fff;
+}
+
+.buttonPrimary:hover:not(:disabled) {
+    background: #357abd;
+}
+
+.buttonSuccess {
+    composes: button;
+    background: #2ecc71;
+    color: #fff;
+}
+
+.buttonSuccess:hover:not(:disabled) {
+    background: #27ae60;
+}
+
+.buttonSecondary {
+    composes: button;
+    background: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.buttonDanger {
+    composes: button;
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+    border: 1px dashed rgba(231, 76, 60, 0.5);
+}
+
+.buttonDanger:hover:not(:disabled) {
+    background: rgba(231, 76, 60, 0.25);
+    border-color: #e74c3c;
+}
+
+.button:disabled {
+    background: #555;
+    color: #888;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* === Кнопка Продолжить (градиентная) === */
+.buttonContinue {
+    composes: button;
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+    color: #fff;
+    font-size: 18px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.buttonContinue:hover:not(:disabled) {
+    background: linear-gradient(135deg, #357abd 0%, #2a5f9e 100%);
+}
+
+/* === Инпуты === */
+.input {
+    padding: 12px 16px;
+    font-size: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    outline: none;
+    box-sizing: border-box;
+    width: 100%;
+    transition: border-color 0.2s;
+}
+
+.input:focus {
+    border-color: #4a90e2;
+}
+
+.input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* === Input в режиме inline-редактирования === */
+.editInput {
+    flex: 1;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid #4a90e2;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+    outline: none;
+}
+
+/* === Список игроков === */
+.playersList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.playerRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: opacity 0.2s;
+}
+
+.playerRow.disconnected {
+    opacity: 0.5;
+}
+
+.playerColor {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+.playerName {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+    flex: 1;
+}
+
+.playerName.editable {
+    cursor: text;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.playerName.editable:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.playerBadge {
+    font-size: 12px;
+    color: #888;
+    margin-left: 8px;
+}
+
+.playerStatus {
+    font-size: 14px;
+}
+
+.playerStatus.ready {
+    color: #2ecc71;
+}
+
+.playerStatus.notReady {
+    color: #e74c3c;
+}
+
+/* === Кнопка удаления/кика === */
+.removeButton {
+    background: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.4);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.removeButton:hover {
+    background: #e74c3c;
+    color: #fff;
+}
+
+/* === Кнопка добавления === */
+.addButton {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border: 1px dashed rgba(46, 204, 113, 0.5);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.addButton:hover {
+    background: rgba(46, 204, 113, 0.25);
+    border-color: #2ecc71;
+}
+
+/* === Настройки === */
+.settingsPanel {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.settingRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-bottom: 12px;
+}
+
+.settingRow:last-child {
+    margin-bottom: 0;
+}
+
+.settingsTitle {
+    color: #fff;
+    font-size: 18px;
+    margin: 0 0 12px 0;
+}
+
+.settingCheckbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.settingLabel {
+    color: #fff;
+    font-size: 14px;
+}
+
+/* === Ошибка === */
+.errorBox {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    text-align: left;
+}
+
+/* === Код комнаты === */
+.roomCodeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.roomCode {
+  margin: 0;
+  color: #888;
+  font-size: 13px;
+}
+
+.roomCodeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roomCodeValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 6px;
+  font-family: monospace;
+}
+
+.copyButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.copyButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.copyButton:active {
+  transform: scale(0.95);
+}
+
+/* === Информация === */
+.roomInfo {
+    color: #888;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* === Статус подключения === */
+.connectionStatus {
+    font-size: 14px;
+    text-align: center;
+}
+
+.connected {
+    color: #4ade80;
+}
+
+.disconnected {
+    color: #888;
+}
+
+.ping {
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+.pingGood {
+    color: #4ade80;
+}
+
+.pingMedium {
+    color: #fbbf24;
+}
+
+.pingBad {
+    color: #ef4444;
+}
+
+.labelColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #fff;
+    font-size: 14px;
+}
+
+/* ============================================
+   🔄 СТИЛИ RECONNECTING OVERLAY
+   Переиспользуем .overlay и .card из лобби
+   ============================================ */
+
+/* === Контент карточки восстановления === */
+.reconnectContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* === Спиннер загрузки === */
+.reconnectSpinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: reconnectSpin 1s linear infinite;
+}
+
+/* Анимация вращения спиннера */
+@keyframes reconnectSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === Заголовок восстановления === */
+.reconnectTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+/* === Подзаголовок восстановления === */
+.reconnectSubtitle {
+  margin: 0;
+  color: #888;
+  font-size: 14px;
+  letter-spacing: 2px;
+}

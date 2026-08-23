@@ -1,0 +1,522 @@
+/* ============================================
+   📦 ОБЩИЕ СТИЛИ МОДАЛЬНЫХ ОКОН
+   Переиспользуются в HotkeysModal и DeckModal
+   ============================================ */
+
+/* === Оверлей (затемнение фона) === */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+/* === Карточка модального окна === */
+.modalCard {
+  background: rgba(25, 25, 35, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* === Заголовок модального окна === */
+.modalHeader {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;  /* Симметричные зоны для центрирования */
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* === Текст заголовка === */
+.modalTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* === Кнопка закрытия === */
+.modalCloseBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  justify-self: end;
+}
+
+.modalCloseBtn:hover {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+.modalCloseBtn:active {
+  transform: scale(0.95);
+}
+
+/* ============================================
+   ⌨️ СТИЛИ HOTKEYS MODAL
+   ============================================ */
+
+/* === Контент модалки (прокручиваемая область) === */
+.hotkeysContent {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+
+/* === Секция категории хоткеев === */
+.hotkeysSection {
+  margin-bottom: 24px;
+}
+
+.hotkeysSection:last-child {
+  margin-bottom: 0;
+}
+
+/* === Заголовок секции === */
+.hotkeysSectionTitle {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  color: #4a90e2;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(74, 144, 226, 0.3);
+  padding-bottom: 8px;
+}
+
+/* === Список хоткеев === */
+.hotkeysList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* === Строка хоткея === */
+.hotkeyRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.hotkeyRow:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* === Описание хоткея === */
+.hotkeyDescription {
+  color: #ccc;
+  font-size: 14px;
+}
+
+/* === Клавиша хоткея (kbd) === */
+.hotkeyKey {
+  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  border-bottom: 2px solid #333;
+  font-family: monospace;
+  font-size: 13px;
+  color: #fff;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* === Блок подсказки внизу === */
+.hotkeysHint {
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.hotkeysHint kbd {
+  background: #2a2a2a;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* ============================================
+   🎴 СТИЛИ DECK MODAL
+   ============================================ */
+
+/* === Сетка тайлов === */
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  overflow-y: auto;
+  padding: 4px;
+  flex: 1;
+}
+
+/* === Карточка тайла === */
+.deckTileCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.2s ease;
+}
+
+/* === Миниатюра тайла === */
+.deckTilePreview {
+  width: 100px;
+  height: 100px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  transition: border-color 0.2s ease;
+}
+
+.deckTileCard:hover .deckTilePreview {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* === Счётчик остатка тайла === */
+.deckTileCount {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* === Знаменатель счётчика === */
+.deckTileCountMax {
+  color: #666;
+  font-weight: normal;
+}
+
+/* === Пустой тайл (все использованы) === */
+.deckTileCardEmpty {
+  opacity: 0.35;
+}
+
+.deckTileCardEmpty .deckTilePreview {
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.deckTileCardEmpty .deckTileCount {
+  color: #666;
+}
+
+/* ============================================
+   🏁 СТИЛИ GAME OVER SCREEN
+   ============================================ */
+
+/* === Свёрнутая плашка (заменяет GameHUD) === */
+.gameOverCollapsed {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(25, 25, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.gameOverCollapsed:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* === Информация в свёрнутой плашке === */
+.collapsedInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emojiIcon {
+  font-size: 24px;
+}
+
+.collapsedLabel {
+  color: #888;
+  font-size: 12px;
+}
+
+.collapsedWinner {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.collapsedScore {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.scoreSuffix {
+  color: #888;
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.collapsedDuration {
+  color: #888;
+  font-size: 13px;
+  font-family: monospace;
+  white-space: nowrap;
+  padding: 0 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.collapsedChevron {
+  color: #888;
+  display: flex;
+  align-items: center;
+}
+
+.collapsedChevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* === Оверлей развёрнутого экрана === */
+.gameOverOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+/* === Контейнер развёрнутого экрана === */
+.gameOverContainer {
+  background: rgba(25, 25, 35, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  padding: 32px;
+  max-width: 700px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* === Заголовок === */
+.gameOverHeader {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gameOverTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  text-align: center;
+}
+
+.collapseBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  justify-self: end;
+}
+
+.collapseBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.collapseBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* === Секция победителя === */
+.winnerSection {
+  display: flex;
+  justify-content: center;
+}
+
+.winnerCard {
+  text-align: center;
+  padding: 24px 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.trophy {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.winnerTitle {
+  margin: 0 0 8px 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+.winnerName {
+  margin: 0 0 8px 0;
+  color: #4a90e2;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.winnerScore {
+  margin: 0;
+  color: #ccc;
+  font-size: 16px;
+}
+
+/* === Продолжительность матча === */
+.matchDuration {
+  text-align: center;
+  color: #888;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.matchDurationValue {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* === Таблица статистики === */
+.tableSection {
+  width: 100%;
+}
+
+.tableTitle {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 16px;
+  text-align: center;
+}
+
+.statsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statsTable th,
+.statsTable td {
+  padding: 10px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.statsTable th {
+  color: #888;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.statsTable td {
+  color: #ccc;
+  font-size: 14px;
+}
+
+/* Строка победителя */
+.trWinner td {
+  background: rgba(74, 144, 226, 0.1);
+}
+
+/* Имя игрока */
+.playerTd {
+  font-weight: 600;
+}
+
+/* Итоговый столбец */
+.totalTd {
+  font-weight: 700;
+  color: #fff;
+}
+
+/* === Кнопка выхода === */
+.exitBtn {
+  width: 100%;
+  padding: 14px;
+  background: rgba(74, 144, 226, 0.15);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  border-radius: 10px;
+  color: #4a90e2;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exitBtn:hover {
+  background: rgba(74, 144, 226, 0.25);
+  border-color: #4a90e2;
+}
+
+.exitBtn:active {
+  transform: scale(0.98);
+}

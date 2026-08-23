@@ -9,6 +9,7 @@ import styles from '@/components/styles/lobby.module.css';
 
 export const NetworkLobby = () => {
   const [screen, setScreen] = useState<'main' | 'create' | 'join' | 'waiting'>('main');
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
   // 🌟 Используем имя и цвет из uiSlice (главное меню)
   const profileName = useGameStore(s => s.playerName);
@@ -64,6 +65,42 @@ export const NetworkLobby = () => {
   const handleJoinRoom = () => {
     if (!profileName.trim() || !roomId.trim()) return;
     joinRoom(roomId.trim().toUpperCase(), profileName.trim(), profileColor);
+  };
+
+  // ============================================
+  // 📋 КОПИРОВАНИЕ КОДА КОМНАТЫ
+  // ============================================
+  const handleCopyRoomCode = async () => {
+    if (!currentRoomId) return;
+
+    try {
+      // 🌟 Пробуем современный Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(currentRoomId);
+      } else {
+        // 🌟 Фоллбек для не-безопасных контекстов (HTTP)
+        const textArea = document.createElement('textarea');
+        textArea.value = currentRoomId;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
+      console.log(`📋 [NetworkLobby] Код комнаты скопирован: ${currentRoomId}`);
+      setCopyStatus('copied');
+
+      // 🌟 Сбрасываем статус через 2 секунды
+      setTimeout(() => setCopyStatus('idle'), 2000);
+    } catch (error) {
+      console.error(`❌ [NetworkLobby] Не удалось скопировать код:`, error);
+      setCopyStatus('error');
+      setTimeout(() => setCopyStatus('idle'), 2000);
+    }
   };
 
   // ============================================
@@ -222,10 +259,21 @@ export const NetworkLobby = () => {
           <h2 className={styles.title}>⏳ Комната {currentRoomId}</h2>
 
           {/* Код комнаты для друзей */}
-          <p className={styles.roomCode}>
-            Сообщите код друзьям:{' '}
-            <strong className={styles.roomCodeValue}>{currentRoomId}</strong>
-          </p>
+          <div className={styles.roomCodeContainer}>
+            <p className={styles.roomCode}>
+              Сообщите код друзьям:
+            </p>
+            <div className={styles.roomCodeRow}>
+              <strong className={styles.roomCodeValue}>{currentRoomId}</strong>
+              <button
+                onClick={handleCopyRoomCode}
+                className={styles.copyButton}
+                title="Скопировать код комнаты"
+              >
+                {copyStatus === 'copied' ? '✓ Скопировано!' : copyStatus === 'error' ? '✕ Ошибка' : '📋 Копировать'}
+              </button>
+            </div>
+          </div>
 
           {/* Список игроков */}
           <div className={styles.playersList}>

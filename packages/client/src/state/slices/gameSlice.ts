@@ -3,6 +3,14 @@ import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
 import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@carcassonne/shared/core/types';
 import { getTileSides, rotateFeatures } from '@carcassonne/shared/core/tileUtils';
+import {
+    SAVE_KEYS,
+    saveGameState,
+    loadGameState,
+    clearGameState,
+    hasGameState,
+    type GameStateForSave,
+} from '@/core/gameSaveManager';
 import { RegionManager } from '@carcassonne/shared/core/regionManager';
 import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@carcassonne/shared/core/scoring';
 import { AVAILABLE_COLORS, COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@carcassonne/shared/core/constants'
@@ -67,9 +75,14 @@ export interface GameSlice {
         }>
     ) => void;
 
-    //Сериализация
-    saveGame: () => void;
-    loadGame: () => void;
+    // Авто-сохранение игры
+    autoSaveLocalGame: () => void;
+    loadLocalGame: () => boolean;
+    clearLocalSave: () => void;
+
+    // === Дебаг-сохранение (ручное) ===
+    saveDebugGame: () => void;
+    loadDebugGame: () => void;
 }
 
 export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set, get) => ({
@@ -271,6 +284,11 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
         }
 
         set({ deck: newDeck, drawnTile, phase: 'placeTile' });
+
+        // 🌟 НОВОЕ: автосохранение в начале хода (только локальная игра)
+        if (state.roomId === null) {
+            get().autoSaveLocalGame();
+        }
     },
 
     // ============================================
@@ -389,6 +407,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 : null;
 
             console.log(`📤 [Store] Отправка commit-move на сервер`);
+
+            set({ phase: 'endTurn' });
             state.sendCommitMove(tileData, meepleData);
 
             // НЕ меняем состояние локально — ждём state-update от сервера
@@ -598,6 +618,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
             // Фиксируем время окончания игры (для локальной игры)
             get().setGameEndTime(Date.now());
+            // 🌟 НОВОЕ: удаляем локальное сохранение при конце игры
+            get().clearLocalSave();
             console.log(`🏁 [Store] Переход в фазу gameOver`);
         }, totalAnimationTime);
     },
@@ -732,43 +754,91 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     },
 
     // ============================================
-    // 💾 СОХРАНЕНИЕ ИГРЫ
+    // 💾 АВТОСОХРАНЕНИЕ (локальная игра)
     // ============================================
-    saveGame: () => {
+
+    /**
+     * 🌟 Автосохранение локальной игры.
+     * Вызывается автоматически в конце каждого хода.
+     */
+    autoSaveLocalGame: () => {
         const state = get();
+        // Сохраняем только локальную игру (не сетевую)
+        if (state.roomId !== null) return;
+        // Не сохраняем лобби или gameOver
+        if (state.phase === 'lobby' || state.phase === 'gameOver') return;
 
-        // 🌟 НОВОЕ: запрет сохранения сетевой игры
-        if (state.roomId !== null) {
-            console.warn('⚠️ [GameSlice] Нельзя сохранять сетевую игру');
-            return;
-        }
-
-        // 🌟 Преобразуем Map в Record для JSON
-        const boardRecord = Object.fromEntries(state.board);
-        const lastPlacedRecord = Object.fromEntries(state.lastPlacedTiles);
-
-        const serialized = {
-            board: boardRecord,
-            regionManager: state.regionManager.serialize(),
+        const dataForSave: GameStateForSave = {
+            board: state.board,
+            regionManager: state.regionManager,
             players: state.players,
             deck: state.deck,
             currentTurn: state.currentTurn,
             phase: state.phase,
             drawnTile: state.drawnTile,
             totalTiles: state.totalTiles,
-            lastPlacedTiles: lastPlacedRecord,
+            lastPlacedTiles: state.lastPlacedTiles,
             showRegions: state.showRegions,
             showDeadCells: state.showDeadCells,
+            enabledDeckView: state.enabledDeckView,
+            gameStartTime: state.gameStartTime,
+            lobbyPlayers: state.lobbyPlayers,
         };
-
-        localStorage.setItem('carcassonne_save', JSON.stringify(serialized));
-        console.log('💾 [GameSlice] Игра сохранена');
+        saveGameState(SAVE_KEYS.LOCAL, dataForSave);
     },
 
     // ============================================
-    // 📂 ЗАГРУЗКА ИГРЫ
+    // 📂 ЗАГРУЗКА ЛОКАЛЬНОГО СОХРАНЕНИЯ
     // ============================================
-    loadGame: () => {
+
+    /**
+     * 🌟 Загружает локальное сохранение.
+     * Возвращает true если загрузка успешна.
+     */
+    loadLocalGame: () => {
+        const data = loadGameState(SAVE_KEYS.LOCAL);
+        if (!data) return false;
+
+        // 🌟 ИСПРАВЛЕНО: data.board и data.lastPlacedTiles УЖЕ являются Map
+        // (десериализованы в loadGameState → deserializeGameState)
+        const regionManager = RegionManager.deserialize(data.regionManagerData);
+
+        set({
+            board: data.board,                   
+            regionManager,
+            players: data.players,
+            deck: data.deck,
+            currentTurn: data.currentTurn,
+            phase: data.phase as GamePhase,
+            drawnTile: data.drawnTile,
+            totalTiles: data.totalTiles,
+            lastPlacedTiles: data.lastPlacedTiles, 
+            showRegions: data.showRegions,
+            showDeadCells: data.showDeadCells,
+            enabledDeckView: data.enabledDeckView,
+            gameStartTime: data.gameStartTime ?? null,
+            lobbyPlayers: data.lobbyPlayers || [],
+            previewTile: null,
+            previewRegionManager: null,
+            moveSnapshot: null,
+            completionAnimations: [],
+        });
+
+        console.log(`📂 [GameSlice] Локальное сохранение загружено: ${data.board.size} тайлов`);
+        return true;
+    },
+
+    /**
+     * 🌟 Удаляет локальное сохранение.
+     */
+    clearLocalSave: () => {
+        clearGameState(SAVE_KEYS.LOCAL);
+    },
+
+    // ============================================
+    // 🐛 ДЕБАГ-СОХРАНЕНИЕ (ручное)
+    // ============================================
+    saveDebugGame: () => {
         const state = get();
 
         // 🌟 НОВОЕ: запрет загрузки в сетевом режиме
@@ -777,46 +847,64 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             return;
         }
 
-        const json = localStorage.getItem('carcassonne_save');
-        if (!json) {
-            console.warn('⚠️ [GameSlice] Нет сохранённой игры');
+        const dataForSave: GameStateForSave = {
+            board: state.board,
+            regionManager: state.regionManager,
+            players: state.players,
+            deck: state.deck,
+            currentTurn: state.currentTurn,
+            phase: state.phase,
+            drawnTile: state.drawnTile,
+            totalTiles: state.totalTiles,
+            lastPlacedTiles: state.lastPlacedTiles,
+            showRegions: state.showRegions,
+            showDeadCells: state.showDeadCells,
+            enabledDeckView: state.enabledDeckView,
+            gameStartTime: state.gameStartTime,
+            lobbyPlayers: state.lobbyPlayers,
+        };
+        saveGameState(SAVE_KEYS.DEBUG, dataForSave);
+        console.log('💾 [GameSlice] Дебаг-сохранение создано');
+    },
+
+    loadDebugGame: () => {
+        const state = get();
+
+        // 🌟 НОВОЕ: запрет загрузки в сетевом режиме
+        if (state.roomId !== null) {
+            console.warn('⚠️ [GameSlice] Нельзя загружать игру в сетевом режиме');
             return;
         }
 
-        try {
-            const data = JSON.parse(json);
-
-            // 🌟 Восстанавливаем Map из Record
-            const board = new Map<string, PlacedTile>(Object.entries(data.board));
-            const lastPlacedTiles = new Map<string, LastPlacedTile>(Object.entries(data.lastPlacedTiles));
-
-            // 🌟 Восстанавливаем RegionManager через static deserialize
-            const regionManager = RegionManager.deserialize(data.regionManager);
-
-            set({
-                board,
-                regionManager,
-                players: data.players,
-                deck: data.deck,
-                currentTurn: data.currentTurn,
-                phase: data.phase as GamePhase,
-                drawnTile: data.drawnTile,
-                totalTiles: data.totalTiles,
-                lastPlacedTiles,
-                showRegions: data.showRegions,
-                showDeadCells: data.showDeadCells,
-
-                // 🌟 Сброс клиентского (UI) состояния
-                previewTile: null,
-                previewRegionManager: null,
-                moveSnapshot: null,
-                completionAnimations: [],
-            });
-
-            console.log('📂 [GameSlice] Игра загружена');
-        } catch (e) {
-            console.error('❌ [GameSlice] Ошибка десериализации:', e);
-            localStorage.removeItem('carcassonne_save'); // Защита от битого файла
+        const loaded = loadGameState(SAVE_KEYS.DEBUG);
+        if (!loaded) {
+            console.warn('⚠️ [GameSlice] Нет дебаг-сохранения');
+            return;
         }
+
+        const regionManager = RegionManager.deserialize(loaded.regionManagerData);
+
+        set({
+            board: loaded.board,
+            regionManager,
+            players: loaded.players,
+            deck: loaded.deck,
+            currentTurn: loaded.currentTurn,
+            phase: loaded.phase,
+            drawnTile: loaded.drawnTile,
+            totalTiles: loaded.totalTiles,
+            lastPlacedTiles: loaded.lastPlacedTiles,
+            showRegions: loaded.showRegions,
+            showDeadCells: loaded.showDeadCells,
+            enabledDeckView: loaded.enabledDeckView,
+            gameStartTime: loaded.gameStartTime,
+            lobbyPlayers: loaded.lobbyPlayers,
+            // Сброс клиентского состояния
+            previewTile: null,
+            previewRegionManager: null,
+            moveSnapshot: null,
+            completionAnimations: [],
+        });
+        console.log('📂 [GameSlice] Дебаг-сохранение загружено');
     },
 });

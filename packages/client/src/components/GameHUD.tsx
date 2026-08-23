@@ -112,7 +112,7 @@ export const GameHUD: React.FC = () => {
     // 🚪 Выход из игры
     // ============================================
     const handleExit = () => {
-        if (window.confirm('Выйти из игры? Прогресс будет потерян.')) {
+        if (window.confirm('Выйти в меню? Прогресс хода будет потерян.')) {
             console.log('🚪 [GameHUD] Выход из игры');
             exitToLobby();
         }

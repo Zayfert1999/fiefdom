@@ -9,10 +9,10 @@ import styles from '@/components/styles/game.module.css';
 // 🏷️ Конфигурация меток типов фич
 // ============================================
 const FEATURE_TAGS: Record<string, { label: string; className: string }> = {
-  city:      { label: '[City]',      className: styles.debugFeatureTagCity },
-  field:     { label: '[Field]',     className: styles.debugFeatureTagField },
+  city: { label: '[City]', className: styles.debugFeatureTagCity },
+  field: { label: '[Field]', className: styles.debugFeatureTagField },
   monastery: { label: '[Monastery]', className: styles.debugFeatureTagMonastery },
-  road:      { label: '[Road]',      className: styles.debugFeatureTagRoad },
+  road: { label: '[Road]', className: styles.debugFeatureTagRoad },
 };
 
 export const DebugPanel = () => {
@@ -25,7 +25,8 @@ export const DebugPanel = () => {
   const players = useGameStore(s => s.players);
   const setDebugSelectedTile = useGameStore(s => s.setDebugSelectedTile);
   const debugForceEndGame = useGameStore(s => s.debugForceEndGame);
-  const { saveGame, loadGame } = useGameStore();
+  const saveDebugGame = useGameStore(s => s.saveDebugGame);
+  const loadDebugGame = useGameStore(s => s.loadDebugGame);
 
   // ============================================
   // 👁️ Видимость панели
@@ -73,7 +74,7 @@ export const DebugPanel = () => {
         <div className={styles.debugPanelButtons}>
           {/* 💾 Сохранить */}
           <button
-            onClick={saveGame}
+            onClick={saveDebugGame}
             className={`${styles.debugIconButton} ${styles.debugIconButtonSave}`}
             title="Сохранить игру"
           >
@@ -81,7 +82,7 @@ export const DebugPanel = () => {
           </button>
           {/* 📂 Загрузить */}
           <button
-            onClick={loadGame}
+            onClick={loadDebugGame}
             className={`${styles.debugIconButton} ${styles.debugIconButtonLoad}`}
             title="Загрузить игру"
           >
@@ -161,9 +162,9 @@ export const DebugPanel = () => {
                 Владельцы (локально):{' '}
                 {owners.length > 0
                   ? owners.map(id => {
-                      const player = players.find(p => p.id === id);
-                      return `${player?.name} (${player?.color})`;
-                    }).join(', ')
+                    const player = players.find(p => p.id === id);
+                    return `${player?.name} (${player?.color})`;
+                  }).join(', ')
                   : 'Нет'}
               </p>
 

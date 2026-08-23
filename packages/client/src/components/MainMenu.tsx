@@ -1,8 +1,9 @@
 // packages/client/src/components/MainMenu.tsx
 // 🌟 Главное меню игры.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
+import { getSaveMeta, SAVE_KEYS } from '@/core/gameSaveManager';
 import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
 import { getSocket } from '@/network/socket';
 import { loadConnectionInfo } from '@/network/persistence';  // 🌟 Используем persistence
@@ -16,6 +17,13 @@ export const MainMenu = () => {
     const playerColor = useGameStore(s => s.playerColor);
     const setPlayerName = useGameStore(s => s.setPlayerName);
     const setPlayerColor = useGameStore(s => s.setPlayerColor);
+    const loadLocalGame = useGameStore(s => s.loadLocalGame);
+
+    // 🌟 НОВОЕ: проверяем локальное сохранение
+    const localSaveMeta = useMemo(() => {
+        return getSaveMeta(SAVE_KEYS.LOCAL);
+    }, []);
+
     const activeGame = useGameStore(s => s.activeGame);
     const reconnectError = useGameStore(s => s.reconnectError);
     const setReconnectError = useGameStore(s => s.setReconnectError);
@@ -27,7 +35,9 @@ export const MainMenu = () => {
     const [isReconnecting, setIsReconnecting] = useState(false);
     const [tempName, setTempName] = useState(playerName);  // 🌟 Для input с Enter
 
-    const hasActiveSession = activeGame !== null;
+    const hasNetworkGame = activeGame !== null;
+    const hasLocalGame = localSaveMeta !== null;
+    const hasActiveSession = hasNetworkGame || hasLocalGame;
 
     // 🌟 Синхронизируем tempName с playerName ТОЛЬКО когда playerName меняется извне
     // (например, после reconnect сервер возвращает другое имя)
@@ -58,41 +68,56 @@ export const MainMenu = () => {
     };
 
     const handleContinueGame = () => {
-        if (!activeGame || isReconnecting) return;
-
+        if (isReconnecting) return;
         clearError();
 
-        // 🌟 Используем persistence вместо прямой работы с localStorage
-        const saved = loadConnectionInfo();
-        if (!saved) {
-            console.warn('⚠️ [MainMenu] Нет сохранённой сессии');
-            setReconnectError('Сессия не найдена. Попробуйте войти заново.');
+        // ============================================
+        // 🌟 ПРИОРИТЕТ 1: Сетевая игра
+        // ============================================
+        if (activeGame) {
+            const saved = loadConnectionInfo();
+            if (!saved) {
+                console.warn('⚠️ [MainMenu] Нет сохранённой сессии для сетевой игры');
+                setReconnectError('Сессия не найдена. Попробуйте войти заново.');
+                return;
+            }
+
+            console.log(`🔄 [MainMenu] Продолжить сетевую игру в комнате ${activeGame.roomId}`);
+            setIsReconnecting(true);
+            useGameStore.setState({ isReconnectingToRoom: true });
+
+            const socket = getSocket();
+            if (!socket.connected) {
+                setIsReconnecting(false);
+                useGameStore.setState({ isReconnectingToRoom: false });
+                setReconnectError('Нет подключения к серверу');
+                return;
+            }
+
+            socket.emit('lobby:reconnect', {
+                playerId: saved.playerId,
+                roomId: activeGame.roomId,
+            });
+
+            setTimeout(() => {
+                setIsReconnecting(false);
+                useGameStore.setState({ isReconnectingToRoom: false });
+            }, 5000);
             return;
         }
 
-        console.log(`🔄 [MainMenu] Продолжить игру в комнате ${activeGame.roomId}`);
-        setIsReconnecting(true);
-
-        useGameStore.setState({ isReconnectingToRoom: true });
-
-        const socket = getSocket();
-        if (!socket.connected) {
-            setIsReconnecting(false);
-            useGameStore.setState({ isReconnectingToRoom: false });
-            setReconnectError('Нет подключения к серверу');
-            return;
+        // ============================================
+        // 🌟 ПРИОРИТЕТ 2: Локальная игра
+        // ============================================
+        if (localSaveMeta) {
+            console.log(`🔄 [MainMenu] Продолжить локальную игру (${localSaveMeta.playerCount} игроков)`);
+            const success = loadLocalGame();
+            if (!success) {
+                setReconnectError('Не удалось загрузить сохранение');
+                return;
+            }
+            console.log('✅ [MainMenu] Локальная игра восстановлена');
         }
-
-        socket.emit('lobby:reconnect', {
-            playerId: saved.playerId,
-            roomId: activeGame.roomId,
-        });
-
-        // 🌟 Таймаут на случай, если сервер не ответит
-        setTimeout(() => {
-            setIsReconnecting(false);
-            useGameStore.setState({ isReconnectingToRoom: false });
-        }, 5000);
     };
 
     const handleLocalGame = () => {
@@ -211,8 +236,20 @@ export const MainMenu = () => {
                     >
                         {isReconnecting ? '⏳ Подключение...' : '🔄 Продолжить игру'}
                         <span style={{ display: 'block', fontSize: '12px', fontWeight: 400, color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
-                            Комната: {activeGame.roomId} • {activeGame.playerCount} игроков
-                            {activeGame.gameStarted ? ' • Игра идёт' : ' • В лобби'}
+                            {/* 🌟 Сетевая игра */}
+                            {hasNetworkGame && activeGame && (
+                                <>
+                                    Комната: {activeGame.roomId} • {activeGame.playerCount} игроков
+                                    {activeGame.gameStarted ? ' • Игра идёт' : ' • В лобби'}
+                                </>
+                            )}
+                            {/* 🌟 Локальная игра */}
+                            {!hasNetworkGame && localSaveMeta && (
+                                <>
+                                    🎮 Локальная игра • {localSaveMeta.playerCount} игроков
+                                    {' • '}Тайлов: {localSaveMeta.deckRemaining}/{localSaveMeta.totalTiles}
+                                </>
+                            )}
                         </span>
                     </button>
                 )}

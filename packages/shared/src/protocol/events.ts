@@ -159,10 +159,8 @@ export interface ServerToClientEvents {
   }) => void;
 
   'lobby:room-joined': (data: {
-    roomId: string;
-    playerId: string;
-    players: LobbyPlayer[];
-    settings: RoomSettings;
+    // 🌟 Единый снапшот вместо фрагментарных полей
+    snapshot: RoomSnapshot;
   }) => void;
 
   'lobby:reconnect-success': (data: {
@@ -186,10 +184,8 @@ export interface ServerToClientEvents {
 
   // --- Игра ---
   'game:started': (data: {
-    gameState: SerializedGameState;
-    gameStartTime: number;
-    seed: string;
-    yourPlayerId: string;
+    // 🌟 Единый снапшот вместо фрагментарных полей
+    snapshot: RoomSnapshot;
   }) => void;
 
   'game:state-update': (data: {

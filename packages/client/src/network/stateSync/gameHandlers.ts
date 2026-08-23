@@ -7,6 +7,7 @@ import { useGameStore } from '@/state/useGameStore';
 import type { FeatureType } from '@carcassonne/shared/core/types';
 import { applyServerState } from './applyServerState';
 
+
 /**
  * 🌟 Регистрирует обработчики событий игры.
  *
@@ -27,13 +28,38 @@ export function registerGameHandlers(socket: GameSocket): void {
   // ============================================
   // 🎮 НАЧАЛО ИГРЫ
   // ============================================
-  socket.on('game:started', ({ gameState, seed, yourPlayerId, gameStartTime }) => {
-    console.log(`🎮 [StateSync] Игра началась! seed=${seed}, myId=${yourPlayerId}`);
+  socket.on('game:started', ({ snapshot }) => {
+    console.log(`🎮 [StateSync] Игра началась! myId=${snapshot.yourPlayerId}`);
 
-    // Сохраняем время старта игры
-    useGameStore.getState().setGameStartTime(gameStartTime);
+    // 🌟 НОВОЕ: применяем снапшот вместо ручной сборки
+    const store = useGameStore.getState();
 
-    applyServerState(gameState);
+    // 1. Мета-данные комнаты
+    store._setRoomInfo(snapshot.roomId, snapshot.yourPlayerId);
+    store._setRoomSettings(snapshot.settings);
+    store._setHost(snapshot.hostId === snapshot.yourPlayerId);
+
+    // 2. Время старта игры
+    store.setGameStartTime(snapshot.gameStartTime);
+
+    // 3. Сохраняем подключение
+    store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId);
+
+    // 4. Сетевой статус игроков → networkLobbyPlayers
+    const lobbyPlayers = snapshot.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      isReady: p.network.isReady,
+      isHost: p.network.isHost,
+      isDisconnected: p.network.isDisconnected,
+    }));
+    store._setLobbyPlayers(lobbyPlayers);
+
+    // 5. Игровое состояние
+    if (snapshot.gameState) {
+      applyServerState(snapshot.gameState);
+    }
   });
 
   // ============================================

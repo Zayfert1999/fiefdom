@@ -93,12 +93,12 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
 
     roomManager.addRoom(room);
 
+    // 🌟 Хосту — уведомление о создании
     socket.emit('lobby:room-created', { roomId, playerId: hostPlayer.id });
+
+    // 🌟 Хосту — снапшот через room-joined (единый формат)
     socket.emit('lobby:room-joined', {
-      roomId,
-      playerId: hostPlayer.id,
-      players: [hostConn.toLobbyPlayer(true)],
-      settings,
+      snapshot: room.getSnapshot(hostPlayer.id),
     });
 
     logger.info('[Lobby]', `${validatedName} создал комнату ${roomId} (private=${settings.isPrivate}, color=${hostPlayer.color})`);
@@ -114,7 +114,6 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
-    // 🌟 Берём preferredColor (опциональный)
     const { roomId, playerName, preferredColor } = parsed.data as {
       roomId: string;
       playerName: string;
@@ -132,7 +131,6 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
-    // 🌟 Валидация имени
     const validatedName = validatePlayerName(playerName);
 
     const newPlayer: Player = {
@@ -147,20 +145,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     socket.data.playerId = newPlayer.id;
     socket.data.roomId = roomId;
 
-    // 🌟 Передаём preferredColor в addPlayer
     room.addPlayer(newConn, preferredColor);
 
-    // Новому игроку — полный список + настройки
-    const players = Array.from(room.players.values())
-      .map(c => c.toLobbyPlayer(c.id === room.hostId));
+    // 🌟 НОВОЕ: рассылаем снапшот новому игроку
     socket.emit('lobby:room-joined', {
-      roomId,
-      playerId: newPlayer.id,
-      players,
-      settings: room.settings,
+      snapshot: room.getSnapshot(newPlayer.id),
     });
 
-    // Остальным — что пришёл новый
+    // Остальным — что пришёл новый (оставляем как есть)
     socket.to(roomId).emit('lobby:player-joined', newConn.toLobbyPlayer(false));
     logger.info('[Lobby]', `${validatedName} присоединился к ${roomId} (color=${newPlayer.color})`);
   });
@@ -286,19 +278,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     // 🌟 ШАГ 1: Инициализируем игру (БЕЗ beginTurn)
     room.initializeGame();
 
-    // 🌟 ШАГ 2: Рассылаем game:started каждому игроку
-    // ВАЖНО: это ДО beginTurn(), чтобы game:started пришёл ПЕРЕД game:your-turn
-    // serializeForPlayer учитывает приватность drawnTile (здесь он ещё null)
+    // 🌟 ШАГ 2: Рассылаем снапшот каждому игроку
+    // ВАЖНО: это ДО beginTurn(), чтобы снапшот пришёл ПЕРЕД game:your-turn
     for (const conn of room.players.values()) {
       if (conn.isDisconnected) continue;
 
-      const personalGameState = room.gameState.serializeForPlayer(conn.id);
-      conn.emit('game:started', {
-        gameState: personalGameState,
-        seed: room.gameState.seed,
-        yourPlayerId: conn.id,
-        gameStartTime: room.gameState.gameStartTime!,
-      });
+      // 🌟 НОВОЕ: используем getSnapshot вместо ручной сборки
+      const snapshot = room.getSnapshot(conn.id);
+      conn.emit('game:started', { snapshot });
     }
 
     logger.info('[Lobby]', `🎮 Игра началась в комнате ${roomId} (gameStartTime=${room.gameState.gameStartTime})`);

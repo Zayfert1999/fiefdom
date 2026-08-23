@@ -6,7 +6,58 @@ import type { GameSocket } from '@/network/socket';
 import { useGameStore } from '@/state/useGameStore';
 import { clearConnectionInfo } from '@/network/persistence';
 import { applyServerState } from './applyServerState';
-import type { LobbyPlayer } from '@carcassonne/shared/protocol/events';
+import type { RoomSnapshot, LobbyPlayer } from '@carcassonne/shared/protocol/events';
+
+/**
+ * 🌟 Применяет RoomSnapshot к клиентскому store.
+ * Единая точка применения для всех сценариев:
+ * - reconnect
+ * - join-room
+ * - game:started
+ */
+function applySnapshot(snapshot: RoomSnapshot): void {
+  const store = useGameStore.getState();
+
+  // 1. Мета-данные комнаты
+  store._setRoomInfo(snapshot.roomId, snapshot.yourPlayerId);
+  store._setRoomSettings(snapshot.settings);
+  store._setHost(snapshot.hostId === snapshot.yourPlayerId);
+
+  // 2. Время старта игры
+  store.setGameStartTime(snapshot.gameStartTime);
+
+  // 3. Сохраняем подключение (для надёжности)
+  store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId);
+
+  // 4. Сетевой статус игроков → networkLobbyPlayers
+  const lobbyPlayers: LobbyPlayer[] = snapshot.players.map(p => ({
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    isReady: p.network.isReady,
+    isHost: p.network.isHost,
+    isDisconnected: p.network.isDisconnected,
+  }));
+  store._setLobbyPlayers(lobbyPlayers);
+
+  // 5. Применяем настройки сессии
+  useGameStore.setState({
+    showRegions: snapshot.settings.showRegions,
+    showDeadCells: snapshot.settings.showDeadCells,
+    enabledDeckView: snapshot.settings.enabledDeckView,
+  });
+
+  // 6. Игровое состояние (если игра началась)
+  if (snapshot.gameState) {
+    console.log(`🎮 [StateSync] Игра уже началась — восстанавливаем состояние`);
+    applyServerState(snapshot.gameState);
+  } else {
+    // В лобби — переключаемся на waiting
+    store.setLobbyScreen('networkLobby');
+  }
+
+  useGameStore.setState({ isReconnectingToRoom: false });
+}
 
 /**
  * 🌟 Регистрирует обработчики событий лобби.
@@ -31,20 +82,9 @@ export function registerLobbyHandlers(socket: GameSocket): void {
     useGameStore.getState()._setHost(true);
   });
 
-  socket.on('lobby:room-joined', ({ roomId, playerId, players, settings }) => {
-    console.log(`🚪 [StateSync] Присоединились к комнате ${roomId}`);
-    const store = useGameStore.getState();
-    store._setRoomInfo(roomId, playerId);
-    store._setLobbyPlayers(players);
-    store._setRoomSettings(settings);
-    store._setHost(players.find(p => p.id === playerId)?.isHost ?? false);
-
-    // Применяем настройки сессии
-    useGameStore.setState({
-      showRegions: settings.showRegions,
-      showDeadCells: settings.showDeadCells,
-      enabledDeckView: settings.enabledDeckView,
-    });
+  socket.on('lobby:room-joined', ({ snapshot }) => {
+    console.log(`🚪 [StateSync] Присоединились к комнате ${snapshot.roomId}`);
+    applySnapshot(snapshot);
   });
 
   // ============================================
@@ -135,55 +175,6 @@ export function registerLobbyHandlers(socket: GameSocket): void {
   // ============================================
   socket.on('lobby:reconnect-success', ({ snapshot }) => {
     console.log(`✅ [StateSync] Успешное восстановление в комнате ${snapshot.roomId}`);
-    const store = useGameStore.getState();
-
-    // ============================================
-    // 📦 ПРИМЕНЯЕМ SNAPSHOT — единый источник истины
-    // ============================================
-
-    // 1. Мета-данные комнаты
-    store._setRoomInfo(snapshot.roomId, snapshot.yourPlayerId);
-    store._setRoomSettings(snapshot.settings);
-    store._setHost(snapshot.hostId === snapshot.yourPlayerId);
-
-    // 2. Время старта игры
-    store.setGameStartTime(snapshot.gameStartTime);
-
-    // 3. Сохраняем подключение (для надёжности)
-    store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId);
-
-    // 4. Сетевой статус игроков → networkLobbyPlayers
-    const lobbyPlayers: LobbyPlayer[] = snapshot.players.map(p => ({
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      isReady: p.network.isReady,
-      isHost: p.network.isHost,
-      isDisconnected: p.network.isDisconnected,
-    }));
-    store._setLobbyPlayers(lobbyPlayers);
-
-    // 5. Игровое состояние (если игра началась)
-    if (snapshot.gameState) {
-      console.log(`🎮 [StateSync] Игра уже началась — восстанавливаем состояние`);
-      applyServerState(snapshot.gameState);
-    } else {
-      // В лобби — переключаемся на waiting
-      store.setLobbyScreen('networkLobby');
-    }
-
-    useGameStore.setState({ isReconnectingToRoom: false });
-  });
-
-  socket.on('lobby:reconnect-failed', ({ reason }) => {
-    console.warn(`❌ [StateSync] Восстановление не удалось: ${reason}`);
-    const store = useGameStore.getState();
-
-    // Очищаем невалидные данные
-    clearConnectionInfo();
-    store.leaveRoom();
-    useGameStore.setState({ isReconnectingToRoom: false });
-
-    store.setReconnectError(`Не удалось восстановить игру: ${reason}`);
+    applySnapshot(snapshot);
   });
 }

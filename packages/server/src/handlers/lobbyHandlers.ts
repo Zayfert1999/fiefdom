@@ -338,7 +338,6 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ (только по playerId)
   // ============================================
   socket.on('lobby:reconnect', (data) => {
-    // 🌟 ИСПРАВЛЕНО: только playerId и roomId, без playerName
     const { playerId, roomId } = data;
     logger.info('[Lobby]', `🔄 Запрос reconnect: ${playerId} → комната ${roomId}`);
 
@@ -350,11 +349,11 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
-    // 🌟 Передаём только playerId (имя и цвет уже есть в PlayerConnection)
     const result = room.reconnectPlayer(playerId, socket);
 
-    if (result.success && result.data) {
-      socket.emit('lobby:reconnect-success', result.data);
+    if (result.success && result.snapshot) {
+      // 🌟 Отправляем единый snapshot
+      socket.emit('lobby:reconnect-success', { snapshot: result.snapshot });
     } else {
       socket.emit('lobby:reconnect-failed', {
         reason: result.reason || 'Неизвестная ошибка'

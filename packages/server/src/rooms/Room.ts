@@ -10,6 +10,7 @@ import { ServerGameState } from '../state/ServerGameState';
 import { RoomPlayerManager } from './RoomPlayerManager';
 import { RoomBroadcaster } from './RoomBroadcaster';
 import { RoomGameLoop } from './RoomGameLoop';
+import type { RoomSnapshot, SnapshotPlayer } from '@carcassonne/shared/protocol/events';
 import { logger } from '../utils/logger';
 
 /**
@@ -93,17 +94,14 @@ export class Room {
   reconnectPlayer(oldPlayerId: string, newSocket: Socket): {
     success: boolean;
     reason?: string;
-    data?: {
-      roomId: string;
-      playerId: string;
-      players: LobbyPlayer[];
-      settings: RoomSettings;
-      isHost: boolean;
-      gameState?: SerializedGameState;
-      gameStartTime: number | null;
-    };
+    snapshot?: RoomSnapshot;
   } {
-    return this.playerManager.reconnectPlayer(oldPlayerId, newSocket, this.hostId);
+    return this.playerManager.reconnectPlayer(
+      oldPlayerId,
+      newSocket,
+      this.hostId,
+      (viewerId) => this.getSnapshot(viewerId)
+    );
   }
 
   // ============================================
@@ -148,6 +146,60 @@ export class Room {
       maxPlayers: this.settings.maxPlayers,
       isPrivate: this.settings.isPrivate,
       isPlaying: this.gameState.isGameStarted,
+    };
+  }
+
+  // ============================================
+  // 📦 SNAPSHOT — единый снимок состояния
+  // ============================================
+
+  /**
+   * 🌟 Создаёт полный снимок состояния комнаты для конкретного игрока.
+   * Используется для reconnect и первоначальной синхронизации.
+   *
+   * @param viewerId ID игрока, для которого создаётся snapshot
+   *                 (нужно для приватности drawnTile)
+   */
+  getSnapshot(viewerId: string): RoomSnapshot {
+    // Собираем игроков с сетевым статусом
+    const players: SnapshotPlayer[] = Array.from(this.players.values()).map(conn => ({
+      // Профиль
+      id: conn.player.id,
+      name: conn.player.name,
+      color: conn.player.color,
+      // Игровое состояние (если игра началась)
+      ...(this.gameState.isGameStarted ? {
+        score: conn.player.score,
+        meepleCount: conn.player.meepleCount,
+        pointsByCategory: conn.player.pointsByCategory,
+      } : {}),
+      // Сетевой статус
+      network: {
+        isReady: conn.isReady,
+        isHost: conn.id === this.hostId,
+        isDisconnected: conn.isDisconnected,
+      },
+    }));
+
+    // Игровое состояние (если игра началась)
+    const gameState = this.gameState.isGameStarted
+      ? this.gameState.serializeForPlayer(viewerId)
+      : undefined;
+
+    // Приватный drawnTile (только если сейчас ход этого игрока)
+    const drawnTile = this.gameState.isGameStarted && this.gameState.currentPlayer?.id === viewerId
+      ? this.gameState.drawnTile
+      : null;
+
+    return {
+      roomId: this.id,
+      hostId: this.hostId,
+      settings: this.settings,
+      gameStartTime: this.gameState.gameStartTime ?? null,
+      players,
+      gameState,
+      yourPlayerId: viewerId,
+      drawnTile,
     };
   }
 

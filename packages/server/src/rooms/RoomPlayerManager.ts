@@ -10,6 +10,7 @@ import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
 import type { PlayerConnection } from '../state/PlayerConnection';
 import type { ServerGameState } from '../state/ServerGameState';
 import type { RoomBroadcaster } from './RoomBroadcaster';
+import type { RoomSnapshot } from '@carcassonne/shared/protocol/events';
 import { logger } from '../utils/logger';
 
 /**
@@ -25,7 +26,7 @@ export class RoomPlayerManager {
     private settings: RoomSettings,
     private gameState: ServerGameState,
     private broadcaster: RoomBroadcaster
-  ) {}
+  ) { }
 
   // ============================================
   // ➕ ДОБАВЛЕНИЕ ИГРОКА
@@ -116,25 +117,18 @@ export class RoomPlayerManager {
   // ============================================
 
   /**
-   * Восстановить игрока в комнате.
-   * Возвращает данные для отправки клиенту.
+   * 🌟 Восстановить игрока в комнате.
+   * Возвращает RoomSnapshot вместо фрагментарных данных.
    */
   reconnectPlayer(
     oldPlayerId: string,
     newSocket: Socket,
-    hostId: string
+    hostId: string,
+    getSnapshot: (viewerId: string) => RoomSnapshot
   ): {
     success: boolean;
     reason?: string;
-    data?: {
-      roomId: string;
-      playerId: string;
-      players: LobbyPlayer[];
-      settings: RoomSettings;
-      isHost: boolean;
-      gameState?: SerializedGameState;
-      gameStartTime: number | null;
-    };
+    snapshot?: RoomSnapshot;
   } {
     const conn = this.players.get(oldPlayerId);
 
@@ -154,32 +148,17 @@ export class RoomPlayerManager {
     // Уведомляем остальных игроков
     this.broadcaster.broadcast('lobby:player-reconnected', { playerId: oldPlayerId });
 
-    // Собираем данные для отправки
-    const players = Array.from(this.players.values())
-      .map(c => c.toLobbyPlayer(c.id === hostId));
+    // 🌟 Создаём единый snapshot
+    const snapshot = getSnapshot(oldPlayerId);
 
-    const data: any = {
-      roomId: this.roomId,
-      playerId: oldPlayerId,
-      players,
-      settings: this.settings,
-      isHost: hostId === oldPlayerId,
-      gameStartTime: this.gameState.gameStartTime ?? null,
-    };
-
-    // Если игра уже началась — отправляем состояние
-    if (this.gameState.isGameStarted) {
-      const gameState = this.gameState.serializeForPlayer(oldPlayerId);
-      data.gameState = gameState;
-
-      // Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
-      if (this.gameState.currentPlayer.id === oldPlayerId && this.gameState.drawnTile) {
-        setTimeout(() => {
-          conn.emit('game:your-turn', { drawnTile: this.gameState.drawnTile! });
-        }, 100);
-      }
+    // Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
+    // (для совместимости с game:your-turn обработчиком)
+    if (snapshot.drawnTile) {
+      setTimeout(() => {
+        conn.emit('game:your-turn', { drawnTile: snapshot.drawnTile! });
+      }, 100);
     }
 
-    return { success: true, data };
+    return { success: true, snapshot };
   }
 }

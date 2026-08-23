@@ -41,6 +41,56 @@ export interface RoomInfo {
 }
 
 // ============================================
+// 📦 ROOM SNAPSHOT — единый снимок состояния комнаты
+// Используется для reconnect и первоначальной синхронизации
+// ============================================
+
+/** Сетевой статус игрока (инфраструктура, не игровая логика) */
+export interface PlayerNetworkStatus {
+  isReady: boolean;
+  isHost: boolean;
+  isDisconnected: boolean;
+}
+
+/** Игрок в snapshot: профиль + игровой статус + сетевой статус */
+export interface SnapshotPlayer {
+  // Профиль (мета-данные)
+  id: string;
+  name: string;
+  color: string;
+  // Игровое состояние (если игра началась)
+  score?: number;
+  meepleCount?: number;
+  pointsByCategory?: {
+    road: number;
+    city: number;
+    field: number;
+    monastery: number;
+  };
+  // Сетевой статус
+  network: PlayerNetworkStatus;
+}
+
+/** Единый снимок состояния комнаты */
+export interface RoomSnapshot {
+  // === Мета-данные комнаты ===
+  roomId: string;
+  hostId: string;
+  settings: RoomSettings;
+  gameStartTime: number | null;
+
+  // === Игроки (профиль + сеть) ===
+  players: SnapshotPlayer[];
+
+  // === Игровое состояние (если игра началась) ===
+  gameState?: SerializedGameState;
+
+  // === Для текущего игрока (приватные данные) ===
+  yourPlayerId: string;
+  drawnTile?: Tile | null;  // Только если сейчас его ход
+}
+
+// ============================================
 // 📤 CLIENT → SERVER (исходящие события)
 // ============================================
 
@@ -116,13 +166,8 @@ export interface ServerToClientEvents {
   }) => void;
 
   'lobby:reconnect-success': (data: {
-    roomId: string;
-    playerId: string;
-    players: LobbyPlayer[];
-    settings: RoomSettings;
-    isHost: boolean;
-    gameState?: SerializedGameState;  // Если игра уже началась
-    gameStartTime?: number | null;
+    // единый snapshot вместо фрагментарных полей
+    snapshot: RoomSnapshot;
   }) => void;
 
   'lobby:reconnect-failed': (data: {

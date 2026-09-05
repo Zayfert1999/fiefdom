@@ -1,7 +1,7 @@
 // renderer/RegionOverlay.tsx
 import { useMemo, useEffect, useRef } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { cloneFeatureGeometry, calculateBoundingBox} from '@/core/cloneFeatureGeometry';
+import { cloneFeatureGeometry, calculateBoundingBox } from '@/core/cloneFeatureGeometry';
 import { rotateFeatures } from '@carcassonne/shared/core/tileUtils';
 import type { RegionManager } from '@carcassonne/shared/core/regionManager';
 
@@ -18,6 +18,7 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
   const visibleFeatureTypes = useGameStore(s => s.visibleFeatureTypes);
   const containerRef = useRef<SVGGElement>(null);
   const previewTile = useGameStore(s => s.previewTile);
+  const placementAnimation = useGameStore(s => s.placementAnimation);
   const regionManager = regionManagerOverride || storeRegionManager;
 
   const regions = useMemo(() => {
@@ -29,14 +30,22 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       featureId: string;
     }[]>();
 
+    // ============================================
     // 🌟 ШАГ 1: Обычные тайлы из board
+    // ============================================
     for (const tile of board.values()) {
+      // 🌟 НОВОЕ: пропускаем тайл, который сейчас анимируется
+      // Подсветка появится после завершения анимации
+      if (placementAnimation?.tile &&
+        placementAnimation.tile.x === tile.x &&
+        placementAnimation.tile.y === tile.y) {
+        continue;
+      }
+
       for (const feature of tile.features) {
         if (!visibleFeatureTypes.includes(feature.type)) continue;
-
         const featureKey = `${tile.x},${tile.y}:${feature.id}`;
         const owners = regionManager.getFeatureOwners(featureKey);
-
         if (owners.length > 0) {
           const root = regionManager.find(featureKey);
           if (root) {
@@ -53,18 +62,15 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       }
     }
 
+    // ============================================
     // 🌟 ШАГ 2: Preview-тайл (если есть)
+    // ============================================
     if (previewTile) {
-      // 🌟 Поворачиваем фичи preview-тайла
       const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
-      
       for (const feature of rotatedFeatures) {
         if (!visibleFeatureTypes.includes(feature.type)) continue;
-        
         const featureKey = `${previewTile.x},${previewTile.y}:${feature.id}`;
         const owners = regionManager.getFeatureOwners(featureKey);
-        
-        // 🌟 Если у фичи есть владельцы (через union с существующим регионом) — добавляем
         if (owners.length > 0) {
           const root = regionManager.find(featureKey);
           if (root) {
@@ -82,7 +88,7 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
     }
 
     return Array.from(regionMap.entries());
-  }, [board, regionManager, players, visibleFeatureTypes, previewTile]);
+  }, [board, regionManager, players, visibleFeatureTypes, previewTile, placementAnimation]);  // 🌟 Добавили placementAnimation
 
   const getPatternId = (featureKey: string): string => {
     const owners = regionManager.getFeatureOwners(featureKey);

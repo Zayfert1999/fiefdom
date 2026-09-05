@@ -230,17 +230,26 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
         {previewTile && (
           <g
             className="preview-tile"
+            // 🌟 НОВОЕ: key привязан к координатам
+            // При перемещении на новую клетку элемент пересоздаётся,
+            // и анимация не запускается с накопленного угла
+            key={`${previewTile.x},${previewTile.y}`}
             transform={`translate(${previewTile.x * TILE_SIZE}, ${previewTile.y * TILE_SIZE})`}
             onClick={handlePreviewClick}
             style={{ cursor: 'pointer', overflow: 'visible' }}
           >
-            <g transform={`rotate(${previewTile.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}>
+            <g
+              className="preview-tile-rotating"
+              style={{
+                transform: `rotate(${previewTile.displayRotation}deg)`,
+                transformOrigin: `${TILE_SIZE / 2}px ${TILE_SIZE / 2}px`,
+              }}
+            >
               <Tile
                 id={previewTile.tile.id as any}
                 size={TILE_SIZE}
               />
             </g>
-
             <rect
               className="preview-tile-overlay"
               x={0}

@@ -77,6 +77,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
                 tile: state.drawnTile,
                 x, y,
                 rotation,
+                displayRotation: rotation,
                 validRotations,
                 currentRotationIndex: 0,
             },
@@ -94,7 +95,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
         const state = get();
         if (!state.previewTile) return;
 
-        const { tile, x, y, validRotations, currentRotationIndex } = state.previewTile;
+        const { tile, x, y, rotation, displayRotation, validRotations, currentRotationIndex } = state.previewTile;
 
         // 🌟 Если только один валидный поворот — поворачивать некуда
         if (validRotations.length <= 1) {
@@ -104,6 +105,15 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
 
         const nextIndex = (currentRotationIndex + 1) % validRotations.length;
         const newRotation = validRotations[nextIndex];
+        
+        // 🌟 НОВОЕ: вычисляем кратчайшую дельту
+        // По часовой: 0→90 = +90, 270→0 = +90
+        // Против часовой: 0→270 = -90, 90→0 = -90
+        let delta = (newRotation - rotation + 360) % 360;
+        if (delta > 180) {
+            delta -= 360;  // Против часовой ближе
+        }
+        const newDisplayRotation = displayRotation + delta;
 
         // 🌟 Используем общую утилиту
         const { newRM: previewTileRM } = applyTileToBoardAndRM(
@@ -117,6 +127,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
             previewTile: {
                 ...state.previewTile,
                 rotation: newRotation,
+                displayRotation: newDisplayRotation,
                 currentRotationIndex: nextIndex,
             },
             previewRegionManager: previewTileRM,
@@ -313,6 +324,6 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     },
 
     setPlacementAnimation: (animation) => {
-    set({ placementAnimation: animation });
-},
+        set({ placementAnimation: animation });
+    },
 });

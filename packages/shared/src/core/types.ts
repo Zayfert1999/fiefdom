@@ -73,7 +73,8 @@ export interface PreviewTile {
   tile: Tile;
   x: number;
   y: number;
-  rotation: 0 | 90 | 180 | 270;           // 🌟 Явный тип
+  rotation: 0 | 90 | 180 | 270;
+  displayRotation: number;           // 🌟 Явный тип
   validRotations: (0 | 90 | 180 | 270)[]; // 🌟 Явный тип массива
   currentRotationIndex: number;
 }

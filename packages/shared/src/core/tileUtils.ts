@@ -279,7 +279,7 @@ export function applyTileToBoardAndRM(
   
   for (const feature of rotatedFeatures) {
     const featureKey: FeatureKey = `${x},${y}:${feature.id}`;
-    newRM.makeSet(featureKey, feature.type, (feature as any).hasShield ?? false);
+    newRM.makeSet(featureKey, feature.type, feature.shieldSpot !== undefined);
   }
 
   for (const { dx, dy, matchKey } of NEIGHBOR_OFFSETS) {

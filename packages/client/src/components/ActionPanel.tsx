@@ -41,7 +41,13 @@ export const ActionPanel: React.FC = () => {
       {phase === 'placeTile' && drawnTile && !previewTile && (
         <div className={styles.tilePreview}>
           <svg width={TILE_SIZE} height={TILE_SIZE} style={{ display: 'block' }}>
-            <Tile id={drawnTile.id as any} size={TILE_SIZE} />
+            {/* 🌟 ОБНОВЛЕНО: передаём features */}
+            <Tile
+              id={drawnTile.id as any}
+              size={TILE_SIZE}
+              features={drawnTile.features}
+              rotation={0}
+            />
           </svg>
         </div>
       )}

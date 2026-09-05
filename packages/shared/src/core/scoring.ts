@@ -146,7 +146,7 @@ function calculateCityPoints(
 
     const tileDef = TILE_DEFINITIONS.find(def => def.id === placedTile.templateId);
     const hasShield = tileDef?.features.some(
-      f => f.id === featureId && f.hasShield === true
+      f => f.id === featureId && f.shieldSpot !== undefined
     );
 
     basePoints += hasShield ? 2 : 1;

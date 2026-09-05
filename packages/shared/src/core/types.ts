@@ -13,7 +13,7 @@ export interface MeepleSpot {
 export interface TileFeature {
   id: string;
   type: FeatureType;
-  hasShield?: boolean;
+  shieldSpot?: MeepleSpot;
   directions: Direction[];
   spots: MeepleSpot[];
   adjacentCities?: string[];

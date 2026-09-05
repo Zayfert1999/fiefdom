@@ -134,7 +134,12 @@ export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
                 {/* Миниатюра тайла */}
                 <div className={styles.deckTilePreview}>
                   <svg width={100} height={100} style={{ display: 'block' }}>
-                    <Tile id={tile.id as any} size={100} />
+                    <Tile
+                      id={tile.id as any}
+                      size={100}
+                      features={TILE_DEFINITIONS.find(d => d.id === tile.id)?.features}
+                      rotation={0}
+                    />
                   </svg>
                 </div>
 

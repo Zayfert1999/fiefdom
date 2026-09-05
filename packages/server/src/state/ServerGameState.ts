@@ -71,7 +71,7 @@ export class ServerGameState {
         derivedSides: getTileSides(startingTile),
       });
       for (const feature of startingTile.features) {
-        this.regionManager.makeSet(`0,0:${feature.id}`, feature.type, feature.hasShield ?? false);
+        this.regionManager.makeSet(`0,0:${feature.id}`, feature.type, feature.shieldSpot !== undefined);
       }
     }
     logger.info('[GameState]', `Игра инициализирована: ${this.players.length} игроков, колода ${this.deck.length}, seed=${seed}`);

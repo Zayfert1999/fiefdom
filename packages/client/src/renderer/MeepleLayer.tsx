@@ -34,11 +34,6 @@ export const MeepleLayer = () => {
         // Определяем, временный ли мипл
         const isTemporary = t.meeple.isTemporary === true;
 
-
-
-
-        const animationDelay = `${((Math.abs(t.x) + Math.abs(t.y)) % 5) * 0.4}s`;
-
         // Проверяем, анимируется ли этот мипл (установка)
         const isAnimatingMeeple = placementAnimation?.meeple &&
           t.meeple &&

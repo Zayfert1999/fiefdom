@@ -2,12 +2,12 @@ import type { Tile } from './types';
 
 export const TILE_DEFINITIONS: Tile[] = [
   { id: 'tile_CCCC -S', quantity: 1, features: [
-    {id: 'city_nesw', type: 'city', hasShield: true, directions: ['N', 'E', 'S', 'W'], spots: [{ x: 50, y: 50 }]}
+    {id: 'city_nesw', type: 'city', shieldSpot: { x: 16, y: 16 }, directions: ['N', 'E', 'S', 'W'], spots: [{ x: 50, y: 50 }]}
     ]
   },
   { id: 'tile_CCFC -S', quantity: 1, features: [
     {id: 'city_new', type: 'city', directions: ['N', 'E', 'W'], spots: [{ x: 50, y: 50 }]},
-    {id: 'field_s', type: 'field', hasShield: true, directions: ['S'], spots: [{ x: 50, y: 90 }], adjacentCities: ['city_new']}
+    {id: 'field_s', type: 'field', shieldSpot: { x: 16, y: 16 }, directions: ['S'], spots: [{ x: 50, y: 90 }], adjacentCities: ['city_new']}
     ]
   },
   { id: 'tile_CCFC', quantity: 3, features: [
@@ -16,7 +16,7 @@ export const TILE_DEFINITIONS: Tile[] = [
     ]
   },
   { id: 'tile_CCFF -S', quantity: 2, features: [
-    {id: 'city_ne', type: 'city', hasShield: true, directions: ['N', 'E'], spots: [{ x: 75, y: 25 }]},
+    {id: 'city_ne', type: 'city', shieldSpot: { x: 84, y: 16 }, directions: ['N', 'E'], spots: [{ x: 75, y: 25 }]},
     {id: 'field_sw', type: 'field', directions: ['S', 'SW', 'W'], spots: [{ x: 25, y: 75 }], adjacentCities: ['city_ne']}
     ] 
   },
@@ -26,7 +26,7 @@ export const TILE_DEFINITIONS: Tile[] = [
     ] 
   },
   { id: 'tile_CCRC -S', quantity: 2, features: [
-    {id: 'city_new', type: 'city', hasShield: true, directions: ['N', 'E', 'W'], spots: [{ x: 50, y: 40 }]},
+    {id: 'city_new', type: 'city', shieldSpot: { x: 16, y: 16 }, directions: ['N', 'E', 'W'], spots: [{ x: 50, y: 40 }]},
     {id: 'road_s', type: 'road', directions: ['S'], spots: [{ x: 50, y: 90 }]},
     {id: 'field_se', type: 'field', directions: ['SE(S)'], spots: [{ x: 75, y: 90 }], adjacentCities: ['city_new']},
     {id: 'field_sw', type: 'field', directions: ['SW(S)'], spots: [{ x: 25, y: 90 }], adjacentCities: ['city_new']}
@@ -71,7 +71,7 @@ export const TILE_DEFINITIONS: Tile[] = [
     ]
   },
   { id: 'tile_CRRC -S', quantity: 2, features: [
-    {id: 'city_nw', type: 'city', hasShield: true, directions: ['N', 'W'], spots: [{ x: 25, y: 25 }]},
+    {id: 'city_nw', type: 'city', shieldSpot: { x: 16, y: 16 }, directions: ['N', 'W'], spots: [{ x: 25, y: 25 }]},
     {id: 'field_ne-sw', type: 'field', directions: ['NE(E)', 'SW(S)'], spots: [{ x: 90, y: 30 }], adjacentCities: ['city_nw']},
     {id: 'road_se', type: 'road', directions: ['S', 'C', 'E'], spots: [{ x: 65, y: 65 }]},
     {id: 'field_se', type: 'field', directions: ['SE'], spots: [{ x: 85, y: 85 }]}
@@ -103,7 +103,7 @@ export const TILE_DEFINITIONS: Tile[] = [
   },
   { id: 'tile_FCFC -S', quantity: 2, features: [
     {id: 'field_n', type: 'field', directions: ['N'], spots: [{ x: 50, y: 10 }], adjacentCities: ['city_ew']},
-    {id: 'city_ew', type: 'city', hasShield: true, directions: ['E', 'C', 'W'], spots: [{ x: 50, y: 50 }]},
+    {id: 'city_ew', type: 'city', shieldSpot: { x: 84, y: 50 }, directions: ['E', 'C', 'W'], spots: [{ x: 50, y: 50 }]},
     {id: 'field_s', type: 'field', directions: ['S'], spots: [{ x: 50, y: 90 }], adjacentCities: ['city_ew']}
     ] 
   },

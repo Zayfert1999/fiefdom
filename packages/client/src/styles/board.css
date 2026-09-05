@@ -29,3 +29,55 @@
   stroke-width: 2;
 }
 
+/* ============================================
+   🎬 АНИМАЦИЯ УСТАНОВКИ ТАЙЛА И МИПЛА
+   ============================================ */
+
+/* Анимация появления тайла: масштабирование с лёгким поворотом */
+@keyframes tile-appear {
+    0% {
+        transform: scale(0) rotate(-10deg);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.1) rotate(3deg);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* Анимация появления мипла: падение сверху */
+@keyframes meeple-drop {
+    0% {
+        transform: translateY(-20px) scale(0.5);
+        opacity: 0;
+    }
+    60% {
+        transform: translateY(2px) scale(1.05);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Класс анимации тайла */
+.tile-placement-animation {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: tile-appear 0.5s ease-out;
+}
+
+/* Класс анимации мипла */
+.meeple-placement-animation {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: meeple-drop 0.4s ease-out;
+    animation-delay: 0.3s;  /* Появляется после тайла */
+    animation-fill-mode: backwards;  /* Скрыт до начала анимации */
+}
+

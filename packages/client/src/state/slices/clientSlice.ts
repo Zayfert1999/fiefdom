@@ -3,7 +3,7 @@ import type { PreviewTile, PlacedMeeple } from '@carcassonne/shared/core/types';
 import type { RegionManager, FeatureKey } from '@carcassonne/shared/core/regionManager';
 import { applyTileToBoardAndRM, getValidRotations } from '@carcassonne/shared/core/tileUtils';
 import type { GameStore } from '../useGameStore';
-import type { MoveSnapshot } from '../types';
+import type { MoveSnapshot, PlacementAnimation } from '../types';
 
 export interface ClientSlice {
     // Preview (клиентское)
@@ -13,6 +13,10 @@ export interface ClientSlice {
 
     // Дебаг
     debugSelectedTile: { x: number; y: number } | null;
+
+    // 🌟 НОВОЕ: Анимация установки тайла/мипла
+    placementAnimation: PlacementAnimation | null;
+    setPlacementAnimation: (animation: PlacementAnimation | null) => void;
 
     // Действия
     startPreview: (x: number, y: number) => void;
@@ -31,6 +35,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     previewRegionManager: null,
     moveSnapshot: null,
     debugSelectedTile: null,
+    placementAnimation: null,
 
     // ============================================
     // 👁️ НАЧАЛО ПРИМЕРКИ
@@ -253,7 +258,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     // ============================================
     removePlacedMeeple: () => {
         const state = get();
-        
+
         // Валидация фазы
         if (state.phase !== 'placeMeeple') {
             console.warn('⚠️ [Store] Неверная фаза для удаления мипла');
@@ -306,4 +311,8 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
     setDebugSelectedTile: (coords) => {
         set({ debugSelectedTile: coords });
     },
+
+    setPlacementAnimation: (animation) => {
+    set({ placementAnimation: animation });
+},
 });

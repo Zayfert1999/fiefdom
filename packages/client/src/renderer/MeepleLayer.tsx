@@ -1,7 +1,7 @@
 // renderer/MeepleLayer.tsx
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
-import {TILE_SIZE} from '@carcassonne/shared/core/constants'
+import { TILE_SIZE } from '@carcassonne/shared/core/constants'
 import { darkenColor } from '@/utils/color';
 
 
@@ -12,6 +12,7 @@ import { darkenColor } from '@/utils/color';
 export const MeepleLayer = () => {
   const board = useGameStore(s => s.board);
   const removePlacedMeeple = useGameStore(s => s.removePlacedMeeple);
+  const placementAnimation = useGameStore(s => s.placementAnimation);
 
   return (
     <g className="meeple-layer" style={{ overflow: 'visible' }}>
@@ -32,62 +33,71 @@ export const MeepleLayer = () => {
 
         // 🌟 НОВОЕ: определяем, временный ли мипл
         const isTemporary = t.meeple.isTemporary === true;
-        const meepleClassName = isTemporary 
-          ? 'meeple-temporary' 
+        const meepleClassName = isTemporary
+          ? 'meeple-temporary'
           : (t.meeple.isCompleting ? 'meeple-completing' : '');
 
+        const isAnimatingMeeple = placementAnimation?.meeple &&
+          t.meeple &&
+          placementAnimation.tile?.x === t.x &&
+          placementAnimation.tile?.y === t.y &&
+          placementAnimation.meeple.featureId === t.meeple.featureId;
+
         return (
-            <g
-                key={`${t.x},${t.y}`}
-                transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE}) rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}
-                style={{ overflow: 'visible' }}
-            >
-                {/* 🌟 Мипл с анимацией */}
-                <g transform={`translate(${t.meeple.x}, ${t.meeple.y})`}>
-                  {/* 🌟 ИСПРАВЛЕНО: объединили style в один объект */}
-                  <g 
-                    className={meepleClassName} 
-                    onClick={isTemporary ? (e) => {
-                      e.stopPropagation();
-                      console.log(`🖱️ [MeepleLayer] Клик по временному миплу на (${t.x}, ${t.y})`);
-                      removePlacedMeeple();
-                    } : undefined}
-                    style={{ 
-                      overflow: 'visible',
-                      cursor: isTemporary ? 'pointer' : 'default'
-                    } as React.CSSProperties}
-                  >
-                    <g transform={`rotate(${compensation}, 0, 0)`}>
-                      <g transform="translate(-16, -16)">
-                        <Meeple 
-                          color={t.meeple.color} 
-                          stroke={strokeColor}
-                        />
-                      </g>
+          <g
+            key={`${t.x},${t.y}`}
+            transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE}) rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}
+            style={{ overflow: 'visible' }}
+          >
+            {/* 🌟 Мипл с анимацией */}
+            <g transform={`translate(${t.meeple.x}, ${t.meeple.y})`}>
+              <g
+                className={meepleClassName}
+                onClick={isTemporary ? (e) => {
+                  e.stopPropagation();
+                  console.log(`🖱️ [MeepleLayer] Клик по временному миплу на (${t.x}, ${t.y})`);
+                  removePlacedMeeple();
+                } : undefined}
+                style={{
+                  overflow: 'visible',
+                  cursor: isTemporary ? 'pointer' : 'default'
+                } as React.CSSProperties}
+              >
+                <g transform={`rotate(${compensation}, 0, 0)`}>
+                  <g transform="translate(-16, -16)">
+                    {/* 🌟 НОВОЕ: Обёртка для анимации мипла */}
+                    <g className={isAnimatingMeeple ? 'meeple-placement-animation' : ''}>
+                      <Meeple
+                        color={t.meeple.color}
+                        stroke={strokeColor}
+                      />
                     </g>
                   </g>
                 </g>
+              </g>
 
-                {/* 🌟 Текст "+N" вынесен на уровень тайла — масштабируется независимо */}
-                {t.meeple.isCompleting && t.meeple.points !== undefined && (
-                <g 
-                    className="points-popup" 
-                    transform={`translate(${t.meeple.x}, ${t.meeple.y}) rotate(${-t.rotation}, 0, 0)`}
-                    style={{ '--n-color': t.meeple.color, overflow: 'visible' } as React.CSSProperties}
-                >
-                    <text
-                    x="0"
-                    y="-20"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="points-text"
-                    >
-                    +{t.meeple.points}
-                    </text>
-                </g>
-                )}
             </g>
-            );
+
+            {/* 🌟 Текст "+N" вынесен на уровень тайла — масштабируется независимо */}
+            {t.meeple.isCompleting && t.meeple.points !== undefined && (
+              <g
+                className="points-popup"
+                transform={`translate(${t.meeple.x}, ${t.meeple.y}) rotate(${-t.rotation}, 0, 0)`}
+                style={{ '--n-color': t.meeple.color, overflow: 'visible' } as React.CSSProperties}
+              >
+                <text
+                  x="0"
+                  y="-20"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="points-text"
+                >
+                  +{t.meeple.points}
+                </text>
+              </g>
+            )}
+          </g>
+        );
       })}
     </g>
   );

@@ -72,7 +72,7 @@ export function registerGameHandlers(socket: GameSocket): void {
     useGameStore.getState().setTurnTimerRemaining(null);
     useGameStore.getState().setTurnDeadline(null);
 
-    applyServerState(gameState);
+    applyServerState(gameState, { animate: true });
   });
 
   // ============================================

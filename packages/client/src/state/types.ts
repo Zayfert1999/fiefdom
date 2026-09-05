@@ -1,4 +1,4 @@
-import type { Tile, PlacedTile, PreviewTile } from '@carcassonne/shared/core/types';
+import type { Tile, PlacedTile, PreviewTile, PlacedMeeple } from '@carcassonne/shared/core/types';
 import type { RegionManager } from '@carcassonne/shared/core/regionManager';
 import type { CompletedRegion } from '@carcassonne/shared/core/scoring';
 
@@ -24,4 +24,17 @@ export interface MoveSnapshot {
     deck: Tile[];
     previewTile: PreviewTile;
     previewTileRegionManager: RegionManager;
+}
+
+// ============================================
+// 🎬 АНИМАЦИЯ УСТАНОВКИ ТАЙЛА/МИПЛА
+// Запускается при получении обновления от сервера (ход другого игрока)
+// ============================================
+export interface PlacementAnimation {
+    /** Тайл для анимации (если новый), иначе null */
+    tile: PlacedTile | null;
+    /** Мипл для анимации (если есть), иначе null */
+    meeple: PlacedMeeple | null;
+    /** Время начала анимации */
+    startTime: number;
 }

@@ -4,8 +4,9 @@
 
 import { useGameStore } from '@/state/useGameStore';
 import { RegionManager } from '@carcassonne/shared/core/regionManager';
-import type { PlacedTile } from '@carcassonne/shared/core/types';
+import type { PlacedTile, PlacedMeeple } from '@carcassonne/shared/core/types';
 import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
+import type { PlacementAnimation } from '@/state/types';
 
 /**
  * 🌟 Применяет состояние сервера к клиентскому store.
@@ -16,8 +17,14 @@ import type { SerializedGameState } from '@carcassonne/shared/core/serialization
  * - Сбрасывает клиентское preview-состояние
  *
  * @param gameState Сериализованное состояние от сервера
+ * @param options.animate Запускать ли анимацию для нового тайла/мипла
  */
-export function applyServerState(gameState: SerializedGameState): void {
+export function applyServerState(
+  gameState: SerializedGameState,
+  options?: { animate?: boolean }
+): void {
+  const animate = options?.animate ?? false;
+
   console.log(`📥 [StateSync] Применение состояния сервера к store`);
 
   // ============================================
@@ -40,11 +47,55 @@ export function applyServerState(gameState: SerializedGameState): void {
   );
 
   // ============================================
+  // 🎬 ПОИСК НОВОГО ТАЙЛА/МИПЛА ЧЕРЕЗ lastPlacedTiles
+  // ============================================
+  const currentState = useGameStore.getState();
+
+  if (animate) {
+    let animatedTile: PlacedTile | null = null;
+    let animatedMeeple: PlacedMeeple | null = null;
+
+    // Сравниваем старый и новый lastPlacedTiles
+    for (const [playerId, newLast] of Object.entries(gameState.lastPlacedTiles)) {
+      const oldLast = currentState.lastPlacedTiles.get(playerId);
+
+      // Проверяем, изменились ли координаты
+      if (!oldLast || oldLast.x !== newLast.x || oldLast.y !== newLast.y) {
+        const tileKey = `${newLast.x},${newLast.y}`;
+        const oldTile = currentState.board.get(tileKey);
+        const newTile = board.get(tileKey);
+
+        if (newTile) {
+          if (!oldTile) {
+            // Тайл НОВЫЙ — анимировать тайл (и мипла если есть)
+            animatedTile = newTile;
+            animatedMeeple = newTile.meeple ?? null;
+            console.log(`🎬 [StateSync] Новый тайл найден: (${newLast.x}, ${newLast.y})`);
+          } else if (!oldTile.meeple && newTile.meeple) {
+            // Тайл уже есть, но мипл новый (я поставил тайл, сервер подтвердил мипла)
+            animatedMeeple = newTile.meeple;
+            console.log(`🎬 [StateSync] Новый мипл найден на тайле (${newLast.x}, ${newLast.y})`);
+          }
+        }
+        break;  // За один ход только один игрок делает ход
+      }
+    }
+
+    if (animatedTile || animatedMeeple) {
+      currentState.setPlacementAnimation({
+        tile: animatedTile,
+        meeple: animatedMeeple,
+        startTime: Date.now(),
+      });
+      console.log(`🎬 [StateSync] Анимация установки запущена`);
+    }
+  }
+
+  // ============================================
   // 🛡️ СОХРАНЕНИЕ МИПЛОВ С АНИМАЦИЕЙ ЗАВЕРШЕНИЯ
   // Если есть активные анимации — переносим isCompleting миплов
   // на серверные тайлы, чтобы анимация не прервалась
   // ============================================
-  const currentState = useGameStore.getState();
   const hasActiveAnimations = currentState.completionAnimations.length > 0;
 
   if (hasActiveAnimations) {

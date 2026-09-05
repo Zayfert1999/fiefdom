@@ -1,4 +1,5 @@
 // renderer/Board.tsx
+import { useEffect } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from './Tile';
 import { RegionOverlay } from './RegionOverlay';
@@ -25,6 +26,22 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
   const lastPlacedTiles = useGameStore(s => s.lastPlacedTiles);
   const phase = useGameStore(s => s.phase);
 
+  const placementAnimation = useGameStore(s => s.placementAnimation);
+  const setPlacementAnimation = useGameStore(s => s.setPlacementAnimation);
+
+  // 🌟 Очистка анимации после завершения
+  useEffect(() => {
+    if (!placementAnimation) return;
+
+    const ANIMATION_DURATION = 700;  // Максимальная длительность
+
+    const timer = setTimeout(() => {
+      setPlacementAnimation(null);
+      console.log(`🎬 [Board] Анимация установки завершена`);
+    }, ANIMATION_DURATION);
+
+    return () => clearTimeout(timer);
+  }, [placementAnimation, setPlacementAnimation]);
 
   /* ============================================
   * 📷 КАМЕРА
@@ -182,6 +199,11 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
         {Array.from(board.values()).map((t) => {
           const key = `${t.x},${t.y}`;
 
+          // 🌟 НОВОЕ: Проверяем, анимируется ли этот тайл
+          const isAnimatingTile = placementAnimation?.tile &&
+            placementAnimation.tile.x === t.x &&
+            placementAnimation.tile.y === t.y;
+
           return (
             <g
               key={key}
@@ -191,11 +213,14 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
               }}
               style={{ cursor: 'pointer', overflow: 'visible' }}
             >
-              <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
-                <Tile
-                  id={t.templateId as any}
-                  size={TILE_SIZE}
-                />
+              {/* 🌟 НОВОЕ: Обёртка для анимации */}
+              <g className={isAnimatingTile ? 'tile-placement-animation' : ''}>
+                <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
+                  <Tile
+                    id={t.templateId as any}
+                    size={TILE_SIZE}
+                  />
+                </g>
               </g>
             </g>
           );

@@ -129,3 +129,32 @@
     transform: translateY(-40px) scale(0.8);
   }
 }
+
+/* ============================================
+   🎭 IDLE-АНИМАЦИЯ МИПЛОВ НА ДОСКЕ
+   Лёгкий боббинг с покачиванием — мипл "дышит"
+   ============================================ */
+
+/* Анимация: подъём + лёгкое покачивание */
+@keyframes meeple-idle-bounce {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.04) rotate(-1.5deg);
+    }
+    50% {
+        transform: scale(1.06) rotate(0deg);
+    }
+    75% {
+        transform: scale(1.04) rotate(1.5deg);
+    }
+}
+
+/* Класс анимации (применяется к обёртке мипла) */
+.meeple-idle-anim {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: meeple-idle-bounce 3s ease-in-out infinite;
+
+}

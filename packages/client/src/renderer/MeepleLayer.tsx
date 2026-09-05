@@ -31,17 +31,30 @@ export const MeepleLayer = () => {
 
         const strokeColor = t.meeple.isCompleting ? 'none' : darkenColor(t.meeple.color, 0.4)
 
-        // 🌟 НОВОЕ: определяем, временный ли мипл
+        // Определяем, временный ли мипл
         const isTemporary = t.meeple.isTemporary === true;
-        const meepleClassName = isTemporary
-          ? 'meeple-temporary'
-          : (t.meeple.isCompleting ? 'meeple-completing' : '');
 
+
+
+
+        const animationDelay = `${((Math.abs(t.x) + Math.abs(t.y)) % 5) * 0.4}s`;
+
+        // Проверяем, анимируется ли этот мипл (установка)
         const isAnimatingMeeple = placementAnimation?.meeple &&
           t.meeple &&
           placementAnimation.tile?.x === t.x &&
           placementAnimation.tile?.y === t.y &&
           placementAnimation.meeple.featureId === t.meeple.featureId;
+
+        // Приоритет классов анимации
+        // Временный > Завершающийся > Установка > Idle
+        const meepleClassName = isTemporary
+          ? 'meeple-temporary'
+          : t.meeple.isCompleting
+            ? 'meeple-completing'
+            : isAnimatingMeeple
+              ? 'meeple-placement-animation'
+              : 'meeple-idle-anim';
 
         return (
           <g
@@ -65,20 +78,16 @@ export const MeepleLayer = () => {
               >
                 <g transform={`rotate(${compensation}, 0, 0)`}>
                   <g transform="translate(-16, -16)">
-                    {/* 🌟 НОВОЕ: Обёртка для анимации мипла */}
-                    <g className={isAnimatingMeeple ? 'meeple-placement-animation' : ''}>
-                      <Meeple
-                        color={t.meeple.color}
-                        stroke={strokeColor}
-                      />
-                    </g>
+                    <Meeple
+                      color={t.meeple.color}
+                      stroke={strokeColor}
+                    />
                   </g>
                 </g>
               </g>
-
             </g>
 
-            {/* 🌟 Текст "+N" вынесен на уровень тайла — масштабируется независимо */}
+            {/* 🌟 Текст "+N" для анимации получения очков */}
             {t.meeple.isCompleting && t.meeple.points !== undefined && (
               <g
                 className="points-popup"

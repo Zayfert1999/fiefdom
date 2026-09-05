@@ -5,7 +5,7 @@ export type Direction =
   | 'SE(S)' | 'SE(E)' | 'SW(S)' | 'SW(W)';
 export type FeatureType = 'road' | 'city' | 'monastery' | 'field';
 
-export interface MeepleSpot {
+export interface Spot {
   x: number;
   y: number;
 }
@@ -13,9 +13,9 @@ export interface MeepleSpot {
 export interface TileFeature {
   id: string;
   type: FeatureType;
-  shieldSpot?: MeepleSpot;
+  shieldSpot?: Spot;
   directions: Direction[];
-  spots: MeepleSpot[];
+  spots: Spot[];
   adjacentCities?: string[];
 }
 

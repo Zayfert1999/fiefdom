@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Carcassonne Tile Set",
+  "description": "Схема для описания набора тайлов Каркассона",
+  "type": "object",
+  "required": ["tiles"],
+  "properties": {
+    "tiles": {
+      "type": "array",
+      "description": "Массив определений тайлов",
+      "items": {
+        "type": "object",
+        "required": ["id", "artId", "quantity", "features"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Уникальный идентификатор тайла (например, 'tile_CCFC-S')"
+          },
+          "artId": {
+            "type": "string",
+            "description": "Идентификатор графики (SVG-файл). Может совпадать с id или указывать на базовый тайл"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Количество экземпляров этого тайла в колоде"
+          },
+          "features": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Список фич тайла (город, дорога, поле, монастырь)",
+            "items": {
+              "type": "object",
+              "required": ["id", "type", "directions", "meepleSpot"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Уникальный ID фичи в пределах тайла"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["city", "road", "field", "monastery"],
+                  "description": "Тип фичи"
+                },
+                "shieldSpot": {
+                  "type": "object",
+                  "required": ["x", "y"],
+                  "properties": {
+                    "x": { "type": "number", "minimum": 0, "maximum": 100 },
+                    "y": { "type": "number", "minimum": 0, "maximum": 100 }
+                  },
+                  "description": "Координаты щита (только для городов с щитом)"
+                },
+                "directions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Направления, в которых фича выходит за пределы тайла",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "N", "E", "S", "W", "C",
+                      "NW", "NE", "SE", "SW",
+                      "NE(E)", "NE(N)", "NW(N)", "NW(W)",
+                      "SE(S)", "SE(E)", "SW(S)", "SW(W)"
+                    ]
+                  }
+                },
+                "meepleSpot": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Споты для размещения миплов на этой фиче",
+                  "items": {
+                    "type": "object",
+                    "required": ["x", "y"],
+                    "properties": {
+                      "x": { "type": "number", "minimum": 0, "maximum": 100 },
+                      "y": { "type": "number", "minimum": 0, "maximum": 100 }
+                    }
+                  }
+                },
+                "adjacentCities": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "ID городов, граничащих с этим полем (только для полей)"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

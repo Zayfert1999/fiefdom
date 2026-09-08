@@ -21,6 +21,7 @@ export interface TileFeature {
 
 export interface Tile {
   id: string;
+  artId: string;
   quantity: number;
   features: TileFeature[];
 }

@@ -51,7 +51,7 @@ export const rotatePoint = (x: number, y: number, rotation: 0 | 90 | 180 | 270) 
 export const rotateFeature = (feat: TileFeature, rotation: 0 | 90 | 180 | 270): TileFeature => ({
   ...feat,
   directions: feat.directions.map(p => rotateCompass(p, rotation)),
-  spots: feat.spots.map(s => {
+  meepleSpot: feat.meepleSpot.map(s => {
     const { x, y } = rotatePoint(s.x, s.y, rotation);
     return { ...s, x, y };
   })

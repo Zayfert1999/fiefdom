@@ -72,7 +72,7 @@ export const MeepleSelectionLayer = () => {
 
   // 🌟 Собираем все споты для размещения миплов
   const markers = features.flatMap((feat: TileFeature) =>
-    feat.spots.map((spot, idx) => ({
+    feat.meepleSpot.map((spot, idx) => ({
       featureId: feat.id,
       type: feat.type,
       x: spot.x,

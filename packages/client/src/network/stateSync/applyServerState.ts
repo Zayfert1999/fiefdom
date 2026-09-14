@@ -6,7 +6,6 @@ import { useGameStore } from '@/state/useGameStore';
 import { RegionManager } from '@fiefdom/shared/core/regionManager';
 import type { PlacedTile, PlacedMeeple } from '@fiefdom/shared/core/types';
 import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
-import type { PlacementAnimation } from '@/state/types';
 
 /**
  * 🌟 Применяет состояние сервера к клиентскому store.

@@ -372,7 +372,7 @@ export function findCompletedRegionsOnTile(
       if (!meta || meta.isComplete) continue;
 
       // Монастырь завершён, если все 8 соседей на месте
-      const { isComplete, points } = calculateMonasteryPoints(board, x, y);
+      const { isComplete } = calculateMonasteryPoints(board, x, y);
       if (!isComplete) continue;
 
       // 🌟 Используем общую функцию

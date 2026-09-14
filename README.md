@@ -1,73 +1,208 @@
-# React + TypeScript + Vite
+# 🏰 Fiefdom
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **your medieval domain, tile by tile**
 
-Currently, two official plugins are available:
+Веб-адаптация классической настольной игры [Carcassonne](https://en.wikipedia.org/wiki/Carcassonne_(board_game)) с поддержкой локальной и сетевой игры в реальном времени.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
+![React](https://img.shields.io/badge/React-19-61dafb)
+![Vite](https://img.shields.io/badge/Vite-8-646cff)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-4-black)
+![pnpm](https://img.shields.io/badge/pnpm-9-f69220)
 
-## React Compiler
+## ✨ Возможности
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 🎮 **Локальная игра** — до 5 игроков за одним экраном
+- 🌐 **Сетевая игра** — приватные и публичные комнаты с кодом приглашения
+- 🔄 **Reconnection** — восстановление соединения при обрыве связи (без потери прогресса)
+- 📷 **Умная камера** — зум, панорамирование, автофокус на важных событиях
+- 🗺️ **Подсветка регионов** — визуализация владений игроков с анимированной штриховкой
+- 💀 **Мёртвые клетки** — подсветка клеток, куда уже нельзя поставить тайл
+- 🎴 **Просмотр колоды** — отслеживание оставшихся тайлов
+- ⌨️ **Горячие клавиши** — полноценное управление с клавиатуры
+- 💾 **Автосохранение** — локальные игры сохраняются между сессиями
+- ⏱️ **Таймер хода** — настраиваемое время на ход в сетевой игре
+- 🏆 **Финальный подсчёт** — детальная статистика по категориям очков
 
-## Expanding the ESLint configuration
+## 🛠 Технологический стек
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Клиент
+- **React 19** + **TypeScript 5.8**
+- **Vite 8** — сборка и dev-сервер
+- **Zustand 5** — управление состоянием (разбито на slices)
+- **Socket.IO Client** — сетевое взаимодействие
+- **SVG** — векторная графика тайлов и миплов
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Сервер
+- **Node.js** + **Express 4**
+- **Socket.IO 4** — real-time коммуникации
+- **Zod 4** — runtime-валидация клиентских запросов
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Общие пакеты
+- **TypeScript** — единая типизация между клиентом и сервером
+- **Mulberry32 PRNG** — детерминированная генерация колоды из seed
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Инфраструктура
+- **pnpm workspaces** — монорепозиторий
+- **Turborepo** — оркестрация сборок
+- **GitHub Actions** — CI/CD и деплой на GitHub Pages
+
+## 📁 Структура проекта
+
+```
+fiefdom/
+├── packages/
+│   ├── client/          # React-приложение (Vite + Zustand)
+│   │   ├── src/
+│   │   │   ├── assets/       # SVG-графика (тайлы, иконки, миплы)
+│   │   │   ├── components/   # UI-компоненты (меню, лобби, HUD)
+│   │   │   ├── core/         # Утилиты (камера, сохранения, CSS-переменные)
+│   │   │   ├── hooks/        # Кастомные хуки (hotkeys, camera, patterns)
+│   │   │   ├── network/      # Socket.IO + state sync
+│   │   │   ├── renderer/     # SVG-рендеринг доски
+│   │   │   └── state/        # Zustand slices (game, client, network, ui, lobby)
+│   │   └── vite.config.ts
+│   │
+│   ├── server/          # Node.js сервер (Express + Socket.IO)
+│   │   ├── src/
+│   │   │   ├── handlers/     # Обработчики событий лобби и игры
+│   │   │   ├── rooms/        # Room, RoomManager, GameLoop, Broadcaster
+│   │   │   ├── services/     # TurnTimer
+│   │   │   ├── state/        # ServerGameState, PlayerConnection
+│   │   │   └── utils/        # Логгер
+│   │   └── tsconfig.json
+│   │
+│   └── shared/          # Общая логика (isomorphic)
+│       ├── src/
+│       │   ├── core/         # Типы, тайлы, DSU-регионы, подсчёт очков
+│       │   ├── data/         # JSON-определения тайлов (72 шт.)
+│       │   ├── prng/         # Seed-based PRNG
+│       │   └── protocol/     # События Socket.IO + Zod-схемы
+│       └── package.json
+│
+├── .github/workflows/   # GitHub Actions (деплой на Pages)
+├── package.json         # Корневой workspace
+└── turbo.json           # Конфигурация Turborepo
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚀 Быстрый старт
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Требования
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Node.js** ≥ 20
+- **pnpm** ≥ 9 (установка: `npm install -g pnpm`)
+
+### Установка
+
+```bash
+# Клонировать репозиторий
+git clone https://github.com/your-username/fiefdom.git
+cd fiefdom
+
+# Установить зависимости
+pnpm install
 ```
+
+### Запуск в режиме разработки
+
+```bash
+# Запустить клиент + сервер параллельно
+pnpm dev
+
+# Или по отдельности:
+pnpm dev:client    # Vite на http://localhost:5173
+pnpm dev:server    # Node на http://localhost:3001
+```
+
+## 📜 Основные команды
+
+| Команда | Описание |
+|---------|----------|
+| `pnpm dev` | Запуск клиента и сервера в dev-режиме |
+| `pnpm build` | Сборка всех пакетов |
+| `pnpm build:client` | Сборка только клиента |
+| `pnpm lint` | Линтинг кода |
+| `pnpm clean` | Очистка `node_modules` и `dist` |
+
+## 🎮 Управление
+
+### Горячие клавиши
+
+| Клавиша | Действие |
+|---------|----------|
+| `R` | Повернуть тайл |
+| `Enter` / `Space` | Подтвердить действие |
+| `Z` | Отменить / Откатить ход |
+| `+` / `-` | Зум камеры |
+| `0` | Сброс камеры |
+| `↑ ↓ ← →` | Панорамирование |
+| `F1` | Показать список хоткеев |
+| `D` | Открыть просмотр колоды |
+| `Alt + ЛКМ` / `СКМ` | Перетаскивание камеры |
+
+### Мышь
+- **ЛКМ** по клетке — начать примерку тайла
+- **ЛКМ** по preview-тайлу — повернуть
+- **Ctrl + ЛКМ** по тайлу — открыть Debug Panel
+
+## 🏗 Архитектура
+
+### Разделение ответственности
+
+```
+┌─────────────┐         Socket.IO         ┌─────────────┐
+│   Client    │ ◄───────────────────────► │   Server    │
+│  (React)    │                           │  (Express)  │
+└──────┬──────┘                           └──────┬──────┘
+       │                                         │
+       └──────────── @fiefdom/shared ────────────┘
+           (типы, правила, подсчёт очков, PRNG)
+```
+
+### Ключевые решения
+
+1. **Авторитарный сервер** — вся игровая логика валидируется на сервере, клиент только отправляет намерения
+2. **Isomorphic shared-пакет** — правила подсчёта очков и проверки валидности ходов работают одинаково на клиенте (для preview) и сервере (для валидации)
+3. **Zustand slices** — состояние разделено на изолированные модули (`gameSlice`, `clientSlice`, `networkSlice`, `uiSlice`, `lobbySlice`)
+4. **DSU (Disjoint Set Union)** — для объединения регионов тайлов (городов, дорог, полей) с поддержкой сериализации
+5. **Seed-based PRNG (Mulberry32)** — детерминированная генерация колоды, одинаковая для всех игроков в комнате
+6. **SVG-графика** — все тайлы хранятся как векторные SVG-компоненты, масштабируются без потери качества
+
+### Синхронизация состояния
+
+Сервер отправляет `SerializedGameState` клиентам через событие `game:state-update`. Клиент применяет его через `applyServerState()`, который:
+- Десериализует `Record → Map` (board) и `JSON → RegionManager`
+- Сохраняет анимации `isCompleting` миплов между обновлениями
+- Запускает анимацию для новых тайлов через `lastPlacedTiles`
+
+## 📜 Правила игры (кратко)
+
+Игроки по очереди вытягивают тайл и размещают его на поле, соблюдая правило совпадения граней:
+- 🛣️ **Дорога** — должна продолжаться дорогой
+- 🏰 **Город** — стена к стене
+- 🌾 **Поле** — соединяется через углы
+- ⛪ **Монастырь** — завершается при 8 соседях
+
+После установки тайла можно поставить **мипла (вассала)** на одну из фич:
+- Дорога: 1 очко за тайл
+- Город: 2 очка за тайл (×2 если замкнут), +2 за щит
+- Монастырь: 9 очков при завершении
+- Поле: 3 очка за каждый замкнутый город (только в конце игры)
+
+## 🤝 Вклад
+
+Проект открыт для предложений и pull request'ов. Перед крупными изменениями создайте issue для обсуждения.
+
+## 📄 Лицензия
+
+Проект создан в образовательных целях. Оригинальная игра Carcassonne © Hans im Glück.
+
+---
+
+<div align="center">
+
+**Fiefdom** — *your medieval domain, tile by tile* 🏰
+
+[Demo](https://zayfert1999.github.io/fiefdom/) • [Issues](https://github.com/zayfert1999/fiefdom/issues) • [Contributing](CONTRIBUTING.md)
+
+</div>

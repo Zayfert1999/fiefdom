@@ -3,10 +3,10 @@
 // Используется и в networkSlice, и в stateSync.
 
 const STORAGE_KEYS = {
-  PLAYER_ID: 'carcassonne_player_id',
-  ROOM_ID: 'carcassonne_room_id',
-  PLAYER_NAME: 'carcassonne_player_name',
-  PLAYER_COLOR: 'carcassonne_player_color',
+  PLAYER_ID: 'Fiefdom_player_id',
+  ROOM_ID: 'Fiefdom_room_id',
+  PLAYER_NAME: 'Fiefdom_player_name',
+  PLAYER_COLOR: 'Fiefdom_player_color',
 } as const;
 
 export function saveConnectionInfo(playerId: string, roomId: string, playerName: string): void {

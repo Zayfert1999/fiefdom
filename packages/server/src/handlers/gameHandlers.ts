@@ -3,7 +3,7 @@
 
 import type { Server, Socket } from 'socket.io';
 import type { RoomManager } from '../rooms/RoomManager';
-import { PlaceTileSchema, PlaceMeepleSchema } from '@carcassonne/shared/protocol/schemas';
+import { PlaceTileSchema, PlaceMeepleSchema } from '@fiefdom/shared/protocol/schemas';
 import { logger } from '../utils/logger';
 
 export function registerGameHandlers(io: Server, socket: Socket, roomManager: RoomManager): void {

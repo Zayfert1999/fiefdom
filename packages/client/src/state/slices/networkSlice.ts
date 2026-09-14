@@ -6,7 +6,7 @@ import type { StateCreator } from 'zustand';
 import type {
   RoomSettings,
   LobbyPlayer,
-} from '@carcassonne/shared/protocol/events';
+} from '@fiefdom/shared/protocol/events';
 import { getSocket, destroySocket } from '@/network/socket';
 import type { GameStore } from '../useGameStore';
 import { registerStateSync, unregisterStateSync } from '@/network/stateSync';

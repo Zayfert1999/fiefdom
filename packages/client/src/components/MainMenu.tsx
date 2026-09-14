@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { getSaveMeta, SAVE_KEYS } from '@/core/gameSaveManager';
-import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
+import { AVAILABLE_COLORS } from '@fiefdom/shared/core/constants';
 import { getSocket } from '@/network/socket';
 import { loadConnectionInfo } from '@/network/persistence';  // 🌟 Используем persistence
 
@@ -147,8 +147,8 @@ export const MainMenu = () => {
         <div className={styles.overlay}>
             <div className={styles.card}>
                 {/* Заголовок */}
-                <h1 className={styles.title}>Carcassonne</h1>
-                <p className={styles.subtitle}>Настольная игра</p>
+                <h1 className={styles.title}>Fiefdom</h1>
+                <p className={styles.subtitle}>your medieval domain, tile by tile</p>
 
                 {/* Профиль */}
                 <div className={styles.section}>

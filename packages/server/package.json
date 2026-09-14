@@ -1,5 +1,5 @@
 {
-  "name": "@carcassonne/server",
+  "name": "@fiefdom/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@carcassonne/shared": "workspace:*",
+    "@fiefdom/shared": "workspace:*",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "socket.io": "^4.7.5"

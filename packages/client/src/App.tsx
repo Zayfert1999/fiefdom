@@ -1,8 +1,8 @@
 // App.tsx
 import { useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { getValidPlacementCells } from '@carcassonne/shared/core/tileUtils';
-import { HOTKEY_DEFINITIONS } from '@carcassonne/shared/core/hotkeys';
+import { getValidPlacementCells } from '@fiefdom/shared/core/tileUtils';
+import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { getSocket } from '@/network/socket';  // 🌟 НОВОЕ
 import { loadConnectionInfo } from '@/network/persistence';

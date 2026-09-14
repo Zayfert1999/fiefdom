@@ -1,14 +1,14 @@
 {
-  "name": "carcassonne-web",
+  "name": "fiefdom",
   "private": true,
   "version": "0.0.0",
-  "description": "Carcassonne web game - monorepo",
+  "description": "Fiefdom web game - monorepo",
   "scripts": {
     "dev": "turbo run dev",
-    "dev:client": "turbo run dev --filter=@carcassonne/client",
-    "dev:server": "turbo run dev --filter=@carcassonne/server",
+    "dev:client": "turbo run dev --filter=@fiefdom/client",
+    "dev:server": "turbo run dev --filter=@fiefdom/server",
     "build": "turbo run build",
-    "build:client": "turbo run build --filter=@carcassonne/client",
+    "build:client": "turbo run build --filter=@fiefdom/client",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules"
   },

@@ -6,7 +6,7 @@ import type { GameSocket } from '@/network/socket';
 import { useGameStore } from '@/state/useGameStore';
 import { clearConnectionInfo } from '@/network/persistence';
 import { applyServerState } from './applyServerState';
-import type { RoomSnapshot, LobbyPlayer } from '@carcassonne/shared/protocol/events';
+import type { RoomSnapshot, LobbyPlayer } from '@fiefdom/shared/protocol/events';
 
 /**
  * 🌟 Применяет RoomSnapshot к клиентскому store.

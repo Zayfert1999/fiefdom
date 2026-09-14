@@ -3,14 +3,14 @@
 // Отделён от Room для чёткого разделения ответственности.
 
 import type { Socket } from 'socket.io';
-import type { Player } from '@carcassonne/shared/core/types';
-import type { RoomSettings, LobbyPlayer } from '@carcassonne/shared/protocol/events';
-import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
-import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
+import type { Player } from '@fiefdom/shared/core/types';
+import type { RoomSettings, LobbyPlayer } from '@fiefdom/shared/protocol/events';
+import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
+import { AVAILABLE_COLORS } from '@fiefdom/shared/core/constants';
 import type { PlayerConnection } from '../state/PlayerConnection';
 import type { ServerGameState } from '../state/ServerGameState';
 import type { RoomBroadcaster } from './RoomBroadcaster';
-import type { RoomSnapshot } from '@carcassonne/shared/protocol/events';
+import type { RoomSnapshot } from '@fiefdom/shared/protocol/events';
 import { logger } from '../utils/logger';
 
 /**

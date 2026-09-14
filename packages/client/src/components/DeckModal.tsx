@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { TILE_DEFINITIONS } from '@carcassonne/shared/core/tileData';
+import { TILE_DEFINITIONS } from '@fiefdom/shared/core/tileData';
 import { Tile } from '@/renderer/Tile';
 import styles from '@/components/styles/modal.module.css';
 

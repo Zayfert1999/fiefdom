@@ -1,5 +1,5 @@
 // Вспомогательная функция для экспорта JS констант в CSS
-import { CAMERA_CONFIG, COMPLITED_REGION_ANIMATION_DURATION } from '@carcassonne/shared/core/constants'
+import { CAMERA_CONFIG, COMPLITED_REGION_ANIMATION_DURATION } from '@fiefdom/shared/core/constants'
 
 export const syncCssVariables = () => {
   const root = document.documentElement;

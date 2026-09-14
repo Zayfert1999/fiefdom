@@ -1,5 +1,5 @@
 {
-  "name": "@carcassonne/client",
+  "name": "@fiefdom/client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@carcassonne/shared": "workspace:*",
+    "@fiefdom/shared": "workspace:*",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
     "react": "^19.2.6",

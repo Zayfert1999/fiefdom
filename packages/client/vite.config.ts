@@ -9,7 +9,7 @@ export default defineConfig({
     alias: {
       // 🌟 Используем fileURLToPath вместо __dirname
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@carcassonne/shared': fileURLToPath(new URL('../shared/src', import.meta.url)),
+      '@fiefdom/shared': fileURLToPath(new URL('../shared/src', import.meta.url)),
     },
   },
   server: {

@@ -1,26 +1,26 @@
 // packages/server/src/state/ServerGameState.ts
 // 🌟 Авторитарное состояние игры на сервере.
-// Переиспользует чистую логику из @carcassonne/shared.
+// Переиспользует чистую логику из @fiefdom/shared.
 // ВАЖНО: drawnTile отправляется ТОЛЬКО текущему игроку.
 
-import type { Player, PlacedTile, Tile } from '@carcassonne/shared/core/types';
-import type { FeatureKey } from '@carcassonne/shared/core/regionManager';
-import { RegionManager } from '@carcassonne/shared/core/regionManager';
-import { createDeck, drawPlayableTile } from '@carcassonne/shared/core/deck';
+import type { Player, PlacedTile, Tile } from '@fiefdom/shared/core/types';
+import type { FeatureKey } from '@fiefdom/shared/core/regionManager';
+import { RegionManager } from '@fiefdom/shared/core/regionManager';
+import { createDeck, drawPlayableTile } from '@fiefdom/shared/core/deck';
 import {
   applyTileToBoardAndRM,
   getTileSides,
   getValidPlacementCells,
   rotateFeatures,      // 🌟 НОВОЕ: для валидации
   isValidPlacement,    // 🌟 НОВОЕ: для валидации
-} from '@carcassonne/shared/core/tileUtils';
+} from '@fiefdom/shared/core/tileUtils';
 import {
   findCompletedRegionsOnTile,
   findAllIncompleteRegionsWithMeeples,
   type CompletedRegion,
-} from '@carcassonne/shared/core/scoring';
-import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
-import { createSeededRandom } from '@carcassonne/shared/prng/seedRandom';
+} from '@fiefdom/shared/core/scoring';
+import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
+import { createSeededRandom } from '@fiefdom/shared/prng/seedRandom';
 import { logger } from '../utils/logger';
 
 export type ServerPhase = 'lobby' | 'playing' | 'gameOver';

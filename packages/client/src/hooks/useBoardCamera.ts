@@ -3,9 +3,9 @@ import { useEffect, useRef} from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { useCamera } from './useCamera';
 import { useHotkeys } from './useHotkeys';
-import { CAMERA_CONFIG} from '@carcassonne/shared/core/constants';
-import type { CompletedRegion } from '@carcassonne/shared/core/scoring';
-import { HOTKEY_DEFINITIONS } from '@carcassonne/shared/core/hotkeys';
+import { CAMERA_CONFIG} from '@fiefdom/shared/core/constants';
+import type { CompletedRegion } from '@fiefdom/shared/core/scoring';
+import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 
 // 🌟 Хелпер: геометрический центр региона
 const getRegionCenter = (region: CompletedRegion): { x: number; y: number } => {

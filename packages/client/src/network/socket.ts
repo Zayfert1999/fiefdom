@@ -6,7 +6,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from '@carcassonne/shared/protocol/events';
+} from '@fiefdom/shared/protocol/events';
 
 // 🌟 Типизированный socket
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;

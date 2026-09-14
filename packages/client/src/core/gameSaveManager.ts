@@ -3,9 +3,9 @@
 // Инкапсулирует сериализацию/десериализацию состояния
 // и работу с localStorage по ключам.
 
-import type { PlacedTile, Tile, Player } from '@carcassonne/shared/core/types';
-import type { RegionManager } from '@carcassonne/shared/core/regionManager';
-import type { SerializedRegionManager } from '@carcassonne/shared/core/serialization';
+import type { PlacedTile, Tile, Player } from '@fiefdom/shared/core/types';
+import type { RegionManager } from '@fiefdom/shared/core/regionManager';
+import type { SerializedRegionManager } from '@fiefdom/shared/core/serialization';
 import type { GamePhase, LastPlacedTile } from '@/state/types';
 
 // ============================================
@@ -13,9 +13,9 @@ import type { GamePhase, LastPlacedTile } from '@/state/types';
 // ============================================
 export const SAVE_KEYS = {
     /** Дебаг-сохранение (ручное, через DebugPanel) */
-    DEBUG: 'carcassonne_debug_save',
+    DEBUG: 'Fiefdom_debug_save',
     /** Автосохранение для игроков (конец каждого хода) */
-    LOCAL: 'carcassonne_local_save',
+    LOCAL: 'Fiefdom_local_save',
 } as const;
 
 export type SaveKey = typeof SAVE_KEYS[keyof typeof SAVE_KEYS];

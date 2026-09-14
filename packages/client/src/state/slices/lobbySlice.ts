@@ -4,9 +4,9 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameStore } from '../useGameStore';
-import type { Player } from '@carcassonne/shared/core/types';
-import { AVAILABLE_COLORS } from '@carcassonne/shared/core/constants';
-import { RegionManager } from '@carcassonne/shared/core/regionManager';
+import type { Player } from '@fiefdom/shared/core/types';
+import { AVAILABLE_COLORS } from '@fiefdom/shared/core/constants';
+import { RegionManager } from '@fiefdom/shared/core/regionManager';
 
 export interface LobbySlice {
     // === Состояние локального лобби ===

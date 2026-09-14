@@ -1,7 +1,7 @@
 // renderer/MeepleLayer.tsx
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
-import { TILE_SIZE } from '@carcassonne/shared/core/constants'
+import { TILE_SIZE } from '@fiefdom/shared/core/constants'
 import { darkenColor } from '@/utils/color';
 
 

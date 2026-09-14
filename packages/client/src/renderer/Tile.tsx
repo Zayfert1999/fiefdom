@@ -2,8 +2,8 @@
 import { memo } from 'react';
 import { TileRegistry, type TileId } from '@/assets/svg/tiles/registry';
 import { Shield } from './Shield';
-import { ART_ID_MAP } from '@carcassonne/shared/core/tileData';
-import type { TileFeature } from '@carcassonne/shared/core/types';
+import { ART_ID_MAP } from '@fiefdom/shared/core/tileData';
+import type { TileFeature } from '@fiefdom/shared/core/types';
 
 // 🌟 Базовый размер тайла, в котором заданы координаты shieldSpot
 const BASE_TILE_SIZE = 100;

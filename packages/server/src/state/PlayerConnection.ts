@@ -2,8 +2,8 @@
 // 🌟 Представление игрока на сервере: игровой профиль + сетевое соединение
 
 import type { Socket } from 'socket.io';
-import type { Player } from '@carcassonne/shared/core/types';
-import type { LobbyPlayer } from '@carcassonne/shared/protocol/events';
+import type { Player } from '@fiefdom/shared/core/types';
+import type { LobbyPlayer } from '@fiefdom/shared/protocol/events';
 
 export class PlayerConnection {
   /** Игровой профиль (id, name, color, score, meeples) */

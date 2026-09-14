@@ -1,6 +1,6 @@
 // hooks/useCamera.ts
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import {TILE_SIZE, CAMERA_CONFIG, WORLD_BOUNDS} from '@carcassonne/shared/core/constants'
+import {TILE_SIZE, CAMERA_CONFIG, WORLD_BOUNDS} from '@fiefdom/shared/core/constants'
 
 
 

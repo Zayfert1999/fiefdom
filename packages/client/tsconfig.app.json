@@ -20,7 +20,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@carcassonne/shared/*": ["../shared/src/*"]
+      "@fiefdom/shared/*": ["../shared/src/*"]
     }
   },
   "include": ["src"],

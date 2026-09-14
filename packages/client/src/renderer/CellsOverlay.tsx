@@ -1,10 +1,10 @@
 // renderer/CellsOverlay.tsx
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { findDeadCells } from '@carcassonne/shared/core/tileUtils';
-import { rotateFeatures, getTileSides } from '@carcassonne/shared/core/tileUtils';
-import type { PlacedTile } from '@carcassonne/shared/core/types';
-import { TILE_SIZE } from '@carcassonne/shared/core/constants'
+import { findDeadCells } from '@fiefdom/shared/core/tileUtils';
+import { rotateFeatures, getTileSides } from '@fiefdom/shared/core/tileUtils';
+import type { PlacedTile } from '@fiefdom/shared/core/types';
+import { TILE_SIZE } from '@fiefdom/shared/core/constants'
 import { getVirtualDeck } from '@/core/deckUtils';
 
 

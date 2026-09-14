@@ -1,7 +1,7 @@
 // packages/shared/src/core/index.ts
 // 🌟 Центральный экспорт core-модуля
 // Позволяет импортировать всё из одного места:
-// import { TILE_SIZE, RegionManager } from '@carcassonne/shared/core';
+// import { TILE_SIZE, RegionManager } from '@fiefdom/shared/core';
 
 export * from './types';
 export * from './serialization';

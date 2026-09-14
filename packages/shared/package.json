@@ -1,5 +1,5 @@
 {
-  "name": "@carcassonne/shared",
+  "name": "@fiefdom/shared",
   "version": "0.0.1",
   "private": true,
   "type": "module",

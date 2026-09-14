@@ -5,7 +5,7 @@ import type { Server, Socket } from 'socket.io';
 import type { RoomManager } from '../rooms/RoomManager';
 import { Room } from '../rooms/Room';
 import { PlayerConnection } from '../state/PlayerConnection';
-import { Player } from '@carcassonne/shared/core/types';
+import { Player } from '@fiefdom/shared/core/types';
 import {
   CreateRoomSchema,
   JoinRoomSchema,
@@ -13,7 +13,7 @@ import {
   KickPlayerSchema,
   SetReadySchema,
   CheckActiveSchema,
-} from '@carcassonne/shared/protocol/schemas';
+} from '@fiefdom/shared/protocol/schemas';
 import { logger } from '../utils/logger';
 
 // ============================================

@@ -10,7 +10,7 @@ import {
   formatHotkeyKey,
   type HotkeyCategory,
   type HotkeyDefinition,
-} from '@carcassonne/shared/core/hotkeys';
+} from '@fiefdom/shared/core/hotkeys';
 import styles from '@/components/styles/modal.module.css';
 
 interface HotkeysModalProps {

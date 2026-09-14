@@ -4,7 +4,7 @@
 
 import type { GameSocket } from '@/network/socket';
 import { useGameStore } from '@/state/useGameStore';
-import type { FeatureType } from '@carcassonne/shared/core/types';
+import type { FeatureType } from '@fiefdom/shared/core/types';
 import { applyServerState } from './applyServerState';
 
 

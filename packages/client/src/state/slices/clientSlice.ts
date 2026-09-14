@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
-import type { PreviewTile, PlacedMeeple } from '@carcassonne/shared/core/types';
-import type { RegionManager, FeatureKey } from '@carcassonne/shared/core/regionManager';
-import { applyTileToBoardAndRM, getValidRotations } from '@carcassonne/shared/core/tileUtils';
+import type { PreviewTile, PlacedMeeple } from '@fiefdom/shared/core/types';
+import type { RegionManager, FeatureKey } from '@fiefdom/shared/core/regionManager';
+import { applyTileToBoardAndRM, getValidRotations } from '@fiefdom/shared/core/tileUtils';
 import type { GameStore } from '../useGameStore';
 import type { MoveSnapshot, PlacementAnimation } from '../types';
 

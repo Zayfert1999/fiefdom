@@ -4,7 +4,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '@carcassonne/shared/protocol/events';
+import type { ClientToServerEvents, ServerToClientEvents } from '@fiefdom/shared/protocol/events';
 import cors from 'cors';
 import { RoomManager } from './rooms/RoomManager';
 import { registerLobbyHandlers } from './handlers/lobbyHandlers';

@@ -3,14 +3,14 @@
 // Делегирует работу специализированным модулям.
 
 import type { Socket } from 'socket.io';
-import type { RoomSettings, RoomInfo, LobbyPlayer } from '@carcassonne/shared/protocol/events';
-import type { SerializedGameState } from '@carcassonne/shared/core/serialization';
+import type { RoomSettings, RoomInfo, LobbyPlayer } from '@fiefdom/shared/protocol/events';
+import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
 import type { PlayerConnection } from '../state/PlayerConnection';
 import { ServerGameState } from '../state/ServerGameState';
 import { RoomPlayerManager } from './RoomPlayerManager';
 import { RoomBroadcaster } from './RoomBroadcaster';
 import { RoomGameLoop } from './RoomGameLoop';
-import type { RoomSnapshot, SnapshotPlayer } from '@carcassonne/shared/protocol/events';
+import type { RoomSnapshot, SnapshotPlayer } from '@fiefdom/shared/protocol/events';
 import { logger } from '../utils/logger';
 
 /**

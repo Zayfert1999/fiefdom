@@ -15,8 +15,8 @@
 
     "baseUrl": ".",
     "paths": {
-      "@carcassonne/shared": ["../shared/src/index.ts"],
-      "@carcassonne/shared/*": ["../shared/src/*"]
+      "@fiefdom/shared": ["../shared/src/index.ts"],
+      "@fiefdom/shared/*": ["../shared/src/*"]
     }
   },
   "include": ["src/**/*"],

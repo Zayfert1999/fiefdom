@@ -1,8 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
-import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@carcassonne/shared/core/types';
-import { getTileSides, rotateFeatures } from '@carcassonne/shared/core/tileUtils';
+import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@fiefdom/shared/core/types';
+import { getTileSides, rotateFeatures } from '@fiefdom/shared/core/tileUtils';
 import {
     SAVE_KEYS,
     saveGameState,
@@ -10,10 +10,10 @@ import {
     clearGameState,
     type GameStateForSave,
 } from '@/core/gameSaveManager';
-import { RegionManager } from '@carcassonne/shared/core/regionManager';
-import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@carcassonne/shared/core/scoring';
-import { COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@carcassonne/shared/core/constants'
-import { createDeck, drawPlayableTile } from '@carcassonne/shared/core/deck';
+import { RegionManager } from '@fiefdom/shared/core/regionManager';
+import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@fiefdom/shared/core/scoring';
+import { COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@fiefdom/shared/core/constants'
+import { createDeck, drawPlayableTile } from '@fiefdom/shared/core/deck';
 
 
 export interface GameSlice {
@@ -102,7 +102,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             });
 
             for (const feature of startingTile.features) {
-                rm.makeSet(`0,0:${feature.id}`, feature.type, (feature as any).hasShield ?? false);
+                rm.makeSet(`0,0:${feature.id}`, feature.type, feature.shieldSpot !== undefined);
             }
         }
 

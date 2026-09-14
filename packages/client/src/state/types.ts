@@ -1,6 +1,6 @@
-import type { Tile, PlacedTile, PreviewTile, PlacedMeeple } from '@carcassonne/shared/core/types';
-import type { RegionManager } from '@carcassonne/shared/core/regionManager';
-import type { CompletedRegion } from '@carcassonne/shared/core/scoring';
+import type { Tile, PlacedTile, PreviewTile, PlacedMeeple } from '@fiefdom/shared/core/types';
+import type { RegionManager } from '@fiefdom/shared/core/regionManager';
+import type { CompletedRegion } from '@fiefdom/shared/core/scoring';
 
 export type GamePhase = 'lobby' | 'startTurn' | 'placeTile' | 'placeMeeple' | 'endTurn' | 'gameOver';
 

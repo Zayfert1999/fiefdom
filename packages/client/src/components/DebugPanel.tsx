@@ -2,7 +2,7 @@
 // 🐛 Панель отладки: информация о выбранном тайле, фичах и регионах.
 // Открывается через Ctrl+клик на тайл.
 import { useGameStore } from '@/state/useGameStore';
-import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@carcassonne/shared/core/scoring';
+import { calculateMonasteryPoints, getAdjacentCitiesForField } from '@fiefdom/shared/core/scoring';
 import styles from '@/components/styles/game.module.css';
 
 // ============================================

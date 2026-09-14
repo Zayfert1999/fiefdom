@@ -2,8 +2,8 @@
 import { useMemo, useEffect, useRef } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { cloneFeatureGeometry, calculateBoundingBox } from '@/core/cloneFeatureGeometry';
-import { rotateFeatures } from '@carcassonne/shared/core/tileUtils';
-import type { RegionManager } from '@carcassonne/shared/core/regionManager';
+import { rotateFeatures } from '@fiefdom/shared/core/tileUtils';
+import type { RegionManager } from '@fiefdom/shared/core/regionManager';
 
 interface RegionOverlayProps {
   // 🌟 НОВОЕ: опциональный override для RegionManager (используется при примерке)

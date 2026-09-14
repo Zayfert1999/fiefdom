@@ -10,7 +10,7 @@ import { CellsOverlay } from './CellsOverlay';
 import { DebugOverlay } from './DebugOverlay';
 import { useBoardCamera } from '@/hooks/useBoardCamera';
 import { useRegionPatterns } from '@/hooks/useRegionPatterns';
-import { TILE_SIZE, WORLD_BOUNDS } from '@carcassonne/shared/core/constants'
+import { TILE_SIZE, WORLD_BOUNDS } from '@fiefdom/shared/core/constants'
 
 type BoardProps = {
   onGridClick: (x: number, y: number) => void;

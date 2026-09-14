@@ -5,10 +5,10 @@ import { useGameStore } from '@/state/useGameStore';
 import { useHotkeysModal } from '@/hooks/useHotkeysModal';
 import { useDeckModal } from '@/hooks/useDeckModal';
 import { useHotkeys } from '@/hooks/useHotkeys';
-import { HOTKEY_DEFINITIONS } from '@carcassonne/shared/core/hotkeys';
+import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import styles from '@/components/styles/game.module.css';
-import type { Player } from '@carcassonne/shared/core/types';
+import type { Player } from '@fiefdom/shared/core/types';
 import { darkenColor } from '@/utils/color';
 
 // Ленивые импорты модалок

@@ -2,8 +2,8 @@
 // 🌟 Вычисление виртуальной колоды на клиенте
 // Работает и для локальной, и для сетевой игры
 
-import type { Tile, PlacedTile } from '@carcassonne/shared/core/types';
-import { TILE_DEFINITIONS } from '@carcassonne/shared/core/tileData';
+import type { Tile, PlacedTile } from '@fiefdom/shared/core/types';
+import { TILE_DEFINITIONS } from '@fiefdom/shared/core/tileData';
 
 /**
  * Создаёт "виртуальную колоду" — список тайлов, которые МОГУТ быть в колоде.

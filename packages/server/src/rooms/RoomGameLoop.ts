@@ -2,12 +2,12 @@
 // 🌟 Игровой цикл: старт, ходы, таймер, конец игры.
 // Отделён от Room для чёткого разделения ответственности.
 
-import type { RoomSettings } from '@carcassonne/shared/protocol/events';
+import type { RoomSettings } from '@fiefdom/shared/protocol/events';
 import type { PlayerConnection } from '../state/PlayerConnection';
 import type { ServerGameState } from '../state/ServerGameState';
 import { TurnTimer } from '../services/TurnTimer';
 import type { RoomBroadcaster } from './RoomBroadcaster';
-import { generateGameSeed } from '@carcassonne/shared/prng/seedRandom';
+import { generateGameSeed } from '@fiefdom/shared/prng/seedRandom';
 import { logger } from '../utils/logger';
 
 // 🌟 Время, в течение которого все видят мипла перед проверкой регионов

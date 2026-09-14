@@ -1,5 +1,8 @@
 {
   "$schema": "./tileSchema.json",
+  "name": "Fiefdom Base Game",
+  "version": "1.0.0",
+  "description": "Базовый набор тайлов Fiefdom (72 тайла)",
   "tiles": [
   {
     "id": "tile_CCCC-S",

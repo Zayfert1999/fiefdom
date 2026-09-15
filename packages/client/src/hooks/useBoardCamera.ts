@@ -1,9 +1,9 @@
 // hooks/useBoardCamera.ts
-import { useEffect, useRef} from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { useCamera } from './useCamera';
 import { useHotkeys } from './useHotkeys';
-import { CAMERA_CONFIG} from '@fiefdom/shared/core/constants';
+import { CAMERA_CONFIG } from '@fiefdom/shared/core/constants';
 import type { CompletedRegion } from '@fiefdom/shared/core/scoring';
 import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 
@@ -29,7 +29,7 @@ const getRegionCenter = (region: CompletedRegion): { x: number; y: number } => {
  * - Хоткеи камеры (+, -, 0, стрелки)
  * - Обработчики drag мыши
  */
-export const useBoardCamera = () => {
+export const useBoardCamera = (onGridClick?: (x: number, y: number) => void) => {
   // 🌟 Ref для SVG (нужен и внутри хука для wheel, и снаружи для рендеринга)
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -52,12 +52,25 @@ export const useBoardCamera = () => {
     zoomIn,
     zoomOut,
     zoomAtPoint,
+    pinchZoom,
     startDrag,
     drag,
     endDrag,
     pan,
     screenToWorld,
   } = cameraApi;
+
+  // ============================================
+  // 🌟 СОСТОЯНИЕ ТАЧ-ЖЕСТОВ
+  // ============================================
+  const touchState = useRef({
+    isTouching: false,
+    touchStartTime: 0,
+    touchStartX: 0,
+    touchStartY: 0,
+    lastDistance: 0,
+    hasMoved: false,
+  });
 
 
   // ============================================
@@ -160,18 +173,18 @@ export const useBoardCamera = () => {
   // ⌨️ Хоткеи камеры
   // ============================================
   const isGameLocked = phase === 'endTurn';
-  
+
   useHotkeys([
     { ...HOTKEY_DEFINITIONS.ZOOM_IN, action: zoomIn, enabled: !isGameLocked },
     { ...HOTKEY_DEFINITIONS.ZOOM_IN_ALT, action: zoomIn, enabled: !isGameLocked },
-    { ...HOTKEY_DEFINITIONS.ZOOM_OUT,  action: zoomOut, enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.ZOOM_OUT, action: zoomOut, enabled: !isGameLocked },
     {
-      ...HOTKEY_DEFINITIONS.RESET_CAMERA, 
+      ...HOTKEY_DEFINITIONS.RESET_CAMERA,
       action: () => resetAndCenter(board),
       enabled: !isGameLocked
     },
     { ...HOTKEY_DEFINITIONS.PAN_UP, action: () => pan(0, 100), enabled: !isGameLocked },
-    { ...HOTKEY_DEFINITIONS.PAN_DOWN,  action: () => pan(0, -100), enabled: !isGameLocked },
+    { ...HOTKEY_DEFINITIONS.PAN_DOWN, action: () => pan(0, -100), enabled: !isGameLocked },
     { ...HOTKEY_DEFINITIONS.PAN_LEFT, action: () => pan(100, 0), enabled: !isGameLocked },
     { ...HOTKEY_DEFINITIONS.PAN_RIGHT, action: () => pan(-100, 0), enabled: !isGameLocked },
   ]);
@@ -194,6 +207,105 @@ export const useBoardCamera = () => {
     endDrag();
   };
 
+  // ============================================
+  // 📱 НОВОЕ: ТАЧ-ОБРАБОТЧИКИ
+  // ============================================
+
+  /** Один палец → начинаем панорамирование. Два пальца → готовимся к pinch */
+  const handleTouchStart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchState.current = {
+        isTouching: true,
+        touchStartTime: Date.now(),
+        touchStartX: touch.clientX,
+        touchStartY: touch.clientY,
+        lastDistance: 0,
+        hasMoved: false,
+      };
+      // Начинаем драг для панорамирования
+      startDrag(touch.clientX, touch.clientY);
+    } else if (e.touches.length === 2) {
+      // Два пальца — вычисляем начальное расстояние для pinch
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchState.current.lastDistance = Math.sqrt(dx * dx + dy * dy);
+      touchState.current.hasMoved = true; // Отменяем возможность тапа
+      endDrag(); // Останавливаем панорамирование
+    }
+  }, [startDrag, endDrag]);
+
+  /** Один палец → панорамирование. Два пальца → масштабирование */
+  const handleTouchMove = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 1 && touchState.current.isTouching) {
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchState.current.touchStartX);
+      const dy = Math.abs(touch.clientY - touchState.current.touchStartY);
+
+      // Если движение > 5px — это драг, не тап
+      if (dx > 5 || dy > 5) {
+        touchState.current.hasMoved = true;
+      }
+
+      drag(touch.clientX, touch.clientY);
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (touchState.current.lastDistance > 0) {
+        const scaleFactor = distance / touchState.current.lastDistance;
+        const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        pinchZoom(scaleFactor, centerX, centerY);
+      }
+
+      touchState.current.lastDistance = distance;
+    }
+  }, [drag, pinchZoom]);
+
+  /** Отпустили пальцы → если это был тап, обрабатываем как клик */
+  const handleTouchEnd = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 0) {
+      endDrag();
+
+      const elapsed = Date.now() - touchState.current.touchStartTime;
+      const touch = e.changedTouches[0];
+
+      // Тап: короткое нажатие без движения → обрабатываем как клик по доске
+      if (!touchState.current.hasMoved && elapsed < 300 && onGridClick) {
+        const { x: gridX, y: gridY } = screenToWorld(touch.clientX, touch.clientY);
+        onGridClick(gridX, gridY);
+      }
+
+      touchState.current.isTouching = false;
+      touchState.current.hasMoved = false;
+    }
+
+    // Сбрасываем расстояние при переходе от двух пальцев к одному
+    if (e.touches.length < 2) {
+      touchState.current.lastDistance = 0;
+    }
+  }, [endDrag, screenToWorld, onGridClick]);
+
+  // ============================================
+  // 🛡️ ПРЕДОТВРАЩЕНИЕ ДЕФОЛТНЫХ ЖЕСТОВ БРАУЗЕРА
+  // ============================================
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const preventTouchDefaults = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    svg.addEventListener('touchmove', preventTouchDefaults, { passive: false });
+
+    return () => {
+      svg.removeEventListener('touchmove', preventTouchDefaults);
+    };
+  }, []);
+
   return {
     // 📷 Состояние камеры
     camera,
@@ -206,6 +318,11 @@ export const useBoardCamera = () => {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+
+    // 📱 Тач
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
 
     // 🌍 Для кликов по клеткам
     screenToWorld

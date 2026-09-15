@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:client": "turbo run dev --filter=@fiefdom/client",
+    "dev:client:host": "turbo run dev --filter=@fiefdom/client -- --host",
     "dev:server": "turbo run dev --filter=@fiefdom/server",
     "build": "turbo run build",
     "build:client": "turbo run build --filter=@fiefdom/client",

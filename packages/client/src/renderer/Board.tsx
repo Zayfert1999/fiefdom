@@ -54,6 +54,9 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     screenToWorld,
   } = useBoardCamera();
 
@@ -103,11 +106,15 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       className="board-svg"
       style={{
         cursor: camera.isDragging ? 'grabbing' : 'default',
         userSelect: 'none',
         pointerEvents: isBoardLocked ? 'none' : 'auto',
+        touchAction: 'none',
       }}
     >
       <defs>
@@ -216,7 +223,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
               {/* 🌟 НОВОЕ: Обёртка для анимации */}
               <g className={isAnimatingTile ? 'tile-placement-animation' : ''}>
                 <g transform={`rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`} style={{ overflow: 'visible' }}>
-                <Tile
+                  <Tile
                     id={t.templateId as any}
                     size={TILE_SIZE}
                     features={t.features}
@@ -247,12 +254,12 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
                 transformOrigin: `${TILE_SIZE / 2}px ${TILE_SIZE / 2}px`,
               }}
             >
-            <Tile
+              <Tile
                 id={previewTile.tile.id as any}
                 size={TILE_SIZE}
                 features={previewTile.tile.features}
                 rotation={previewTile.rotation}
-            />
+              />
             </g>
             <rect
               className="preview-tile-overlay"

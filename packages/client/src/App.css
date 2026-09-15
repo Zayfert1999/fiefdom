@@ -25,3 +25,8 @@ textarea,
   -moz-user-select: text;
   -ms-user-select: text;
 }
+
+/* Запрещаем скролл/зум страницы на доске */
+.board-svg {
+  touch-action: none;
+}

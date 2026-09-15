@@ -356,6 +356,20 @@ export const useCamera = () => {
     setCamera(prev => ({ ...prev, isDragging: false }));
   }, []);
 
+  const pinchZoom = useCallback((scaleFactor: number, centerX: number, centerY: number) => {
+  setCamera(prev => {
+    const newZoom = Math.max(CAMERA_CONFIG.MIN_ZOOM, Math.min(prev.zoom * scaleFactor, CAMERA_CONFIG.MAX_ZOOM));
+    // Если зум не изменился — не вызываем re-render
+    if (Math.abs(newZoom - prev.zoom) < 0.001) return prev;
+
+    const zoomRatio = newZoom / prev.zoom;
+    const newX = centerX - (centerX - prev.x) * zoomRatio;
+    const newY = centerY - (centerY - prev.y) * zoomRatio;
+    const clamped = clampCamera(newX, newY, newZoom);
+    return { ...prev, x: clamped.x, y: clamped.y, zoom: newZoom };
+  });
+}, [clampCamera]);
+
   // ============================================
   // 🌟 УТИЛИТЫ
   // ============================================
@@ -385,6 +399,7 @@ export const useCamera = () => {
     zoomIn,
     zoomOut,
     zoomAtPoint,
+    pinchZoom,
     startDrag,
     drag,
     endDrag,

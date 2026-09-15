@@ -58,7 +58,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     handleTouchMove,
     handleTouchEnd,
     screenToWorld,
-  } = useBoardCamera();
+  } = useBoardCamera(onGridClick);
 
 
   // ============================================

@@ -6,10 +6,16 @@
 .board-camera-group {
   will-change: transform;
   transform-origin: 0 0;
+  transition: none;
+}
+
+/* 🎬 Анимация ТОЛЬКО при программных действиях (центрирование, зум к тайлу) */
+.board-camera-group.animating {
   transition: transform var(--anim-camera) cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* При drag — отключаем transition (мгновенный отклик) */
 .board-camera-group.dragging {
+  will-change: transform;
   transition: none;
 }

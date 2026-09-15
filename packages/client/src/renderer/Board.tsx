@@ -1,5 +1,5 @@
 // renderer/Board.tsx
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Tile } from './Tile';
 import { RegionOverlay } from './RegionOverlay';
@@ -48,7 +48,6 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
   * ============================================ */
   const {
     camera,
-    transform,
     svgRef,
 
     handleMouseDown,
@@ -59,6 +58,18 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     handleTouchEnd,
     screenToWorld,
   } = useBoardCamera(onGridClick);
+
+  // 🌟 НОВОЕ: Ref для группы камеры
+  const cameraLayerRef = useRef<SVGGElement>(null);
+
+  // 🌟 НОВОЕ: Обновляем CSS-переменные через DOM (без re-render Board)
+  useEffect(() => {
+    const el = cameraLayerRef.current;
+    if (!el) return;
+    el.style.setProperty('--cam-x', `${camera.x}px`);
+    el.style.setProperty('--cam-y', `${camera.y}px`);
+    el.style.setProperty('--cam-zoom', `${camera.zoom}`);
+  }, [camera.x, camera.y, camera.zoom]);
 
 
   // ============================================
@@ -166,8 +177,13 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
 
       {/* 🌟 ГРУППА С КАМЕРОЙ — всё содержимое доски */}
       <g
-        className={`board-camera-group ${camera.isDragging ? 'dragging' : ''}`}
-        transform={transform}
+        ref={cameraLayerRef}
+        className={`board-camera-group ${camera.isDragging ? 'dragging' : ''} ${camera.isAnimating ? 'animating' : ''}`}
+        style={{
+          transform: 'translate(var(--cam-x, 0px), var(--cam-y, 0px)) scale(var(--cam-zoom, 1))',
+          transformOrigin: '0 0',
+          willChange: camera.isDragging || camera.isAnimating ? 'transform' : 'auto',
+        }}
       >
         {/* СЛОЙ 0: ФОН */}
         <rect

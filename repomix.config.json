@@ -4,7 +4,7 @@
     "style": "xml"
   },
   "include": [
-    "packages/**/*.{ts,tsx,json}",
+    "packages/**/*.{ts,tsx,json,css}",
     "package.json",
     "tsconfig.json",
     "vite.config.ts"

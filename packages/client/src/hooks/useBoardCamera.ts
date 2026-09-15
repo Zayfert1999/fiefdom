@@ -269,15 +269,6 @@ export const useBoardCamera = (onGridClick?: (x: number, y: number) => void) => 
     if (e.touches.length === 0) {
       endDrag();
 
-      const elapsed = Date.now() - touchState.current.touchStartTime;
-      const touch = e.changedTouches[0];
-
-      // Тап: короткое нажатие без движения → обрабатываем как клик по доске
-      if (!touchState.current.hasMoved && elapsed < 300 && onGridClick) {
-        const { x: gridX, y: gridY } = screenToWorld(touch.clientX, touch.clientY);
-        onGridClick(gridX, gridY);
-      }
-
       touchState.current.isTouching = false;
       touchState.current.hasMoved = false;
     }

@@ -57,7 +57,7 @@ export const Board = ({ onGridClick, validCells }: BoardProps) => {
     handleTouchMove,
     handleTouchEnd,
     screenToWorld,
-  } = useBoardCamera(onGridClick);
+  } = useBoardCamera();
 
   // 🌟 НОВОЕ: Ref для группы камеры
   const cameraLayerRef = useRef<SVGGElement>(null);

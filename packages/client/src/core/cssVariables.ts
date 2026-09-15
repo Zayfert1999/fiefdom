@@ -1,5 +1,5 @@
 // Вспомогательная функция для экспорта JS констант в CSS
-import { CAMERA_CONFIG, COMPLITED_REGION_ANIMATION_DURATION } from '@fiefdom/shared/core/constants'
+import { CAMERA_CONFIG, COMPLITED_REGION_ANIMATION_DURATION, PREVIEW_ROTATION_DURATION } from '@fiefdom/shared/core/constants'
 
 export const syncCssVariables = () => {
   const root = document.documentElement;
@@ -10,8 +10,12 @@ export const syncCssVariables = () => {
   // Анимация завершения региона
   root.style.setProperty('--comp-reg-anim-completion', `${COMPLITED_REGION_ANIMATION_DURATION}ms`);
 
+  // Анимация поворота превью-тайла
+  root.style.setProperty('--preview-rotation', `${PREVIEW_ROTATION_DURATION}ms`);
+
   console.log(`🎨 [CSS Sync] Переменные синхронизированы:`, {
     '--anim-camera': `${CAMERA_CONFIG.ANIMATION_DURATION}ms`,
     '--comp-reg-anim-completion': `${COMPLITED_REGION_ANIMATION_DURATION}ms`,
+    '--preview-rotation': `${PREVIEW_ROTATION_DURATION}ms`,
   });
 };

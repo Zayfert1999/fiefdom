@@ -14,6 +14,9 @@ export const WORLD_BOUNDS = {
 // Длительность анимации одного региона (синхронизировано с --comp-reg-anim-completion)
 export const COMPLITED_REGION_ANIMATION_DURATION = 3000;
 
+// Длительность анимации поворота превью-тайла (синхронизировано с --preview-rotation)
+export const PREVIEW_ROTATION_DURATION = 300;
+
 //Настройки камеры
 export const CAMERA_CONFIG = {
     MIN_ZOOM: 0.5,

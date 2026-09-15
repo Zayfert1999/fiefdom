@@ -1,12 +1,12 @@
 // renderer/RegionOverlay.tsx
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { cloneFeatureGeometry, calculateBoundingBox } from '@/core/cloneFeatureGeometry';
 import { rotateFeatures } from '@fiefdom/shared/core/tileUtils';
 import type { RegionManager } from '@fiefdom/shared/core/regionManager';
+import { PREVIEW_ROTATION_DURATION } from '@fiefdom/shared/core/constants';
 
 interface RegionOverlayProps {
-  // 🌟 НОВОЕ: опциональный override для RegionManager (используется при примерке)
   regionManagerOverride?: RegionManager;
 }
 
@@ -21,6 +21,41 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
   const placementAnimation = useGameStore(s => s.placementAnimation);
   const regionManager = regionManagerOverride || storeRegionManager;
 
+  // ============================================
+  // 🔄 ОТСЛЕЖИВАНИЕ ПОВОРОТА ПРЕВЬЮ
+  // Скрываем фичи превью тайла на время анимации,
+  // НЕ затрагивая подсветку существующих тайлов
+  // ============================================
+  const [previewRotating, setPreviewRotating] = useState(false);
+  const prevPreviewRef = useRef<{ x: number; y: number; rotation: number } | null>(null);
+
+  useEffect(() => {
+    // Превью убрано — сбрасываем
+    if (!previewTile) {
+      prevPreviewRef.current = null;
+      setPreviewRotating(false);
+      return;
+    }
+
+    const prev = prevPreviewRef.current;
+    const current = { x: previewTile.x, y: previewTile.y, rotation: previewTile.rotation };
+
+    // Поворот изменился НА ТОЙ ЖЕ ПОЗИЦИИ → скрываем подсветку превью
+    if (prev && prev.x === current.x && prev.y === current.y && prev.rotation !== current.rotation) {
+      setPreviewRotating(true);
+      const timer = setTimeout(() => {
+        setPreviewRotating(false);
+      }, PREVIEW_ROTATION_DURATION);
+      prevPreviewRef.current = current;
+      return () => clearTimeout(timer);
+    }
+
+    prevPreviewRef.current = current;
+  }, [previewTile]);
+
+  // ============================================
+  // 🗺️ РАСЧЁТ РЕГИОНОВ
+  // ============================================
   const regions = useMemo(() => {
     const regionMap = new Map<string, {
       featureKey: string;
@@ -30,18 +65,13 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       featureId: string;
     }[]>();
 
-    // ============================================
-    // 🌟 ШАГ 1: Обычные тайлы из board
-    // ============================================
+    // ШАГ 1: Обычные тайлы из board (НЕ затрагиваются поворотом превью)
     for (const tile of board.values()) {
-      // 🌟 НОВОЕ: пропускаем тайл, который сейчас анимируется
-      // Подсветка появится после завершения анимации
       if (placementAnimation?.tile &&
         placementAnimation.tile.x === tile.x &&
         placementAnimation.tile.y === tile.y) {
         continue;
       }
-
       for (const feature of tile.features) {
         if (!visibleFeatureTypes.includes(feature.type)) continue;
         const featureKey = `${tile.x},${tile.y}:${feature.id}`;
@@ -62,10 +92,9 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       }
     }
 
-    // ============================================
-    // 🌟 ШАГ 2: Preview-тайл (если есть)
-    // ============================================
-    if (previewTile) {
+    // 🌟 ШАГ 2: Превью тайл — ПРОПУСКАЕМ во время анимации поворота
+    // Подсветка существующих тайлов (ШАГ 1) при этом сохраняется
+    if (previewTile && !previewRotating) {
       const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
       for (const feature of rotatedFeatures) {
         if (!visibleFeatureTypes.includes(feature.type)) continue;
@@ -88,7 +117,8 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
     }
 
     return Array.from(regionMap.entries());
-  }, [board, regionManager, players, visibleFeatureTypes, previewTile, placementAnimation]);  // 🌟 Добавили placementAnimation
+  }, [board, regionManager, players, visibleFeatureTypes, previewTile, placementAnimation, previewRotating]);
+
 
   const getPatternId = (featureKey: string): string => {
     const owners = regionManager.getFeatureOwners(featureKey);

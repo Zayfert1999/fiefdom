@@ -58,7 +58,7 @@
 /* Обёртка с анимацией вращения */
 .preview-tile-rotating {
     /* Используем CSS transform вместо SVG-атрибута для анимации */
-    transition: transform 0.3s ease;
+    transition: transform var(--preview-rotation, 0.3s) ease;
     /* Указываем, что transform-origin относительно самого элемента */
     transform-box: fill-box;
 }

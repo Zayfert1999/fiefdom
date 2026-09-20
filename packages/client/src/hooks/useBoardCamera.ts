@@ -105,7 +105,7 @@ export const useBoardCamera = (onGridClick?: (x: number, y: number) => void) => 
 
   // ============================================
   // 🎬 АНИМАЦИЯ 2: Приближение при placeMeeple
-  // 🎬 АНИМАЦИЯ 3: Восстановление при startTurn
+  // 🎬 АНИМАЦИЯ 3: Восстановление после
   // ============================================
   const prevPhaseRef = useRef(phase);
   useEffect(() => {
@@ -119,9 +119,9 @@ export const useBoardCamera = (onGridClick?: (x: number, y: number) => void) => 
         console.log(`🔍 [Camera] Приближение к миплу: zoom → ${CAMERA_CONFIG.MAX_ZOOM}`);
       }
 
-      if (phase === 'startTurn' && prevPhase === 'placeMeeple') {
+      if (prevPhase === 'placeMeeple') {
         restoreZoom(board);
-        console.log(`🔭 [Camera] Восстановление исходного масштаба`);
+        console.log(`🔭 [Camera] Восстановление исходного масштаба (из ${prevPhase} → ${phase})`);
       }
     }
 

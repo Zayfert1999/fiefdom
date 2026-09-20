@@ -10,6 +10,7 @@
 /* Контейнер валидной клетки */
 .valid-cell-container {
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .valid-cell {
@@ -53,6 +54,7 @@
 /* Контейнер конфликтной клетки */
 .conflicted-cell-container {
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .conflicted-cell-container:hover .valid-cell{

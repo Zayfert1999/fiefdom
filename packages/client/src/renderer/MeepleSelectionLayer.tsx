@@ -1,5 +1,5 @@
 // renderer/MeepleSelectionLayer.tsx
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
 import { TILE_DEFINITIONS } from '@fiefdom/shared/core/tileData';
@@ -7,15 +7,11 @@ import type { TileFeature } from '@fiefdom/shared/core/types';
 import {TILE_SIZE} from '@fiefdom/shared/core/constants'
 
 /**
- * 🌟 Глобальный слой для спотов размещения миплов.
- * Рендерится ПОВЕРХ подсветки регионов (RegionOverlay).
- * 
- * Объединяет логику:
- *   - Находит последний тайл
- *   - Вычисляет доступные фичи
- *   - Рендерит споты для миплов
+ * 🔶 Споты для размещения миплов на последнем тайле.
+ * Мемоизирован — перерендеривается при смене фазы/игрока/последнего тайла.
  */
-export const MeepleSelectionLayer = () => {
+
+export const MeepleSelectionLayer = memo(() => {
   const board = useGameStore(s => s.board);
   const phase = useGameStore(s => s.phase);
   const currentPlayer = useGameStore(s => s.players[s.currentTurn]);
@@ -130,4 +126,6 @@ export const MeepleSelectionLayer = () => {
       })}
     </g>
   );
-};
+});
+
+MeepleSelectionLayer.displayName = 'MeepleSelectionLayer';

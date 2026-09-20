@@ -1,16 +1,17 @@
 // renderer/RegionOverlay.tsx
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { memo, useMemo, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { cloneFeatureGeometry, calculateBoundingBox } from '@/core/cloneFeatureGeometry';
 import { rotateFeatures } from '@fiefdom/shared/core/tileUtils';
-import type { RegionManager } from '@fiefdom/shared/core/regionManager';
 import { PREVIEW_ROTATION_DURATION } from '@fiefdom/shared/core/constants';
 
-interface RegionOverlayProps {
-  regionManagerOverride?: RegionManager;
-}
+/**
+🎨 Подсветка регионов штриховкой.
+Мемоизирован — перерендеривается только при изменении board/regionManager/previewTile.
+Сам читает previewRegionManager из стора.
+*/
 
-export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => {
+export const RegionOverlay = memo(() => {
   const board = useGameStore(s => s.board);
   const storeRegionManager = useGameStore(s => s.regionManager);
   const players = useGameStore(s => s.players);
@@ -19,7 +20,8 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
   const containerRef = useRef<SVGGElement>(null);
   const previewTile = useGameStore(s => s.previewTile);
   const placementAnimation = useGameStore(s => s.placementAnimation);
-  const regionManager = regionManagerOverride || storeRegionManager;
+  const previewRegionManager = useGameStore(s => s.previewRegionManager);
+  const regionManager = previewRegionManager || storeRegionManager;
 
   // ============================================
   // 🔄 ОТСЛЕЖИВАНИЕ ПОВОРОТА ПРЕВЬЮ
@@ -92,7 +94,7 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       }
     }
 
-    // 🌟 ШАГ 2: Превью тайл — ПРОПУСКАЕМ во время анимации поворота
+    // ШАГ 2: Превью тайл — ПРОПУСКАЕМ во время анимации поворота
     // Подсветка существующих тайлов (ШАГ 1) при этом сохраняется
     if (previewTile && !previewRotating) {
       const rotatedFeatures = rotateFeatures(previewTile.tile.features, previewTile.rotation);
@@ -144,7 +146,7 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
     return `hatch-${combo.replace(/#/g, '').replace(/\|/g, '-')}`;
   };
 
-  // 🌟 Используем общую утилиту для клонирования
+  // Используем общую утилиту для клонирования
   useEffect(() => {
     if (!containerRef.current || regions.length === 0) return;
 
@@ -189,4 +191,6 @@ export const RegionOverlay = ({ regionManagerOverride }: RegionOverlayProps) => 
       })}
     </g>
   );
-};
+});
+
+RegionOverlay.displayName = 'RegionOverlay';

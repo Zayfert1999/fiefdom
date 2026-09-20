@@ -1,9 +1,14 @@
 // renderer/CompletionOverlay.tsx
-import { useRef, useMemo, useLayoutEffect } from 'react';
+import { memo, useRef, useMemo, useLayoutEffect } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { cloneFeatureGeometry } from '@/core/cloneFeatureGeometry';
 
-export const CompletionOverlay = () => {
+/**
+ * ✨ Подсветка завершённых регионов (золотая пульсация).
+ * Мемоизирован — перерендеривается только при появлении/исчезновении анимаций.
+ */
+
+export const CompletionOverlay = memo(() => {
   const completionAnimations = useGameStore(s => s.completionAnimations);
   const board = useGameStore(s => s.board);
   const containerRef = useRef<SVGGElement>(null);
@@ -82,4 +87,6 @@ export const CompletionOverlay = () => {
       })}
     </g>
   );
-};
+});
+
+CompletionOverlay.displayName = 'CompletionOverlay';

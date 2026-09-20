@@ -1,4 +1,5 @@
 // renderer/MeepleLayer.tsx
+import { memo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
 import { TILE_SIZE } from '@fiefdom/shared/core/constants'
@@ -6,10 +7,11 @@ import { darkenColor } from '@/utils/color';
 
 
 /**
- * 🌟 Отдельный слой для миплов.
- * Рендерится ПОВЕРХ подсветки регионов (RegionOverlay).
+ * 🔶 Слой размещённых миплов поверх всех регионов.
+ * Мемоизирован — перерендеривается при изменении board/placementAnimation.
  */
-export const MeepleLayer = () => {
+
+export const MeepleLayer = memo(() => {
   const board = useGameStore(s => s.board);
   const removePlacedMeeple = useGameStore(s => s.removePlacedMeeple);
   const placementAnimation = useGameStore(s => s.placementAnimation);
@@ -105,4 +107,6 @@ export const MeepleLayer = () => {
       })}
     </g>
   );
-};
+});
+
+MeepleLayer.displayName = 'MeepleLayer';

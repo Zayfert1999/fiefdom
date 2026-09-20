@@ -1,9 +1,14 @@
 // renderer/DebugOverlay.tsx
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { TILE_SIZE } from '@fiefdom/shared/core/constants';
 
-export const DebugOverlay = () => {
+/**
+ * 🐛 Дебаг-выделение выбранного тайла (Ctrl+клик).
+ * Мемоизирован — перерендеривается только при изменении debugSelectedTile.
+ */
+
+export const DebugOverlay = memo(() => {
   const debugSelectedTile = useGameStore(s => s.debugSelectedTile);
 
   const selection = useMemo(() => {
@@ -27,4 +32,6 @@ export const DebugOverlay = () => {
       />
     </g>
   );
-};
+});
+
+DebugOverlay.displayName = 'DebugOverlay';

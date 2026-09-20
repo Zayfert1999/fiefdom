@@ -1,5 +1,5 @@
 // renderer/CellsOverlay.tsx
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { findDeadCells } from '@fiefdom/shared/core/tileUtils';
 import { rotateFeatures, getTileSides } from '@fiefdom/shared/core/tileUtils';
@@ -13,7 +13,12 @@ interface CellsOverlayProps {
   validCells: Set<string>;
 }
 
-export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => {
+/**
+ * 🟢💀 Слой клеток: валидные (зелёные), мёртвые (красные), конфликтные (жёлтые).
+ * Мемоизирован — перерендеривается при изменении board/previewTile/showDeadCells.
+ */
+
+export const CellsOverlay = memo(({ onGridClick, validCells }: CellsOverlayProps) => {
   const board = useGameStore(s => s.board);
   const drawnTile = useGameStore(s => s.drawnTile);
   const phase = useGameStore(s => s.phase);
@@ -49,7 +54,7 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
       boardToCheck = virtualBoard;
     }
 
-    // 🌟 ИСПРАВЛЕНО: виртуальная колода вместо deck из store
+    // виртуальная колода
     const availableDeck = getVirtualDeck(boardToCheck);
     const dead = findDeadCells(boardToCheck, availableDeck);
 
@@ -61,7 +66,7 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
     return dead;
   }, [board, drawnTile, phase, showDeadCells, previewTile]);
 
-  // 🌟 ОДИН useMemo для всех трёх типов клеток
+  // Разделение на три типа клеток
   const { pureValidCells, pureDeadCells, conflictedCells } = useMemo(() => {
     const conflicted = new Set<string>();
     const pureValid = new Set<string>();
@@ -232,4 +237,6 @@ export const CellsOverlay = ({ onGridClick, validCells }: CellsOverlayProps) => 
       })}
     </g>
   );
-};
+});
+
+CellsOverlay.displayName = 'CellsOverlay';

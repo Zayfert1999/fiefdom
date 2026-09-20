@@ -1,6 +1,6 @@
 // packages/client/src/components/GameHUD.tsx
 // 🌟 Единый игровой HUD: игроки, таймер, колода, фаза, управление
-import { useState, useEffect, useMemo, useRef, useLayoutEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, memo, useMemo, useRef, useLayoutEffect, lazy, Suspense } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { useHotkeysModal } from '@/hooks/useHotkeysModal';
 import { useDeckModal } from '@/hooks/useDeckModal';
@@ -35,7 +35,6 @@ export const GameHUD: React.FC = () => {
     const turnDeadline = useGameStore(s => s.turnDeadline);
     const turnTimerTotal = useGameStore(s => s.roomSettings?.turnTimerSeconds ?? 0);
     const exitToLobby = useGameStore(s => s.exitToLobby);
-    const gameStartTime = useGameStore(s => s.gameStartTime);
 
     // ============================================
     // 🎴 Колода
@@ -45,37 +44,6 @@ export const GameHUD: React.FC = () => {
         if (drawnTile) remaining -= 1;
         return Math.max(0, remaining);
     }, [totalTiles, board, drawnTile]);
-
-    // ============================================
-    // ⏱️ Общее время игры
-    // ============================================
-    const [gameElapsed, setGameElapsed] = useState(0);
-    useEffect(() => {
-        // 🌟 Если нет времени старта (локальная игра или лобби) — считаем локально
-        if (gameStartTime === null) {
-            const interval = setInterval(() => setGameElapsed(prev => prev + 1), 1000);
-            return () => clearInterval(interval);
-        }
-
-        // 🌟 Сетевая игра: вычисляем от серверного времени старта
-        const updateElapsed = () => {
-            const elapsed = Math.max(0, Math.floor((Date.now() - gameStartTime) / 1000));
-            setGameElapsed(elapsed);
-        };
-
-        // Сразу вычисляем при монтировании
-        updateElapsed();
-
-        // Обновляем каждую секунду
-        const interval = setInterval(updateElapsed, 1000);
-        return () => clearInterval(interval);
-    }, [gameStartTime]);
-
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
 
     // ============================================
     // 👥 Разбивка игроков на ряды по 3
@@ -143,7 +111,7 @@ export const GameHUD: React.FC = () => {
 
                     {/* Центральная зона: общее время игры */}
                     <div className={styles.timerZone}>
-                        <span className={styles.gameTimer}>⏱️ {formatTime(gameElapsed)}</span>
+                        <GameTimer />
                     </div>
 
                     {/* Правая зона: кнопки управления */}
@@ -237,9 +205,9 @@ interface PlayerCardProps {
     turnDeadline: number | null;
 }
 
-const PlayerCard = ({ player, isActive, isSelf, isDisconnected, timerTotal, turnDeadline }: PlayerCardProps) => {
+const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, timerTotal, turnDeadline }: PlayerCardProps) => {
 
-    // 🌟 Упрощённая логика: таймер активен если есть deadline и timerTotal > 0
+    // Упрощённая логика: таймер активен если есть deadline и timerTotal > 0
     const hasTimer = turnDeadline !== null && timerTotal > 0;
 
     // ============================================
@@ -375,4 +343,58 @@ const PlayerCard = ({ player, isActive, isSelf, isDisconnected, timerTotal, turn
             </div>
         </div>
     );
-};
+});
+
+PlayerCard.displayName = 'PlayerCard';
+
+// ============================================
+// ⏱️ ИЗОЛИРОВАННЫЙ ТАЙМЕР ИГРЫ
+// ============================================
+/**
+ * Компонент вынесен отдельно, чтобы его ежесекундное обновление
+ * НЕ вызывало перерендер всего GameHUD.
+
+ * Логика:
+ * - Локальная игра (gameStartTime === null): считаем от монтирования
+ * - Сетевая игра: считаем от серверного времени старта
+ */
+const GameTimer = memo(() => {
+  const gameStartTime = useGameStore(s => s.gameStartTime);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    console.log(`⏱️ [GameTimer] Таймер запущен, gameStartTime=${gameStartTime}`);
+
+    // 🌟 Локальная игра: считаем секунды от монтирования
+    if (gameStartTime === null) {
+      const interval = setInterval(() => {
+        setElapsed(prev => prev + 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+
+    // 🌟 Сетевая игра: синхронизируемся с серверным временем
+    const update = () => {
+      const secs = Math.max(0, Math.floor((Date.now() - gameStartTime) / 1000));
+      setElapsed(secs);
+    };
+
+    // Сразу вычисляем при монтировании
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [gameStartTime]);
+
+  // 🌟 Форматирование мм:сс
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+  return (
+    <span className={styles.gameTimer}>
+      ⏱️ {formatted}
+    </span>
+  );
+});
+
+GameTimer.displayName = 'GameTimer';

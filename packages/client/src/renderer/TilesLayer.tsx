@@ -9,31 +9,26 @@ interface TilesLayerProps {
 
 /**
  * 🎨 Слой размещённых тайлов.
- * Подписан на стор напрямую — не зависит от пропсов из родителя.
- * Мемоизирован — перерендеривается только при изменении board или анимации.
+ * Подписан ТОЛЬКО на board — анимация обрабатывается внутри каждого TileItem.
+ * Это значит, что при анимации одного тайла перерендеривается
+ * только один TileItem, а не весь слой.
  */
-
 export const TilesLayer = memo(({ onDebugClick }: TilesLayerProps) => {
   const board = useGameStore(s => s.board);
-  const placementAnimation = useGameStore(s => s.placementAnimation);
+
+  console.log(`🗺️ [TilesLayer] Рендер слоя: ${board.size} тайлов`);
 
   return (
     <>
-      {Array.from(board.values()).map((t) => {
-        const isAnimatingTile = placementAnimation?.tile &&
-          placementAnimation.tile.x === t.x &&
-          placementAnimation.tile.y === t.y;
-
-        return (
-          <TileItem
-            key={`${t.x},${t.y}`}
-            placedTile={t}
-            isAnimating={!!isAnimatingTile}
-            onDebugClick={onDebugClick}
-          />
-        );
-      })}
+      {Array.from(board.values()).map((t) => (
+        <TileItem
+          key={`${t.x},${t.y}`}
+          placedTile={t}
+          onDebugClick={onDebugClick}
+        />
+      ))}
     </>
   );
 });
+
 TilesLayer.displayName = 'TilesLayer';

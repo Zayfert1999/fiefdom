@@ -2,7 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { GameStore } from '../useGameStore';
 import type { GamePhase, LastPlacedTile, CompletionAnimation, MoveSnapshot } from '../types';
 import type { Player, PlacedTile, PlacedMeeple, Tile, FeatureType } from '@fiefdom/shared/core/types';
-import { getTileSides, rotateFeatures } from '@fiefdom/shared/core/tileUtils';
+import { getTilePorts, rotateFeatures } from '@fiefdom/shared/core/tileUtils';
 import {
     SAVE_KEYS,
     saveGameState,
@@ -98,7 +98,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 templateId: startingTile.id,
                 x: 0, y: 0, rotation: 0,
                 features: startingTile.features,
-                derivedSides: getTileSides(startingTile),
+                derivedPorts: getTilePorts(startingTile),
             });
 
             for (const feature of startingTile.features) {
@@ -202,7 +202,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
                 templateId: state.previewTile.tile.id,
                 x, y, rotation,
                 features: rotatedFeatures,
-                derivedSides: getTileSides({ ...state.previewTile.tile, features: rotatedFeatures }),
+                derivedPorts: getTilePorts({ ...state.previewTile.tile, features: rotatedFeatures }),
             });
 
             set({
@@ -235,7 +235,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             templateId: tile.id,
             x, y, rotation,
             features: rotatedFeatures,
-            derivedSides: getTileSides({ ...tile, features: rotatedFeatures }),
+            derivedPorts: getTilePorts({ ...tile, features: rotatedFeatures }),
         });
 
 

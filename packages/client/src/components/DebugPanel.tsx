@@ -157,7 +157,7 @@ export const DebugPanel = () => {
                 <strong>#{idx + 1} {feature.id}</strong>
               </p>
 
-              <p>Направления: {feature.directions.join(', ')}</p>
+              <p>Порты: {feature.ports.join(', ')}</p>
               <p>
                 Владельцы (локально):{' '}
                 {owners.length > 0

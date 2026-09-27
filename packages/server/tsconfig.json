@@ -13,7 +13,6 @@
     "noEmit": true,
     "types": ["node"],
 
-    "baseUrl": ".",
     "paths": {
       "@fiefdom/shared": ["../shared/src/index.ts"],
       "@fiefdom/shared/*": ["../shared/src/*"]

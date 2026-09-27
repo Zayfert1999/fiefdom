@@ -1,8 +1,11 @@
-export type Direction = 
-  | 'N' | 'E' | 'S' | 'W' | 'C' 
-  | 'NW' | 'NE' | 'SE' | 'SW'
-  | 'NE(E)' | 'NE(N)' | 'NW(N)' | 'NW(W)'
-  | 'SE(S)' | 'SE(E)' | 'SW(S)' | 'SW(W)';
+// packages/shared/src/core/types.ts
+
+/** Индекс порта на периметре тайла (0-11) */
+export type Port = number;
+
+/** Направление соседа: 0=верх, 1=право, 2=низ, 3=лево */
+export type Dir = 0 | 1 | 2 | 3;
+
 export type FeatureType = 'road' | 'city' | 'monastery' | 'field';
 
 export interface Spot {
@@ -14,7 +17,7 @@ export interface TileFeature {
   id: string;
   type: FeatureType;
   shieldSpot?: Spot;
-  directions: Direction[];
+  ports: Port[];
   meepleSpot: Spot[];
   adjacentCities?: string[];
 }
@@ -65,7 +68,7 @@ export interface PlacedTile {
   y: number;
   rotation: 0 | 90 | 180 | 270;
   features: TileFeature[];
-  derivedSides: [FeatureType, FeatureType, FeatureType, FeatureType];
+  derivedPorts: FeatureType[];
   meeple?: PlacedMeeple;
 }
 
@@ -75,7 +78,7 @@ export interface PreviewTile {
   x: number;
   y: number;
   rotation: 0 | 90 | 180 | 270;
-  displayRotation: number;           // 🌟 Явный тип
-  validRotations: (0 | 90 | 180 | 270)[]; // 🌟 Явный тип массива
+  displayRotation: number;
+  validRotations: (0 | 90 | 180 | 270)[];
   currentRotationIndex: number;
 }

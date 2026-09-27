@@ -1,10 +1,27 @@
 // core/scoring.ts
 import { RegionManager, type FeatureKey } from './regionManager';
-import type { PlacedTile, FeatureType } from './types';
+import type { PlacedTile, FeatureType, Port } from './types';
 import { TILE_DEFINITIONS } from './tileData';
+import {
+  getPortSide,
+  getStitchedPort,
+  NEIGHBOR_OFFSETS,
+} from './portUtils';
+
+// ============================================
+// 📌 Центральные порты для валидации завершённости
+// Аналог старых направлений N, E, S, W
+// ============================================
+const CENTER_PORTS: Port[] = [1, 4, 7, 10];
 
 /**
- * 🌟 Универсальная проверка замкнутости региона
+ * 🌟 Универсальная проверка замкнутости региона (12-портовая система)
+ *
+ * Логика:
+ * - Для каждой фичи в регионе проверяем только центральные порты (1, 4, 7, 10)
+ * - Угловые порты пропускаются (как в старой системе пропускались углы)
+ * - Для каждого центрального порта: сосед должен существовать,
+ *   и на стыкуемом порту соседа должна быть фича того же типа
  */
 export function checkRegionCompleteness(
   board: Map<string, PlacedTile>,
@@ -15,42 +32,45 @@ export function checkRegionCompleteness(
   const meta = rm.getMetadata(rootKey);
   if (!meta || meta.type !== featureType) return false;
 
+  // Монастыри проверяются отдельно через calculateMonasteryPoints
+  if (featureType === 'monastery') return false;
+
   for (const featureKey of meta.featureKeys) {
     const [tileCoord, featureId] = featureKey.split(':');
     const [xStr, yStr] = tileCoord.split(',');
     const x = parseInt(xStr, 10);
     const y = parseInt(yStr, 10);
     const placedTile = board.get(`${x},${y}`);
-
     if (!placedTile) continue;
 
     const feature = placedTile.features.find(f => f.id === featureId);
     if (!feature || feature.type !== featureType) continue;
 
-    const externalDirections = feature.directions.filter(dir => dir !== 'C');
+    // 🌟 Проверяем только центральные порты фичи
+    for (const port of feature.ports) {
+      // Пропускаем угловые порты (аналог старой логики)
+      if (!CENTER_PORTS.includes(port)) continue;
 
-    for (const extDir of externalDirections) {
-      let neighborX = x;
-      let neighborY = y;
-      let oppositeDir: string = '';
+      // Определяем сторону и смещение к соседу
+      const side = getPortSide(port);
+      const offset = NEIGHBOR_OFFSETS.find(o => o.dir === side);
+      if (!offset) continue;
 
-      switch (extDir) {
-        case 'N': neighborY--; oppositeDir = 'S'; break;
-        case 'E': neighborX++; oppositeDir = 'W'; break;
-        case 'S': neighborY++; oppositeDir = 'N'; break;
-        case 'W': neighborX--; oppositeDir = 'E'; break;
-        default: continue;
-      }
-
+      const neighborX = x + offset.dx;
+      const neighborY = y + offset.dy;
       const neighborKey = `${neighborX},${neighborY}`;
       const neighborTile = board.get(neighborKey);
 
+      // Соседа нет — регион не замкнут
       if (!neighborTile) return false;
 
+      // Находим стыкуемый порт на соседе
+      const theirPort = getStitchedPort(port);
       const neighborFeature = neighborTile.features.find(
-        f => f.directions.includes(oppositeDir as any) && f.type === featureType
+        f => f.ports.includes(theirPort) && f.type === featureType
       );
 
+      // На стыкуемом порту нет фичи того же типа — регион не замкнут
       if (!neighborFeature) return false;
     }
   }

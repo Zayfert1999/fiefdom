@@ -9,7 +9,7 @@ import { RegionManager } from '@fiefdom/shared/core/regionManager';
 import { createDeck, drawPlayableTile } from '@fiefdom/shared/core/deck';
 import {
   applyTileToBoardAndRM,
-  getTileSides,
+  getTilePorts,
   getValidPlacementCells,
   rotateFeatures,      // 🌟 НОВОЕ: для валидации
   isValidPlacement,    // 🌟 НОВОЕ: для валидации
@@ -68,7 +68,7 @@ export class ServerGameState {
         templateId: startingTile.id,
         x: 0, y: 0, rotation: 0,
         features: startingTile.features,
-        derivedSides: getTileSides(startingTile),
+        derivedPorts: getTilePorts(startingTile),
       });
       for (const feature of startingTile.features) {
         this.regionManager.makeSet(`0,0:${feature.id}`, feature.type, feature.shieldSpot !== undefined);

@@ -1,198 +1,146 @@
 // core/tileUtils.ts
-import type { Direction, FeatureType, Tile, TileFeature, PlacedTile } from './types';
+// ============================================
+// 📐 УТИЛИТЫ ТАЙЛОВ (12-портовая система)
+// ============================================
+// Валидация размещения, поворот фич, применение
+// тайла к доске и RegionManager, мёртвые клетки.
+//
+// Портовая система:
+// - Валидация: только центральные порты (1, 4, 7, 10)
+// - Объединение регионов: все 12 портов
+// ============================================
+
+import type { FeatureType, Tile, TileFeature, PlacedTile, Dir } from './types';
 import { RegionManager, type FeatureKey } from './regionManager';
+import {
+  rotatePorts,
+  getSidePorts,
+  getStitchedPort,
+  getFeatureByPort,
+  getTilePorts,
+  NEIGHBOR_OFFSETS,
+} from './portUtils';
 
-const COMPASS_ORDER: Direction[] = ['N','NE(N)', 'NE', 'NE(E)', 'E', 'SE(E)', 'SE', 'SE(S)', 'S', 'SW(S)', 'SW', 'SW(W)', 'W', 'NW(W)', 'NW', 'NW(N)'];
+// ============================================
+// 🔄 ПОВОРОТ КООРДИНАТ (для мипл-спотов)
+// ============================================
 
-export const NEIGHBOR_OFFSETS = [
-  { dx: 0, dy: -1, mySide: 'N' as Direction, theirSide: 'S' as Direction, matchKey: 'N-S' },
-  { dx: 1, dy: 0,  mySide: 'E' as Direction, theirSide: 'W' as Direction, matchKey: 'E-W' },
-  { dx: 0, dy: 1,  mySide: 'S' as Direction, theirSide: 'N' as Direction, matchKey: 'S-N' },
-  { dx: -1, dy: 0, mySide: 'W' as Direction, theirSide: 'E' as Direction, matchKey: 'W-E' },
-] as const;
-
-/** Выводит типы сторон [N, E, S, W] из features */
-export const getTileSides = (tile: Tile): [FeatureType, FeatureType, FeatureType, FeatureType] => {
-  const sides: FeatureType[] = ['N', 'E', 'S', 'W'].map(side => {
-    const feat = tile.features.find(f => f.directions.includes(side as Direction));
-    return feat?.type ?? 'field';
-  });
-  return sides as [FeatureType, FeatureType, FeatureType, FeatureType];
-};
-
-/** Поворот компасной точки (включая подточки) */
-export const rotateCompass = (point: Direction, rotation: 0 | 90 | 180 | 270): Direction => {
-  if (point === 'C') return 'C';
-  
-  const idx = COMPASS_ORDER.indexOf(point);
-  if (idx === -1) {
-    console.warn(`⚠️ [rotateCompass] Неизвестное направление: ${point}`);
-    return point;
-  }
-  
-  // 🌟 Сдвиг: 90° = 4 позиции, 180° = 8, 270° = 12
-  const shift = (rotation / 90) * 4;
-  
-  // 🌟 Модуль 16 (размер массива)
-  return COMPASS_ORDER[(idx + shift) % 16];
-};
-
-/** Поворот точки (x,y) вокруг центра (50,50) */
-export const rotatePoint = (x: number, y: number, rotation: 0 | 90 | 180 | 270) => {
+/** Поворот точки (x, y) вокруг центра тайла (50, 50) */
+export const rotatePoint = (
+  x: number,
+  y: number,
+  rotation: 0 | 90 | 180 | 270
+) => {
   const rad = (rotation * Math.PI) / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
   return {
     x: 50 + (x - 50) * cos - (y - 50) * sin,
     y: 50 + (x - 50) * sin + (y - 50) * cos,
   };
 };
 
-/** Поворот одной фичи */
-export const rotateFeature = (feat: TileFeature, rotation: 0 | 90 | 180 | 270): TileFeature => ({
+// ============================================
+// 🔄 ПОВОРОТ ФИЧ
+// ============================================
+
+/** Поворот одной фичи: порты + мипл-споты */
+export const rotateFeature = (
+  feat: TileFeature,
+  rotation: 0 | 90 | 180 | 270
+): TileFeature => ({
   ...feat,
-  directions: feat.directions.map(p => rotateCompass(p, rotation)),
+  ports: rotatePorts(feat.ports, rotation),
   meepleSpot: feat.meepleSpot.map(s => {
     const { x, y } = rotatePoint(s.x, s.y, rotation);
     return { ...s, x, y };
-  })
+  }),
 });
 
+/** Поворот массива фич */
 export const rotateFeatures = (
-  features: TileFeature[], 
+  features: TileFeature[],
   rotation: 0 | 90 | 180 | 270
-): TileFeature[] => {
-  return features.map(f => rotateFeature(f, rotation));
+): TileFeature[] => features.map(f => rotateFeature(f, rotation));
+
+// ============================================
+// ✅ ВАЛИДАЦИЯ РАЗМЕЩЕНИЯ
+// ============================================
+
+/**
+ * Центральный порт каждой стороны.
+ * Валидация идёт ТОЛЬКО по ним (как в оригинальном Каркассоне).
+ * Угловые порты используются только для объединения регионов.
+ */
+const CENTER_PORT: Record<Dir, number> = {
+  0: 1,   // N → порт 1
+  1: 4,   // E → порт 4
+  2: 7,   // S → порт 7
+  3: 10,  // W → порт 10
 };
 
 /**
- * Карта точного соответствия точек на стыкуемых границах.
- * Поддерживает обычные углы (NE, NW, SE, SW) и подточки (NE(E), NW(W) и т.д.).
- * 
- * Подточки соединяются:
- * - С обычными углами соседа
- * - С подточками соседа (если они указывают на ту же сторону)
+ * Проверка валидности размещения тайла.
+ * Для каждого соседа: типы фич на центральных портах
+ * стыкуемых сторон должны совпадать.
  */
-export const BOUNDARY_MATCHES: Record<string, { my: Direction; their: Direction }[]> = {
-  'S-N': [ // Моя нижняя граница (S) стыкуется с его верхней (N)
-    // Обычные углы
-    { my: 'SW', their: 'NW' },
-    { my: 'S', their: 'N' },
-    { my: 'SE', their: 'NE' },
-    // Подточки моей стороны S
-    { my: 'SW(S)', their: 'NW' },
-    { my: 'SW(S)', their: 'NW(N)' },
-    { my: 'SE(S)', their: 'NE' },
-    { my: 'SE(S)', their: 'NE(N)' },
-    // Подточки его стороны N
-    { my: 'SW', their: 'NW(N)' },
-    { my: 'SW(S)', their: 'NW(N)' },
-    { my: 'SE', their: 'NE(N)' },
-    { my: 'SE(S)', their: 'NE(N)' },
-  ],
-  'N-S': [ // Моя верхняя (N) с его нижней (S)
-    // Обычные углы
-    { my: 'NW', their: 'SW' },
-    { my: 'N', their: 'S' },
-    { my: 'NE', their: 'SE' },
-    // Подточки моей стороны N
-    { my: 'NW(N)', their: 'SW' },
-    { my: 'NW(N)', their: 'SW(S)' },
-    { my: 'NE(N)', their: 'SE' },
-    { my: 'NE(N)', their: 'SE(S)' },
-    // Подточки его стороны S
-    { my: 'NW', their: 'SW(S)' },
-    { my: 'NW(N)', their: 'SW(S)' },
-    { my: 'NE', their: 'SE(S)' },
-    { my: 'NE(N)', their: 'SE(S)' },
-  ],
-  'W-E': [ // Моя левая (W) с его правой (E)
-    // Обычные углы
-    { my: 'NW', their: 'NE' },
-    { my: 'W', their: 'E' },
-    { my: 'SW', their: 'SE' },
-    // Подточки моей стороны W
-    { my: 'NW(W)', their: 'NE' },
-    { my: 'NW(W)', their: 'NE(E)' },
-    { my: 'SW(W)', their: 'SE' },
-    { my: 'SW(W)', their: 'SE(E)' },
-    // Подточки его стороны E
-    { my: 'NW', their: 'NE(E)' },
-    { my: 'NW(W)', their: 'NE(E)' },
-    { my: 'SW', their: 'SE(E)' },
-    { my: 'SW(W)', their: 'SE(E)' },
-  ],
-  'E-W': [ // Моя правая (E) с его левой (W)
-    // Обычные углы
-    { my: 'NE', their: 'NW' },
-    { my: 'E', their: 'W' },
-    { my: 'SE', their: 'SW' },
-    // Подточки моей стороны E
-    { my: 'NE(E)', their: 'NW' },
-    { my: 'NE(E)', their: 'NW(W)' },
-    { my: 'SE(E)', their: 'SW' },
-    { my: 'SE(E)', their: 'SW(W)' },
-    // Подточки его стороны W
-    { my: 'NE', their: 'NW(W)' },
-    { my: 'NE(E)', their: 'NW(W)' },
-    { my: 'SE', their: 'SW(W)' },
-    { my: 'SE(E)', their: 'SW(W)' },
-  ]
-};
-
-/** Проверка валидности размещения по features */
 export const isValidPlacement = (
-  board: Map<string, any>,
-  x: number, y: number,
+  board: Map<string, PlacedTile>,
+  x: number,
+  y: number,
   newFeatures: TileFeature[]
-) => {
+): boolean => {
   let hasAdjacent = false;
 
-  // 🌟 Используем общий массив смещений
-  for (const { dx, dy, mySide, theirSide } of NEIGHBOR_OFFSETS) {
+  for (const { dx, dy, dir } of NEIGHBOR_OFFSETS) {
     const nx = x + dx;
     const ny = y + dy;
     const neighbor = board.get(`${nx},${ny}`);
-    
-    if (!neighbor) continue; // Соседа нет, проверяем следующую грань
+    if (!neighbor) continue;
+
     hasAdjacent = true;
 
-    // Ищем фичу, которая касается нужной стороны
-    const myFeat = newFeatures.find(f => f.directions.includes(mySide));
-    const theirFeat = neighbor.features.find((f: TileFeature) => f.directions.includes(theirSide));
+    // 🌟 Только центральные порты
+    const myPort = CENTER_PORT[dir];
+    const theirPort = getStitchedPort(myPort);
 
-    // Если фича не найдена, по правилам Каркассона это считается 'field'
+    const myFeat = getFeatureByPort(newFeatures, myPort);
+    const theirFeat = getFeatureByPort(neighbor.features, theirPort);
+
+    // Если фича не найдена — это поле
     const myType = myFeat?.type ?? 'field';
     const theirType = theirFeat?.type ?? 'field';
 
-    // Если ни один не поле, они должны строго совпадать
     if (myType !== theirType) {
       return false;
     }
   }
 
   if (hasAdjacent) {
-    console.log(`✅ [Validation] Все грани совпадают! Тайл можно ставить.`);
+    console.log(`✅ [Validation] Все стыки совпадают. Тайл можно ставить.`);
   } else {
-    console.warn(`⚠️ [Validation] У тайла нет соседей. (Должен быть хотя бы один)`);
+    console.warn(`⚠️ [Validation] У тайла нет соседей.`);
   }
-  
+
   return hasAdjacent;
 };
 
+// ============================================
+// 📐 ВАЛИДНЫЕ КЛЕТКИ И ПОВОРОТЫ
+// ============================================
+
 /**
- * Возвращает множество ключей клеток "x,y", куда можно поставить данный тайл
+ * Множество клеток, куда можно поставить тайл
  * хотя бы в одном из 4 поворотов.
- * Используется и в UI (для подсветки), и в логике автопропуска тайла.
  */
 export const getValidPlacementCells = (
   drawnTile: Tile,
-  board: Map<string, any>
+  board: Map<string, PlacedTile>
 ): Set<string> => {
   const validSet = new Set<string>();
-  const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
 
   for (const existing of board.values()) {
-    for (const { dx, dy } of directions) {
+    for (const { dx, dy } of NEIGHBOR_OFFSETS) {
       const nx = existing.x + dx;
       const ny = existing.y + dy;
       const cellKey = `${nx},${ny}`;
@@ -202,7 +150,7 @@ export const getValidPlacementCells = (
         const rotatedFeatures = rotateFeatures(drawnTile.features, rot);
         if (isValidPlacement(board, nx, ny, rotatedFeatures)) {
           validSet.add(cellKey);
-          break; // Достаточно одного валидного поворота для этой клетки
+          break;
         }
       }
     }
@@ -211,16 +159,8 @@ export const getValidPlacementCells = (
   return validSet;
 };
 
-
 /**
- * 🌟 Возвращает массив валидных поворотов для тайла на конкретной позиции.
- * Используется при примерке тайла — чтобы знать, какие повороты доступны.
- * 
- * @param tile Тайл из руки
- * @param board Текущая доска
- * @param x Координата X для установки
- * @param y Координата Y для установки
- * @returns Массив валидных поворотов (0, 90, 180, 270). Может быть пустым.
+ * Массив валидных поворотов для тайла на конкретной позиции.
  */
 export function getValidRotations(
   tile: Tile,
@@ -229,31 +169,29 @@ export function getValidRotations(
   y: number
 ): (0 | 90 | 180 | 270)[] {
   const rotations: (0 | 90 | 180 | 270)[] = [];
-  
+
   for (const rotation of [0, 90, 180, 270] as const) {
     const rotatedFeatures = rotateFeatures(tile.features, rotation);
-    
     if (isValidPlacement(board, x, y, rotatedFeatures)) {
       rotations.push(rotation);
     }
   }
-  
+
   console.log(
     `🔄 [TileUtils] getValidRotations для ${tile.id} в (${x}, ${y}): ` +
-    `валидных поворотов: ${rotations.length}/4 [${rotations.join(', ')}°]`
+    `валидных ${rotations.length}/4 [${rotations.join(', ')}°]`
   );
-  
+
   return rotations;
 }
 
+// ============================================
+// 🏗️ ПРИМЕНЕНИЕ ТАЙЛА К ДОСКЕ И RM
+// ============================================
+
 /**
- * 🌟 Применяет тайл к доске и RegionManager.
- * Возвращает новый board и новый RM с объединёнными регионами.
- * 
- * Используется в:
- * - placeTile (окончательная установка)
- * - startPreview (создание previewRM)
- * - rotatePreview (пересоздание previewRM)
+ * Применяет тайл к доске и RegionManager.
+ * Объединение регионов идёт по ВСЕМ 12 портам.
  */
 export function applyTileToBoardAndRM(
   board: Map<string, PlacedTile>,
@@ -265,36 +203,41 @@ export function applyTileToBoardAndRM(
 ): { newBoard: Map<string, PlacedTile>; newRM: RegionManager } {
   const rotatedFeatures = rotateFeatures(tile.features, rotation);
 
-  // 🌟 Новый board
+  // Новый board
   const newBoard = new Map(board);
   newBoard.set(`${x},${y}`, {
     templateId: tile.id,
     x, y, rotation,
     features: rotatedFeatures,
-    derivedSides: getTileSides({ ...tile, features: rotatedFeatures }),
+    derivedPorts: getTilePorts({ ...tile, features: rotatedFeatures }),
   });
 
-  // 🌟 Новый RM с объединёнными регионами
+  // Новый RM
   const newRM = regionManager.clone();
-  
   for (const feature of rotatedFeatures) {
     const featureKey: FeatureKey = `${x},${y}:${feature.id}`;
     newRM.makeSet(featureKey, feature.type, feature.shieldSpot !== undefined);
   }
 
-  for (const { dx, dy, matchKey } of NEIGHBOR_OFFSETS) {
+  // 🌟 Объединение по ВСЕМ портам стороны
+  for (const { dx, dy, dir } of NEIGHBOR_OFFSETS) {
     const nx = x + dx;
     const ny = y + dy;
-    const neighborTile = newBoard.get(`${nx},${ny}`);
-    if (!neighborTile) continue;
+    const neighbor = newBoard.get(`${nx},${ny}`);
+    if (!neighbor) continue;
 
-    const matches = BOUNDARY_MATCHES[matchKey];
-    for (const { my: myDir, their: theirDir } of matches) {
-      const myFeat = rotatedFeatures.find(f => f.directions.includes(myDir));
-      const theirFeat = neighborTile.features.find(f => f.directions.includes(theirDir));
+    for (const myPort of getSidePorts(dir)) {
+      const myFeat = getFeatureByPort(rotatedFeatures, myPort);
+      if (!myFeat) continue;
 
-      if (myFeat && theirFeat && myFeat.type === theirFeat.type) {
-        newRM.union(`${x},${y}:${myFeat.id}`, `${nx},${ny}:${theirFeat.id}`);
+      const theirPort = getStitchedPort(myPort);
+      const theirFeat = getFeatureByPort(neighbor.features, theirPort);
+
+      if (theirFeat && myFeat.type === theirFeat.type) {
+        newRM.union(
+          `${x},${y}:${myFeat.id}`,
+          `${nx},${ny}:${theirFeat.id}`
+        );
       }
     }
   }
@@ -302,86 +245,71 @@ export function applyTileToBoardAndRM(
   return { newBoard, newRM };
 }
 
+// ============================================
+// 💀 МЁРТВЫЕ КЛЕТКИ
+// ============================================
+
 /**
- * 💀 Находит все "мёртвые" клетки — пустые клетки-кандидаты,
- * в которые ни один тайл из колоды не может быть поставлен
- * (ни в одном из 4 поворотов).
- * 
- * Используется для подсветки клеток, куда уже нельзя поставить тайл
- * до конца игры.
- * 
- * @param board Текущая доска
- * @param deck Оставшаяся колода тайлов
- * @returns Set координат "мёртвых" клеток в формате "x,y"
+ * Находит пустые клетки, в которые ни один тайл
+ * из колоды не может быть поставлен.
  */
 export function findDeadCells(
   board: Map<string, PlacedTile>,
   deck: Tile[]
 ): Set<string> {
-  // 🌟 Если колода пуста — все пустые клетки мёртвые
+  // Колода пуста — все соседи мёртвые
   if (deck.length === 0) {
     const emptyNeighbors = new Set<string>();
     for (const tile of board.values()) {
       for (const { dx, dy } of NEIGHBOR_OFFSETS) {
-        const nx = tile.x + dx;
-        const ny = tile.y + dy;
-        const key = `${nx},${ny}`;
-        if (!board.has(key)) {
-          emptyNeighbors.add(key);
-        }
+        const key = `${tile.x + dx},${tile.y + dy}`;
+        if (!board.has(key)) emptyNeighbors.add(key);
       }
     }
     console.log(`💀 [TileUtils] Колода пуста — все ${emptyNeighbors.size} соседей мёртвые`);
     return emptyNeighbors;
   }
-  
-  // 🌟 ШАГ 1: Собираем все пустые клетки-кандидаты (соседи существующих тайлов)
+
+  // Собираем пустые клетки-кандидаты
   const candidateCells = new Set<string>();
   for (const tile of board.values()) {
     for (const { dx, dy } of NEIGHBOR_OFFSETS) {
-      const nx = tile.x + dx;
-      const ny = tile.y + dy;
-      const key = `${nx},${ny}`;
-      if (!board.has(key)) {
-        candidateCells.add(key);
-      }
+      const key = `${tile.x + dx},${tile.y + dy}`;
+      if (!board.has(key)) candidateCells.add(key);
     }
   }
-  
-  // 🌟 ШАГ 2: Для каждой клетки проверяем все тайлы × все повороты
+
+  // Проверяем каждую клетку
   const deadCells = new Set<string>();
-  
   for (const cellKey of candidateCells) {
     const [xStr, yStr] = cellKey.split(',');
     const x = parseInt(xStr, 10);
     const y = parseInt(yStr, 10);
-    
     let canBePlaced = false;
-    
-    // 🌟 Перебираем все тайлы в колоде
+
     for (const tile of deck) {
-      // 🌟 Перебираем все 4 поворота
       for (const rotation of [0, 90, 180, 270] as const) {
         const rotatedFeatures = rotateFeatures(tile.features, rotation);
-        
         if (isValidPlacement(board, x, y, rotatedFeatures)) {
           canBePlaced = true;
-          break; // 🌟 РАННИЙ ВЫХОД: нашли подходящий тайл
+          break;
         }
       }
-      
-      if (canBePlaced) break; // 🌟 РАННИЙ ВЫХОД: клетка жива
+      if (canBePlaced) break;
     }
-    
-    if (!canBePlaced) {
-      deadCells.add(cellKey);
-    }
+
+    if (!canBePlaced) deadCells.add(cellKey);
   }
-  
+
   console.log(
-    `💀 [TileUtils] Найдено мёртвых клеток: ${deadCells.size} из ${candidateCells.size} кандидатов ` +
+    `💀 [TileUtils] Мёртвых клеток: ${deadCells.size} из ${candidateCells.size} ` +
     `(колода: ${deck.length} тайлов)`
   );
-  
+
   return deadCells;
 }
+
+// ============================================
+// 📤 РЕЭКСПОРТ для совместимости
+// ============================================
+export { getTilePorts, NEIGHBOR_OFFSETS };

@@ -1,7 +1,7 @@
 // renderer/CellsOverlay.tsx
 import { memo, useMemo, useCallback } from 'react';
 import { useGameStore } from '@/state/useGameStore';
-import { findDeadCells, rotateFeatures, getTileSides } from '@fiefdom/shared/core/tileUtils';
+import { findDeadCells, rotateFeatures, getTilePorts } from '@fiefdom/shared/core/tileUtils';
 import type { PlacedTile } from '@fiefdom/shared/core/types';
 import { TILE_SIZE } from '@fiefdom/shared/core/constants';
 import { getVirtualDeck } from '@/core/deckUtils';
@@ -67,7 +67,7 @@ export const CellsOverlay = memo(({ onGridClick, validCells }: CellsOverlayProps
         y: previewTile.y,
         rotation: previewTile.rotation,
         features: rotatedFeatures,
-        derivedSides: getTileSides({ ...previewTile.tile, features: rotatedFeatures }),
+        derivedPorts: getTilePorts({ ...previewTile.tile, features: rotatedFeatures }),
       };
       virtualBoard.set(`${previewTile.x},${previewTile.y}`, virtualTile);
       boardToCheck = virtualBoard;

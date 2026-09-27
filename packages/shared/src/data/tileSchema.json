@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Fiefdom Tile Set",
-  "description": "Схема для описания набора тайлов Каркассона",
+  "description": "Схема для описания набора тайлов Каркассона (12-портовая система)",
   "type": "object",
   "required": ["tiles"],
   "properties": {
@@ -31,7 +31,7 @@
             "description": "Список фич тайла (город, дорога, поле, монастырь)",
             "items": {
               "type": "object",
-              "required": ["id", "type", "directions", "meepleSpot"],
+              "required": ["id", "type", "ports", "meepleSpot"],
               "properties": {
                 "id": {
                   "type": "string",
@@ -51,19 +51,14 @@
                   },
                   "description": "Координаты щита (только для городов с щитом)"
                 },
-                "directions": {
+                "ports": {
                   "type": "array",
-                  "minItems": 1,
                   "uniqueItems": true,
-                  "description": "Направления, в которых фича выходит за пределы тайла",
+                  "description": "Порты тайла (0-11), которые занимает фича. Монастыри — пустой массив.",
                   "items": {
-                    "type": "string",
-                    "enum": [
-                      "N", "E", "S", "W", "C",
-                      "NW", "NE", "SE", "SW",
-                      "NE(E)", "NE(N)", "NW(N)", "NW(W)",
-                      "SE(S)", "SE(E)", "SW(S)", "SW(W)"
-                    ]
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 11
                   }
                 },
                 "meepleSpot": {

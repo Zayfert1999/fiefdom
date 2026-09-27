@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Fiefdom Tile Set",
-  "description": "Схема для описания набора тайлов Каркассона (12-портовая система)",
+  "description": "Схема для описания набора тайлов Каркассона (12-портовая система). Система координат: [-50, 50], центр тайла = (0, 0).",
   "type": "object",
   "required": ["tiles"],
   "properties": {
@@ -46,10 +46,10 @@
                   "type": "object",
                   "required": ["x", "y"],
                   "properties": {
-                    "x": { "type": "number", "minimum": 0, "maximum": 100 },
-                    "y": { "type": "number", "minimum": 0, "maximum": 100 }
+                    "x": { "type": "number", "minimum": -50, "maximum": 50 },
+                    "y": { "type": "number", "minimum": -50, "maximum": 50 }
                   },
-                  "description": "Координаты щита (только для городов с щитом)"
+                  "description": "Координаты щита в системе [-50, 50] (только для городов с щитом)"
                 },
                 "ports": {
                   "type": "array",
@@ -62,17 +62,13 @@
                   }
                 },
                 "meepleSpot": {
-                  "type": "array",
-                  "minItems": 1,
-                  "description": "Споты для размещения миплов на этой фиче",
-                  "items": {
-                    "type": "object",
-                    "required": ["x", "y"],
-                    "properties": {
-                      "x": { "type": "number", "minimum": 0, "maximum": 100 },
-                      "y": { "type": "number", "minimum": 0, "maximum": 100 }
-                    }
-                  }
+                  "type": "object",
+                  "required": ["x", "y"],
+                  "properties": {
+                    "x": { "type": "number", "minimum": -50, "maximum": 50 },
+                    "y": { "type": "number", "minimum": -50, "maximum": 50 }
+                  },
+                  "description": "ОДИН спот для размещения мипла в системе [-50, 50]"
                 },
                 "adjacentCities": {
                   "type": "array",

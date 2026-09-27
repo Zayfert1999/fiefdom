@@ -4,6 +4,7 @@ import { TileRegistry, type TileId } from '@/assets/svg/tiles/registry';
 import { Shield } from './Shield';
 import { ART_ID_MAP } from '@fiefdom/shared/core/tileData';
 import type { TileFeature } from '@fiefdom/shared/core/types';
+import { toSvg } from '@fiefdom/shared/core/coordUtils';
 
 // 🌟 Базовый размер тайла, в котором заданы координаты shieldSpot
 const BASE_TILE_SIZE = 100;
@@ -51,12 +52,9 @@ export const Tile = memo(({
 
             {/* 🌟 Щит поверх тайла */}
             {shieldSpot && (
-                // 🌟 МАСШТАБИРОВАНИЕ: координаты и размер щита
-                // пропорциональны размеру тайла
                 <g transform={`scale(${scale})`}>
-                    {/* Позиционирование по координатам shieldSpot (в системе 100×100) */}
-                    <g transform={`translate(${shieldSpot.x}, ${shieldSpot.y})`}>
-                        {/* 🌟 Компенсация поворота через CSS — плавная анимация */}
+                    {/* 🌟 ИЗМЕНЕНО: конвертируем координаты из [-50,50] в [0,100] */}
+                    <g transform={`translate(${toSvg(shieldSpot.x)}, ${toSvg(shieldSpot.y)})`}>
                         <g
                             className="shield-rotation-wrapper"
                             style={{
@@ -66,7 +64,6 @@ export const Tile = memo(({
                                 transformBox: 'fill-box',
                             }}
                         >
-                            {/* Центрирование щита */}
                             <g transform="translate(-8, -8)">
                                 <Shield size={16} className="shield-animated" />
                             </g>

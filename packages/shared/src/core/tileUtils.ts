@@ -10,7 +10,7 @@
 // - Объединение регионов: все 12 портов
 // ============================================
 
-import type { FeatureType, Tile, TileFeature, PlacedTile, Dir } from './types';
+import type { FeatureType, Tile, TileFeature, PlacedTile, Dir, Spot } from './types';
 import { RegionManager, type FeatureKey } from './regionManager';
 import {
   rotatePorts,
@@ -25,18 +25,18 @@ import {
 // 🔄 ПОВОРОТ КООРДИНАТ (для мипл-спотов)
 // ============================================
 
-/** Поворот точки (x, y) вокруг центра тайла (50, 50) */
+/** Поворот точки (x, y) вокруг центра тайла (0, 0) */
 export const rotatePoint = (
   x: number,
   y: number,
   rotation: 0 | 90 | 180 | 270
-) => {
+): Spot => {
   const rad = (rotation * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   return {
-    x: 50 + (x - 50) * cos - (y - 50) * sin,
-    y: 50 + (x - 50) * sin + (y - 50) * cos,
+    x: x * cos - y * sin,
+    y: x * sin + y * cos,
   };
 };
 
@@ -48,14 +48,20 @@ export const rotatePoint = (
 export const rotateFeature = (
   feat: TileFeature,
   rotation: 0 | 90 | 180 | 270
-): TileFeature => ({
-  ...feat,
-  ports: rotatePorts(feat.ports, rotation),
-  meepleSpot: feat.meepleSpot.map(s => {
-    const { x, y } = rotatePoint(s.x, s.y, rotation);
-    return { ...s, x, y };
-  }),
-});
+): TileFeature => {
+  if (rotation === 0) return feat;
+
+  return {
+    ...feat,
+    ports: rotatePorts(feat.ports, rotation),
+    // 🎯 Одиночный спот — просто поворачиваем
+    meepleSpot: rotatePoint(feat.meepleSpot.x, feat.meepleSpot.y, rotation),
+    // 🛡️ Щит тоже поворачиваем (исправление: ранее не поворачивался)
+    ...(feat.shieldSpot
+      ? { shieldSpot: rotatePoint(feat.shieldSpot.x, feat.shieldSpot.y, rotation) }
+      : {}),
+  };
+};
 
 /** Поворот массива фич */
 export const rotateFeatures = (

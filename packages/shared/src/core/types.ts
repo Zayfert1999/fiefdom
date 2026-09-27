@@ -18,7 +18,7 @@ export interface TileFeature {
   type: FeatureType;
   shieldSpot?: Spot;
   ports: Port[];
-  meepleSpot: Spot[];
+  meepleSpot: Spot;
   adjacentCities?: string[];
 }
 

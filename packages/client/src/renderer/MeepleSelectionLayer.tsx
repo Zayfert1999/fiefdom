@@ -4,7 +4,8 @@ import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
 import { TILE_DEFINITIONS } from '@fiefdom/shared/core/tileData';
 import type { TileFeature } from '@fiefdom/shared/core/types';
-import {TILE_SIZE} from '@fiefdom/shared/core/constants'
+import { TILE_SIZE } from '@fiefdom/shared/core/constants'
+import { toSvg } from '@fiefdom/shared/core/coordUtils';
 
 /**
  * 🔶 Споты для размещения миплов на последнем тайле.
@@ -21,15 +22,15 @@ export const MeepleSelectionLayer = memo(() => {
   // 🌟 Находим последний тайл и вычисляем доступные фичи
   const lastTileData = useMemo(() => {
     if (phase !== 'placeMeeple' || !currentPlayer) return null;
-    
+
     // 🌟 Проверка: есть ли миплы у игрока
     if (currentPlayer.meepleCount <= 0) return null;
-    
+
     const tiles = Array.from(board.values());
     const lastTile = tiles[tiles.length - 1];
-    
+
     if (!lastTile) return null;
-    
+
     // 🌟 ИЗМЕНЕНО: если есть ПОСТОЯННЫЙ мипл (не временный) — не показываем споты
     if (lastTile.meeple && !lastTile.meeple.isTemporary) return null;
 
@@ -39,15 +40,15 @@ export const MeepleSelectionLayer = memo(() => {
     const availableFeatures = featuresForRendering.filter(feature => {
       const featureKey = `${lastTile.x},${lastTile.y}:${feature.id}`;
       const owners = regionManager.getFeatureOwners(featureKey);
-      
+
       // 🌟 Если фича уже занята постоянным миплом — пропускаем
       if (owners.length > 0) return false;
-      
+
       // 🌟 Если на этой фиче уже стоит ВРЕМЕННЫЙ мипл — скрываем её спот
       if (lastTile.meeple?.isTemporary && lastTile.meeple.featureId === feature.id) {
         return false;
       }
-      
+
       return true;
     });
 
@@ -60,22 +61,20 @@ export const MeepleSelectionLayer = memo(() => {
       features: availableFeatures
     };
   }, [board, phase, currentPlayer, regionManager]);
-  
+
   // 🌟 Если нет данных для отображения — ничего не рендерим
   if (!lastTileData) return null;
 
   const { tileX, tileY, rotation, features } = lastTileData;
 
   // 🌟 Собираем все споты для размещения миплов
-  const markers = features.flatMap((feat: TileFeature) =>
-    feat.meepleSpot.map((spot, idx) => ({
-      featureId: feat.id,
-      type: feat.type,
-      x: spot.x,
-      y: spot.y,
-      key: `${feat.id}-spot-${idx}`,
-    }))
-  );
+  const markers = features.map((feat: TileFeature) => ({
+    featureId: feat.id,
+    type: feat.type,
+    x: toSvg(feat.meepleSpot.x),   // [-50,50] → [0,100]
+    y: toSvg(feat.meepleSpot.y),
+    key: `${feat.id}-spot`,
+  }));
 
   if (markers.length === 0) {
     console.warn('⚠️ [MeepleSelectionLayer] Не найдено спотов для размещения мипла');

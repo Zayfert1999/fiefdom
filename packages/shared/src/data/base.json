@@ -1,8 +1,8 @@
 {
   "$schema": "./tileSchema.json",
   "name": "Fiefdom Base Game",
-  "version": "2.0.0",
-  "description": "Базовый набор тайлов Fiefdom (72 тайла) — 12-портовая система",
+  "version": "2.1.0",
+  "description": "Базовый набор тайлов Fiefdom (72 тайла) — 12-портовая система. Система координат: [-50, 50], центр = (0, 0).",
   "tiles": [
     {
       "id": "tile_CCCC-S",
@@ -12,9 +12,9 @@
         {
           "id": "city_nesw",
           "type": "city",
-          "shieldSpot": { "x": 16, "y": 16 },
+          "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 4, 7, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         }
       ]
     },
@@ -26,15 +26,15 @@
         {
           "id": "city_new",
           "type": "city",
-          "shieldSpot": { "x": 16, "y": 16 },
+          "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 4, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }],
+          "meepleSpot": { "x": 0, "y": 40 },
           "adjacentCities": ["city_new"]
         }
       ]
@@ -48,13 +48,13 @@
           "id": "city_new",
           "type": "city",
           "ports": [1, 4, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }],
+          "meepleSpot": { "x": 0, "y": 40 },
           "adjacentCities": ["city_new"]
         }
       ]
@@ -67,15 +67,15 @@
         {
           "id": "city_ne",
           "type": "city",
-          "shieldSpot": { "x": 84, "y": 16 },
+          "shieldSpot": { "x": 34, "y": -34 },
           "ports": [1, 4],
-          "meepleSpot": [{ "x": 75, "y": 25 }]
+          "meepleSpot": { "x": 25, "y": -25 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [7, 8, 9, 10],
-          "meepleSpot": [{ "x": 25, "y": 75 }],
+          "meepleSpot": { "x": -25, "y": 25 },
           "adjacentCities": ["city_ne"]
         }
       ]
@@ -89,13 +89,13 @@
           "id": "city_ne",
           "type": "city",
           "ports": [1, 4],
-          "meepleSpot": [{ "x": 75, "y": 25 }]
+          "meepleSpot": { "x": 25, "y": -25 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [7, 8, 9, 10],
-          "meepleSpot": [{ "x": 25, "y": 75 }],
+          "meepleSpot": { "x": -25, "y": 25 },
           "adjacentCities": ["city_ne"]
         }
       ]
@@ -108,28 +108,28 @@
         {
           "id": "city_new",
           "type": "city",
-          "shieldSpot": { "x": 16, "y": 16 },
+          "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 4, 10],
-          "meepleSpot": [{ "x": 50, "y": 40 }]
+          "meepleSpot": { "x": 0, "y": -10 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }]
+          "meepleSpot": { "x": 0, "y": 40 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [6],
-          "meepleSpot": [{ "x": 75, "y": 90 }],
+          "meepleSpot": { "x": 25, "y": 40 },
           "adjacentCities": ["city_new"]
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8],
-          "meepleSpot": [{ "x": 25, "y": 90 }],
+          "meepleSpot": { "x": -25, "y": 40 },
           "adjacentCities": ["city_new"]
         }
       ]
@@ -143,26 +143,26 @@
           "id": "city_new",
           "type": "city",
           "ports": [1, 4, 10],
-          "meepleSpot": [{ "x": 50, "y": 40 }]
+          "meepleSpot": { "x": 0, "y": -10 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }]
+          "meepleSpot": { "x": 0, "y": 40 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [6],
-          "meepleSpot": [{ "x": 75, "y": 90 }],
+          "meepleSpot": { "x": 25, "y": 40 },
           "adjacentCities": ["city_new"]
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8],
-          "meepleSpot": [{ "x": 25, "y": 90 }],
+          "meepleSpot": { "x": -25, "y": 40 },
           "adjacentCities": ["city_new"]
         }
       ]
@@ -176,20 +176,20 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_ew",
           "type": "field",
           "ports": [4, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }],
+          "meepleSpot": { "x": 0, "y": 0 },
           "adjacentCities": ["city_n", "city_s"]
         },
         {
           "id": "city_s",
           "type": "city",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }]
+          "meepleSpot": { "x": 0, "y": 40 }
         }
       ]
     },
@@ -202,20 +202,20 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [4, 5, 6, 7],
-          "meepleSpot": [{ "x": 50, "y": 50 }],
+          "meepleSpot": { "x": 0, "y": 0 },
           "adjacentCities": ["city_n", "city_w"]
         },
         {
           "id": "city_w",
           "type": "city",
           "ports": [10],
-          "meepleSpot": [{ "x": 10, "y": 50 }]
+          "meepleSpot": { "x": -40, "y": 0 }
         }
       ]
     },
@@ -228,13 +228,13 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_esw",
           "type": "field",
           "ports": [4, 5, 6, 7, 8, 9, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }],
+          "meepleSpot": { "x": 0, "y": 0 },
           "adjacentCities": ["city_n"]
         }
       ]
@@ -248,26 +248,26 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "road_sw",
           "type": "road",
           "ports": [7, 10],
-          "meepleSpot": [{ "x": 45, "y": 55 }]
+          "meepleSpot": { "x": -5, "y": 5 }
         },
         {
           "id": "field_e-nw",
           "type": "field",
           "ports": [3, 4, 5, 6, 11],
-          "meepleSpot": [{ "x": 80, "y": 50 }],
+          "meepleSpot": { "x": 30, "y": 0 },
           "adjacentCities": ["city_n"]
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": [{ "x": 20, "y": 80 }]
+          "meepleSpot": { "x": -30, "y": 30 }
         }
       ]
     },
@@ -280,26 +280,26 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_ne-nw",
           "type": "field",
           "ports": [3, 11],
-          "meepleSpot": [{ "x": 90, "y": 25 }],
+          "meepleSpot": { "x": 40, "y": -25 },
           "adjacentCities": ["city_n"]
         },
         {
           "id": "road_ew",
           "type": "road",
           "ports": [4, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [5, 6, 7, 8, 9],
-          "meepleSpot": [{ "x": 50, "y": 80 }]
+          "meepleSpot": { "x": 0, "y": 30 }
         }
       ]
     },
@@ -311,28 +311,28 @@
         {
           "id": "city_nw",
           "type": "city",
-          "shieldSpot": { "x": 16, "y": 16 },
+          "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 10],
-          "meepleSpot": [{ "x": 25, "y": 25 }]
+          "meepleSpot": { "x": -25, "y": -25 }
         },
         {
           "id": "field_ne-sw",
           "type": "field",
           "ports": [3, 8],
-          "meepleSpot": [{ "x": 90, "y": 30 }],
+          "meepleSpot": { "x": 40, "y": -20 },
           "adjacentCities": ["city_nw"]
         },
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": [{ "x": 65, "y": 65 }]
+          "meepleSpot": { "x": 15, "y": 15 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 85, "y": 85 }]
+          "meepleSpot": { "x": 35, "y": 35 }
         }
       ]
     },
@@ -345,26 +345,26 @@
           "id": "city_nw",
           "type": "city",
           "ports": [1, 10],
-          "meepleSpot": [{ "x": 25, "y": 25 }]
+          "meepleSpot": { "x": -25, "y": -25 }
         },
         {
           "id": "field_ne-sw",
           "type": "field",
           "ports": [3, 8],
-          "meepleSpot": [{ "x": 90, "y": 30 }],
+          "meepleSpot": { "x": 40, "y": -20 },
           "adjacentCities": ["city_nw"]
         },
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": [{ "x": 65, "y": 65 }]
+          "meepleSpot": { "x": 15, "y": 15 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 85, "y": 85 }]
+          "meepleSpot": { "x": 35, "y": 35 }
         }
       ]
     },
@@ -377,26 +377,26 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": [{ "x": 55, "y": 55 }]
+          "meepleSpot": { "x": 5, "y": 5 }
         },
         {
           "id": "field_ne-w",
           "type": "field",
           "ports": [3, 8, 9, 10, 11],
-          "meepleSpot": [{ "x": 20, "y": 50 }],
+          "meepleSpot": { "x": -30, "y": 0 },
           "adjacentCities": ["city_n"]
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 80, "y": 80 }]
+          "meepleSpot": { "x": 30, "y": 30 }
         }
       ]
     },
@@ -409,44 +409,44 @@
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }]
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_ne-nw",
           "type": "field",
           "ports": [3, 11],
-          "meepleSpot": [{ "x": 90, "y": 25 }],
+          "meepleSpot": { "x": 40, "y": -25 },
           "adjacentCities": ["city_n"]
         },
         {
           "id": "road_e",
           "type": "road",
           "ports": [4],
-          "meepleSpot": [{ "x": 85, "y": 50 }]
+          "meepleSpot": { "x": 35, "y": 0 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": [{ "x": 20, "y": 80 }]
+          "meepleSpot": { "x": -30, "y": 30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 85 }]
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 80, "y": 80 }]
+          "meepleSpot": { "x": 30, "y": 30 }
         },
         {
           "id": "road_w",
           "type": "road",
           "ports": [10],
-          "meepleSpot": [{ "x": 15, "y": 50 }]
+          "meepleSpot": { "x": -35, "y": 0 }
         }
       ]
     },
@@ -459,21 +459,21 @@
           "id": "field_n",
           "type": "field",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }],
+          "meepleSpot": { "x": 0, "y": -40 },
           "adjacentCities": ["city_ew"]
         },
         {
           "id": "city_ew",
           "type": "city",
-          "shieldSpot": { "x": 84, "y": 50 },
+          "shieldSpot": { "x": 34, "y": 0 },
           "ports": [4, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }],
+          "meepleSpot": { "x": 0, "y": 40 },
           "adjacentCities": ["city_ew"]
         }
       ]
@@ -487,20 +487,20 @@
           "id": "field_n",
           "type": "field",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 10 }],
+          "meepleSpot": { "x": 0, "y": -40 },
           "adjacentCities": ["city_ew"]
         },
         {
           "id": "city_ew",
           "type": "city",
           "ports": [4, 10],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 90 }],
+          "meepleSpot": { "x": 0, "y": 40 },
           "adjacentCities": ["city_ew"]
         }
       ]
@@ -514,13 +514,13 @@
           "id": "monastery",
           "type": "monastery",
           "ports": [],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_nesw",
           "type": "field",
           "ports": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-          "meepleSpot": [{ "x": 80, "y": 20 }]
+          "meepleSpot": { "x": 30, "y": -30 }
         }
       ]
     },
@@ -533,19 +533,19 @@
           "id": "monastery",
           "type": "monastery",
           "ports": [],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_new",
           "type": "field",
           "ports": [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11],
-          "meepleSpot": [{ "x": 80, "y": 20 }]
+          "meepleSpot": { "x": 30, "y": -30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 80 }]
+          "meepleSpot": { "x": 0, "y": 30 }
         }
       ]
     },
@@ -558,19 +558,19 @@
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": [{ "x": 55, "y": 55 }]
+          "meepleSpot": { "x": 5, "y": 5 }
         },
         {
           "id": "field_nw",
           "type": "field",
           "ports": [0, 1, 2, 3, 8, 9, 10, 11],
-          "meepleSpot": [{ "x": 25, "y": 25 }]
+          "meepleSpot": { "x": -25, "y": -25 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 80, "y": 80 }]
+          "meepleSpot": { "x": 30, "y": 30 }
         }
       ]
     },
@@ -583,37 +583,37 @@
           "id": "field_n",
           "type": "field",
           "ports": [0, 1, 2, 3, 11],
-          "meepleSpot": [{ "x": 50, "y": 20 }]
+          "meepleSpot": { "x": 0, "y": -30 }
         },
         {
           "id": "road_e",
           "type": "road",
           "ports": [4],
-          "meepleSpot": [{ "x": 85, "y": 50 }]
+          "meepleSpot": { "x": 35, "y": 0 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": [{ "x": 20, "y": 80 }]
+          "meepleSpot": { "x": -30, "y": 30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 85 }]
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 80, "y": 80 }]
+          "meepleSpot": { "x": 30, "y": 30 }
         },
         {
           "id": "road_w",
           "type": "road",
           "ports": [10],
-          "meepleSpot": [{ "x": 15, "y": 50 }]
+          "meepleSpot": { "x": -35, "y": 0 }
         }
       ]
     },
@@ -626,19 +626,19 @@
           "id": "road_ns",
           "type": "road",
           "ports": [1, 7],
-          "meepleSpot": [{ "x": 50, "y": 50 }]
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_w",
           "type": "field",
           "ports": [0, 8, 9, 10, 11],
-          "meepleSpot": [{ "x": 20, "y": 50 }]
+          "meepleSpot": { "x": -30, "y": 0 }
         },
         {
           "id": "field_e",
           "type": "field",
           "ports": [2, 3, 4, 5, 6],
-          "meepleSpot": [{ "x": 80, "y": 50 }]
+          "meepleSpot": { "x": 30, "y": 0 }
         }
       ]
     },
@@ -651,49 +651,49 @@
           "id": "road_n",
           "type": "road",
           "ports": [1],
-          "meepleSpot": [{ "x": 50, "y": 15 }]
+          "meepleSpot": { "x": 0, "y": -35 }
         },
         {
           "id": "field_ne",
           "type": "field",
           "ports": [2, 3],
-          "meepleSpot": [{ "x": 80, "y": 20 }]
+          "meepleSpot": { "x": 30, "y": -30 }
         },
         {
           "id": "road_e",
           "type": "road",
           "ports": [4],
-          "meepleSpot": [{ "x": 85, "y": 50 }]
+          "meepleSpot": { "x": 35, "y": 0 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": [{ "x": 20, "y": 80 }]
+          "meepleSpot": { "x": -30, "y": 30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": [{ "x": 50, "y": 85 }]
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": [{ "x": 80, "y": 80 }]
+          "meepleSpot": { "x": 30, "y": 30 }
         },
         {
           "id": "road_w",
           "type": "road",
           "ports": [10],
-          "meepleSpot": [{ "x": 15, "y": 50 }]
+          "meepleSpot": { "x": -35, "y": 0 }
         },
         {
           "id": "field_nw",
           "type": "field",
           "ports": [0, 11],
-          "meepleSpot": [{ "x": 20, "y": 20 }]
+          "meepleSpot": { "x": -30, "y": -30 }
         }
       ]
     }

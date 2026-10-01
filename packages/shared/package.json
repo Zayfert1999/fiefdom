@@ -18,6 +18,7 @@
     "typescript": "~5.8.0"
   },
   "dependencies": {
+    "polygon-clipping": "^0.15.7",
     "zod": "^4.4.3"
   }
 }

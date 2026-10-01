@@ -90,9 +90,14 @@ export const HOTKEY_DEFINITIONS = {
     description: 'Показать подсказку по хоткеям',
     category: 'system',
   },
-    SHOW_DECK: {
+  SHOW_DECK: {
     key: 'D',
     description: 'Показать/скрыть содержимое колоды',
+    category: 'system',
+  },
+  SHOW_GEOMETRY_SANDBOX: {
+    key: 'F2',
+    description: 'Песочница геометрии тайлов (dev)',
     category: 'system',
   },
 } as const satisfies Record<string, HotkeyDefinition>;
@@ -103,7 +108,7 @@ export const HOTKEY_DEFINITIONS = {
 export const CATEGORY_ORDER: HotkeyCategory[] = ['game', 'camera', 'system'];
 
 export const CATEGORY_LABELS: Record<HotkeyCategory, string> = {
-  game:   '🎮 Игровые действия',
+  game: '🎮 Игровые действия',
   camera: '📷 Управление камерой',
   system: '⚙️ Системные',
 };

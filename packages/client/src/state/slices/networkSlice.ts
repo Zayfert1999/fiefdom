@@ -19,7 +19,7 @@ import {
 
 
 
-export type LobbyScreen = 'modeSelect' | 'localLobby' | 'networkLobby';
+export type LobbyScreen = 'modeSelect' | 'localLobby' | 'networkLobby' | 'geometrySandbox';
 
 export interface NetworkSlice {
   // === Состояние лобби ===

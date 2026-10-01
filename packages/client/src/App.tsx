@@ -20,7 +20,7 @@ const LocalLobby = lazy(() => import('@/components/LocalLobby').then(m => ({ def
 const GameOverScreen = lazy(() => import('@/components/GameOverScreen').then(m => ({ default: m.GameOverScreen })));
 const DebugPanel = lazy(() => import('@/components/DebugPanel').then(m => ({ default: m.DebugPanel })));
 const NetworkLobby = lazy(() => import('@/components/NetworkLobby').then(m => ({ default: m.NetworkLobby })));
-
+const GeometrySandbox = lazy(() => import('@/components/GeometrySandbox').then(m => ({ default: m.GeometrySandbox })));
 
 // 🌟 Fallback для Suspense — минимальный, не мешает UX
 const LazyFallback = () => null;  // Или можно <div>Загрузка...</div>
@@ -249,47 +249,56 @@ export default function App() {
         </Suspense>
       );
     }
-  }
-
-  // ============================================
-  // 🎨 РЕНДЕР
-  // ============================================
-  return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
-      <ReconnectingOverlay />
-
-      {/* 🖼️ Единый GameHUD — НЕ рендерим при gameOver */}
-      {phase !== 'gameOver' && (
-        <ErrorBoundary name="GameHUD">
-          <GameHUD />
-        </ErrorBoundary>
-      )}
-
-      {/* 🤲 Панель действий */}
-      <ErrorBoundary name="ActionPanel">
-        <ActionPanel />
-      </ErrorBoundary>
-
-      {/* 🗺️ Игровое поле */}
-      <ErrorBoundary name="Board">
-        <Board onGridClick={handleBoardClick} validCells={validCells} />
-      </ErrorBoundary>
-
-      {/* 🐛 Рендерим дебаг-панель поверх всего */}
-      <Suspense fallback={<LazyFallback />}>
-        <ErrorBoundary name="DebugPanel">
-          <DebugPanel />
-        </ErrorBoundary>
-      </Suspense>
-
-      {/* 🏁 Конец игры */}
-      {phase === 'gameOver' && (
-        <Suspense fallback={<LazyFallback />}>
-          <ErrorBoundary name="GameOverScreen">
-            <GameOverScreen />
+    if (lobbyScreen === 'geometrySandbox') {
+      return (
+        <Suspense fallback={null}>
+          <ErrorBoundary name="GeometrySandbox">
+            <GeometrySandbox />
           </ErrorBoundary>
         </Suspense>
-      )}
-    </div>
-  );
-}
+      );
+    }
+  }
+
+    // ============================================
+    // 🎨 РЕНДЕР
+    // ============================================
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111' }}>
+        <ReconnectingOverlay />
+
+        {/* 🖼️ Единый GameHUD — НЕ рендерим при gameOver */}
+        {phase !== 'gameOver' && (
+          <ErrorBoundary name="GameHUD">
+            <GameHUD />
+          </ErrorBoundary>
+        )}
+
+        {/* 🤲 Панель действий */}
+        <ErrorBoundary name="ActionPanel">
+          <ActionPanel />
+        </ErrorBoundary>
+
+        {/* 🗺️ Игровое поле */}
+        <ErrorBoundary name="Board">
+          <Board onGridClick={handleBoardClick} validCells={validCells} />
+        </ErrorBoundary>
+
+        {/* 🐛 Рендерим дебаг-панель поверх всего */}
+        <Suspense fallback={<LazyFallback />}>
+          <ErrorBoundary name="DebugPanel">
+            <DebugPanel />
+          </ErrorBoundary>
+        </Suspense>
+
+        {/* 🏁 Конец игры */}
+        {phase === 'gameOver' && (
+          <Suspense fallback={<LazyFallback />}>
+            <ErrorBoundary name="GameOverScreen">
+              <GameOverScreen />
+            </ErrorBoundary>
+          </Suspense>
+        )}
+      </div>
+    );
+  }

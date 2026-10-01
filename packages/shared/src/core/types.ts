@@ -1,5 +1,5 @@
 // packages/shared/src/core/types.ts
-
+import type { FeatureGeometry } from './geometry.types';
 /** Индекс порта на периметре тайла (0-11) */
 export type Port = number;
 
@@ -20,6 +20,7 @@ export interface TileFeature {
   ports: Port[];
   meepleSpot: Spot;
   adjacentCities?: string[];
+  geometry?: FeatureGeometry;
 }
 
 export interface Tile {

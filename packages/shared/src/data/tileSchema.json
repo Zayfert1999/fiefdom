@@ -1,85 +1,62 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Fiefdom Tile Set",
-  "description": "Схема для описания набора тайлов Каркассона (12-портовая система). Система координат: [-50, 50], центр тайла = (0, 0).",
   "type": "object",
   "required": ["tiles"],
   "properties": {
     "tiles": {
       "type": "array",
-      "description": "Массив определений тайлов",
       "items": {
         "type": "object",
         "required": ["id", "artId", "quantity", "features"],
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "Уникальный идентификатор тайла (например, 'tile_CCFC-S')"
-          },
-          "artId": {
-            "type": "string",
-            "description": "Идентификатор графики (SVG-файл). Может совпадать с id или указывать на базовый тайл"
-          },
-          "quantity": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Количество экземпляров этого тайла в колоде"
-          },
           "features": {
             "type": "array",
-            "minItems": 1,
-            "description": "Список фич тайла (город, дорога, поле, монастырь)",
             "items": {
               "type": "object",
               "required": ["id", "type", "ports", "meepleSpot"],
               "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Уникальный ID фичи в пределах тайла"
-                },
-                "type": {
-                  "type": "string",
-                  "enum": ["city", "road", "field", "monastery"],
-                  "description": "Тип фичи"
-                },
-                "shieldSpot": {
+                "geometry": {
                   "type": "object",
-                  "required": ["x", "y"],
+                  "required": ["kind"],
                   "properties": {
-                    "x": { "type": "number", "minimum": -50, "maximum": 50 },
-                    "y": { "type": "number", "minimum": -50, "maximum": 50 }
+                    "kind": {
+                      "type": "string",
+                      "enum": ["area", "line", "derived"]
+                    },
+                    "start": { "$ref": "#/definitions/point" },
+                    "outline": { "type": "array" },
+                    "lineWidth": { "type": "number", "minimum": 0 },
+                    "path": { "type": "array" }
                   },
-                  "description": "Координаты щита в системе [-50, 50] (только для городов с щитом)"
-                },
-                "ports": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "description": "Порты тайла (0-11), которые занимает фича. Монастыри — пустой массив.",
-                  "items": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 11
-                  }
-                },
-                "meepleSpot": {
-                  "type": "object",
-                  "required": ["x", "y"],
-                  "properties": {
-                    "x": { "type": "number", "minimum": -50, "maximum": 50 },
-                    "y": { "type": "number", "minimum": -50, "maximum": 50 }
-                  },
-                  "description": "ОДИН спот для размещения мипла в системе [-50, 50]"
-                },
-                "adjacentCities": {
-                  "type": "array",
-                  "items": { "type": "string" },
-                  "description": "ID городов, граничащих с этим полем (только для полей)"
+                  "allOf": [
+                    {
+                      "if": { "properties": { "kind": { "const": "area" } } },
+                      "then": { "required": ["start", "outline"] }
+                    },
+                    {
+                      "if": { "properties": { "kind": { "const": "line" } } },
+                      "then": { "required": ["lineWidth", "start", "path"] }
+                    },
+                    {
+                      "if": { "properties": { "kind": { "const": "derived" } } },
+                      "then": { "not": { "required": ["start", "outline", "path"] } }
+                    }
+                  ]
                 }
               }
             }
           }
         }
       }
+    }
+  },
+  "definitions": {
+    "point": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number", "minimum": -50, "maximum": 50 }
     }
   }
 }

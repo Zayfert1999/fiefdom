@@ -3,6 +3,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
+import { useHotkeys } from '@/hooks/useHotkeys';
+import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 import { getSaveMeta, SAVE_KEYS } from '@/core/gameSaveManager';
 import { AVAILABLE_COLORS } from '@fiefdom/shared/core/constants';
 import { getSocket } from '@/network/socket';
@@ -142,6 +144,22 @@ export const MainMenu = () => {
         if (ping < 200) return styles.pingMedium;
         return styles.pingBad;
     };
+
+        // 🌟 НОВОЕ: открытие песочницы геометрии
+    const handleOpenGeometrySandbox = () => {
+        clearError();
+        console.log('🧪 [MainMenu] Открытие песочницы геометрии');
+        setLobbyScreen('geometrySandbox');
+    };
+
+    // 🌟 НОВОЕ: регистрируем хоткей только пока видимо главное меню
+    useHotkeys([
+        {
+            ...HOTKEY_DEFINITIONS.SHOW_GEOMETRY_SANDBOX,
+            action: handleOpenGeometrySandbox,
+            enabled: true,
+        },
+    ]);
 
     return (
         <div className={styles.overlay}>

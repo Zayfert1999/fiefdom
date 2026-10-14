@@ -20,7 +20,7 @@
 //      c. Соединяем края соседних дорог вогнутыми кривыми
 // ============================================
 
-import type { Point, AreaGeometry, OutlineSegment } from './geometry.types';
+import type { Point, AreaGeometry, OutlineSegment } from '../../../../shared/src/core/geometry.types';
 import type { TessellatedLine } from './tessellate';
 
 // ============================================

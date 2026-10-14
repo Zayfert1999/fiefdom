@@ -1,7 +1,5 @@
 // packages/shared/src/core/index.ts
 // 🌟 Центральный экспорт core-модуля
-// Позволяет импортировать всё из одного места:
-// import { TILE_SIZE, RegionManager } from '@fiefdom/shared/core';
 
 export * from './types';
 export * from './serialization';
@@ -13,3 +11,5 @@ export * from './hotkeys';
 export * from './constants';
 export * from './deck';
 export * from './portUtils';
+
+export * from './geometry.types';

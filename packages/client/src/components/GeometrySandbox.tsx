@@ -22,7 +22,6 @@ import { useState, useMemo, memo, useCallback, useEffect } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { useLiveTiles } from '@/hooks/useLiveTiles';
 import { Tile3DView } from './Tile3DView';
-
 import {
   processTileGeometry,
   toPathD,
@@ -30,14 +29,12 @@ import {
   generateFeatureGeometries,
   ROAD_PARAMS,
 } from '@/core/geometry';
-
 import type { TileFeature, Port } from '@fiefdom/shared/core/types';
 import type { MultiPolygon } from '@fiefdom/shared/core/geometry.types';
-
 import styles from '@/components/styles/modal.module.css';
 
 // ============================================
-// 🎨 ЦВЕТОВАЯ СХЕМА ОТЛАДОЧНОЙ ВИЗУАЛИЗАЦИИ
+// 🎨 ЦВЕТОВАЯ СХЕМА
 // ============================================
 
 const COLORS = {
@@ -102,6 +99,7 @@ const getFeatureFill = (feature: Pick<TileFeature, 'type'>): string => {
       return '#71717a';
   }
 };
+
 
 // ============================================
 // 📍 ГЕОМЕТРИЯ ПОРТОВ ДЛЯ ОТЛАДКИ
@@ -313,13 +311,14 @@ interface SandboxTileViewProps {
   showSpots: boolean;
   showPorts: boolean;
   showGeometry: boolean;
-
-  // 🧬 Генеративная геометрия
+  // Генеративная геометрия
   enableGenerative: boolean;
-  jitter: number;
   overwrite: boolean;
   roadWidth: number;
   seedOverride?: string;
+  // 🌟 Шум Перлина
+  noiseEnabled: boolean;
+  noiseAmplitude: number;
 }
 
 const SandboxTileView = memo(({
@@ -331,29 +330,25 @@ const SandboxTileView = memo(({
   showPorts,
   showGeometry,
   enableGenerative,
-  jitter,
   overwrite,
   roadWidth,
   seedOverride,
+  noiseEnabled,
+  noiseAmplitude,
 }: SandboxTileViewProps) => {
   // ============================================
-  // 🔑 SEED
+  // 🔑 SEED (для шума, не для генераторов)
   // ============================================
-  // По умолчанию используем artId, чтобы все копии одного художественного тайла
-  // выглядели одинаково.
-  // seedOverride нужен для экспериментов в песочнице.
   const seed = useMemo(
     () => seedOverride?.trim() || tile.artId || tile.id,
     [seedOverride, tile.artId, tile.id]
   );
 
   // ============================================
-  // 🧬 ГЕНЕРАЦИЯ ГЕОМЕТРИИ ИЗ ПОРТОВ
+  // 🧬 ГЕНЕРАЦИЯ ГЕОМЕТРИИ (БЕЗ seed и jitter)
   // ============================================
   const generation = useMemo(() => {
     if (!enableGenerative) {
-      console.log(`🧬 [Sandbox] Генеративная геометрия отключена для "${tile.id}"`);
-
       return {
         features: tile.features as readonly TileFeature[],
         warnings: [] as readonly string[],
@@ -362,101 +357,67 @@ const SandboxTileView = memo(({
     }
 
     console.log(
-      `🧬 [Sandbox] Генерация геометрии: ` +
-      `tile="${tile.id}", seed="${seed}", ` +
-      `jitter=${jitter}, overwrite=${overwrite}, roadWidth=${roadWidth}`
+      `🧬 [Sandbox] Генерация: tile="${tile.id}", ` +
+      `overwrite=${overwrite}, roadWidth=${roadWidth}`
     );
 
+    // 🌟 БЕЗ seed и jitter — генераторы чистые
     const gen = generateFeatureGeometries(tile.features, {
-      seed,
-      jitter,
       overwrite,
       roadWidth,
     });
 
     const generatedIds = new Set(gen.geometries.keys());
-
-    // Подставляем сгенерированную геометрию в фичи.
-    // Важно: не мутируем исходные tile.features.
     const features: TileFeature[] = tile.features.map((feature) => {
       const geometry = gen.geometries.get(feature.id);
       return geometry ? { ...feature, geometry } : feature;
     });
 
-    console.log(
-      `🧬 [Sandbox] Генерация завершена: ` +
-      `сгенерировано ${generatedIds.size} фич, ` +
-      `предупреждений ${gen.warnings.length}`
-    );
-
     if (gen.warnings.length > 0) {
-      console.warn(
-        `⚠️ [Sandbox] Предупреждения генератора для "${tile.id}":`,
-        gen.warnings
-      );
+      console.warn(`⚠️ [Sandbox] Предупреждения для "${tile.id}":`, gen.warnings);
     }
 
-    return {
-      features,
-      warnings: gen.warnings,
-      generatedIds,
-    };
-  }, [
-    enableGenerative,
-    tile,
-    seed,
-    jitter,
-    overwrite,
-    roadWidth,
-  ]);
+    return { features, warnings: gen.warnings, generatedIds };
+  }, [enableGenerative, tile, overwrite, roadWidth]);
 
   // ============================================
-  // 🏭 ГЕОМЕТРИЧЕСКИЙ ПРОЦЕССОР
+  // 🏭 ПРОЦЕССОР С ШУМОМ ПЕРЛИНА
   // ============================================
-  // Уже получает фичи с generated geometry для городов/дорог.
-  // Поля остаются derived и вычисляются здесь.
   const result = useMemo(() => {
-    console.log(`🏭 [Sandbox] Запуск процессора геометрии для "${tile.id}"`);
-
-    const processed = processTileGeometry(generation.features);
-
     console.log(
-      `✅ [Sandbox] Процессор завершён: ` +
-      `областей=${processed.tessellation.areas.size}, ` +
-      `линий=${processed.tessellation.lines.size}, ` +
-      `обрезанных дорог=${processed.clipping.clippedLines.size}, ` +
-      `площадей=${processed.decorations.plazas.length}, ` +
-      `полей=${processed.assignments.fieldGeometries.size}`
+      `🏭 [Sandbox] Процессор: "${tile.id}", ` +
+      `noise=${noiseEnabled}, amp=${noiseAmplitude}`
     );
 
+    // 🌟 Передаём параметры шума в процессор
+    const processed = processTileGeometry(generation.features, {
+      noiseSeed: noiseEnabled ? seed : undefined,
+      noise: {
+        areaAmplitude: noiseAmplitude,
+        lineAmplitude: noiseAmplitude * 0.6,
+      },
+    });
+
     return processed;
-  }, [generation.features, tile.id]);
+  }, [generation.features, tile.id, seed, noiseEnabled, noiseAmplitude]);
 
   // ============================================
   // 🧱 ПОРЯДОК ОТРИСОВКИ
   // ============================================
-  // Сначала поля, потом дороги, затем города/монастыри.
   const orderedFeatures = useMemo(
-    () =>
-      [...generation.features].sort(
-        (a, b) => getFeatureLayer(a.type) - getFeatureLayer(b.type)
-      ),
+    () => [...generation.features].sort(
+      (a, b) => getFeatureLayer(a.type) - getFeatureLayer(b.type)
+    ),
     [generation.features]
   );
 
-  const {
-    tessellation,
-    decorations,
-    clipping,
-    assignments,
-  } = result;
+  const { tessellation, decorations, clipping, assignments } = result;
 
   // ============================================
-  // 🩺 ДИАГНОСТИКА: ЕСЛИ ГЕОМЕТРИЯ НЕ ПОЛУЧИЛАСЬ
+  // 🩺 ДИАГНОСТИКА
   // ============================================
   const missingGeometry = useMemo(() => {
     const missing: string[] = [];
-
     for (const feature of orderedFeatures) {
       if (feature.type === 'field') {
         if (!assignments.fieldGeometries.has(feature.id)) {
@@ -472,68 +433,27 @@ const SandboxTileView = memo(({
         }
       }
     }
-
     if (missing.length > 0) {
-      console.warn(
-        `⚠️ [Sandbox] Не удалось получить полигоны: ${missing.join(', ')}`
-      );
+      console.warn(`⚠️ [Sandbox] Нет полигонов: ${missing.join(', ')}`);
     }
-
     return missing;
-  }, [
-    orderedFeatures,
-    assignments,
-    tessellation,
-    clipping,
-  ]);
+  }, [orderedFeatures, assignments, tessellation, clipping]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        {/* ============================================ */}
         {/* 📐 2D SVG ВИД */}
-        {/* ============================================ */}
-        <div
-          style={{
-            position: 'relative',
-            width: size,
-            height: size,
-            padding: 24,
-            boxSizing: 'content-box',
-          }}
-        >
-          <style>{`
-            .sandbox-svg .hoverable-shape {
-              transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
-              stroke: transparent;
-              stroke-width: 0;
-              pointer-events: visiblePainted;
-            }
-            .sandbox-svg .hoverable-shape:hover {
-              stroke: #ffffff;
-              stroke-width: 1.5;
-              stroke-linejoin: round;
-              cursor: crosshair;
-            }
-          `}</style>
-
+        <div style={{ position: 'relative', width: size, height: size, padding: 24, boxSizing: 'content-box' }}>
+          <style>{`.sandbox-svg .hoverable-shape { transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease; stroke: transparent; stroke-width: 0; pointer-events: visiblePainted; } .sandbox-svg .hoverable-shape:hover { stroke: #ffffff; stroke-width: 1.5; stroke-linejoin: round; cursor: crosshair; }`}</style>
           <CompassLabels />
-
           <svg
             className="sandbox-svg"
             width={size}
             height={size}
             viewBox="-65 -65 130 130"
-            style={{
-              display: 'block',
-              overflow: 'visible',
-              background: '#1a1a2e',
-              borderRadius: 8,
-            }}
+            style={{ display: 'block', overflow: 'visible', background: '#1a1a2e', borderRadius: 8 }}
           >
-            {/* ======================================== */}
-            {/* 🔲 СЕТКА */}
-            {/* ======================================== */}
+            {/* Сетка */}
             {showGrid && (
               <g stroke="#ffffff" strokeWidth="0.3" opacity="0.15">
                 {Array.from({ length: 11 }, (_, i) => {
@@ -548,268 +468,105 @@ const SandboxTileView = memo(({
               </g>
             )}
 
-            {/* ======================================== */}
-            {/* ➕ ОСИ */}
-            {/* ======================================== */}
+            {/* Оси */}
             {showAxes && (
               <g>
-                <line
-                  x1={-50}
-                  y1={0}
-                  x2={50}
-                  y2={0}
-                  stroke="#ef4444"
-                  strokeWidth={0.5}
-                  opacity={0.55}
-                />
-                <line
-                  x1={0}
-                  y1={-50}
-                  x2={0}
-                  y2={50}
-                  stroke="#22c55e"
-                  strokeWidth={0.5}
-                  opacity={0.55}
-                />
-                <text x={52} y={2} fill="#ef4444" fontSize={5}>
-                  X
-                </text>
-                <text x={2} y={-52} fill="#22c55e" fontSize={5}>
-                  Y
-                </text>
+                <line x1={-50} y1={0} x2={50} y2={0} stroke="#ef4444" strokeWidth={0.5} opacity={0.55} />
+                <line x1={0} y1={-50} x2={0} y2={50} stroke="#22c55e" strokeWidth={0.5} opacity={0.55} />
+                <text x={52} y={2} fill="#ef4444" fontSize={5}>X</text>
+                <text x={2} y={-52} fill="#22c55e" fontSize={5}>Y</text>
               </g>
             )}
 
-            {/* ======================================== */}
-            {/* 🎨 ГЕОМЕТРИЯ ФИЧ */}
-            {/* ======================================== */}
-            {showGeometry &&
-              orderedFeatures.map((feature) => {
-                const generated = generation.generatedIds.has(feature.id);
-                const fill = getFeatureFill(feature);
+            {/* Геометрия фич */}
+            {showGeometry && orderedFeatures.map((feature) => {
+              const generated = generation.generatedIds.has(feature.id);
+              const fill = getFeatureFill(feature);
 
-                // ====================================
-                // 🌾 ПОЛЯ
-                // ====================================
-                // Поля не имеют явной geometry в base.json.
-                // Они вычисляются процессором как остаток тайла.
-                if (feature.type === 'field') {
-                  const fieldMultiPolygon = assignments.fieldGeometries.get(feature.id);
+              if (feature.type === 'field') {
+                const fieldMP = assignments.fieldGeometries.get(feature.id);
+                return (
+                  <g key={feature.id} data-feature-id={feature.id}>
+                    {renderMultiPolygon(fieldMP, { keyPrefix: `field-${feature.id}`, featureId: feature.id, fill, opacity: 0.8, generated, className: 'hoverable-shape' })}
+                  </g>
+                );
+              }
+              if (feature.geometry?.kind === 'area') {
+                const areaMP = tessellation.areas.get(feature.id);
+                if (!areaMP) return null;
+                return (
+                  <g key={feature.id} data-feature-id={feature.id}>
+                    {renderMultiPolygon(areaMP, { keyPrefix: `area-${feature.id}`, featureId: feature.id, fill, opacity: 0.8, generated, className: 'hoverable-shape' })}
+                  </g>
+                );
+              }
+              if (feature.geometry?.kind === 'line') {
+                const roadMP = clipping.clippedLines.get(feature.id);
+                if (!roadMP || roadMP.length === 0) return null;
+                return (
+                  <g key={feature.id} data-feature-id={feature.id}>
+                    {renderMultiPolygon(roadMP, { keyPrefix: `road-${feature.id}`, featureId: feature.id, fill, opacity: 0.8, generated, className: 'hoverable-shape' })}
+                  </g>
+                );
+              }
+              return null;
+            })}
 
+            {/* Площади */}
+            {showGeometry && decorations.plazas.map((plaza, index) => (
+              <path key={`plaza-${index}`} d={ringToPathD(plaza)} fill={PLAZA_COLOR} fillOpacity={0.8} pointerEvents="none" />
+            ))}
+
+            {/* Порты */}
+            {showPorts && tile.features.map((feature) => (
+              <g key={`ports-${feature.id}`}>
+                {feature.ports.map((port) => {
+                  const [x, y] = getPortPoint(port);
+                  const color = getFeatureFill(feature);
                   return (
-                    <g key={feature.id} data-feature-id={feature.id}>
-                      {renderMultiPolygon(fieldMultiPolygon, {
-                        keyPrefix: `field-${feature.id}`,
-                        featureId: feature.id,
-                        fill,
-                        opacity: 0.8,
-                        generated,
-                        className: 'hoverable-shape',
-                      })}
+                    <g key={`${feature.id}-port-${port}`}>
+                      <circle cx={x} cy={y} r={2} fill={color} stroke="#fff" strokeWidth={0.3} />
+                      <text x={x} y={y - 3.5} textAnchor="middle" fontSize={3.5} fill="#ddd" fontFamily="monospace">{port}</text>
                     </g>
                   );
-                }
+                })}
+              </g>
+            ))}
 
-                // ====================================
-                // 🏰 ГОРОДА / МОНАСТЫРИ
-                // ====================================
-                if (feature.geometry?.kind === 'area') {
-                  const areaMultiPolygon = tessellation.areas.get(feature.id);
-
-                  if (!areaMultiPolygon) {
-                    console.warn(`⚠️ [Sandbox] Нет полигона для area "${feature.id}"`);
-                    return null;
-                  }
-
-                  return (
-                    <g key={feature.id} data-feature-id={feature.id}>
-                      {renderMultiPolygon(areaMultiPolygon, {
-                        keyPrefix: `area-${feature.id}`,
-                        featureId: feature.id,
-                        fill,
-                        opacity: 0.8,
-                        generated,
-                        className: 'hoverable-shape',
-                      })}
-                    </g>
-                  );
-                }
-
-                // ====================================
-                // 🛤️ ДОРОГИ
-                // ====================================
-                // Дороги после процессора представлены как обрезанные MultiPolygon.
-                if (feature.geometry?.kind === 'line') {
-                  const clippedRoadMultiPolygon = clipping.clippedLines.get(feature.id);
-
-                  if (!clippedRoadMultiPolygon || clippedRoadMultiPolygon.length === 0) {
-                    console.warn(`⚠️ [Sandbox] Нет полигонов для дороги "${feature.id}"`);
-                    return null;
-                  }
-
-                  return (
-                    <g key={feature.id} data-feature-id={feature.id}>
-                      {renderMultiPolygon(clippedRoadMultiPolygon, {
-                        keyPrefix: `road-${feature.id}`,
-                        featureId: feature.id,
-                        fill,
-                        opacity: 0.8,
-                        generated,
-                        className: 'hoverable-shape',
-                      })}
-                    </g>
-                  );
-                }
-
-                return null;
-              })}
-
-            {/* ======================================== */}
-            {/* 🏛️ ПЛОЩАДИ НА ПЕРЕКРЁСТКАХ ДОРОГ */}
-            {/* ======================================== */}
-            {showGeometry &&
-              decorations.plazas.map((plaza, index) => (
-                <path
-                  key={`plaza-${index}`}
-                  d={ringToPathD(plaza)}
-                  fill={PLAZA_COLOR}
-                  fillOpacity={0.8}
-                  pointerEvents="none"
-                />
-              ))}
-
-            {/* ======================================== */}
-            {/* 📍 ПОРТЫ */}
-            {/* ======================================== */}
-            {showPorts &&
-              tile.features.map((feature) => (
-                <g key={`ports-${feature.id}`}>
-                  {feature.ports.map((port) => {
-                    const [x, y] = getPortPoint(port);
-                    const color = getFeatureFill(feature);
-
-                    return (
-                      <g key={`${feature.id}-port-${port}`}>
-                        <circle
-                          cx={x}
-                          cy={y}
-                          r={2}
-                          fill={color}
-                          stroke="#fff"
-                          strokeWidth={0.3}
-                        />
-                        <text
-                          x={x}
-                          y={y - 3.5}
-                          textAnchor="middle"
-                          fontSize={3.5}
-                          fill="#ddd"
-                          fontFamily="monospace"
-                        >
-                          {port}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </g>
-              ))}
-
-            {/* ======================================== */}
-            {/* 🔶 СПОТЫ */}
-            {/* ======================================== */}
-            {showSpots &&
-              tile.features.map((feature) => (
-                <g key={`spots-${feature.id}`}>
-                  {/* Мипл-спот */}
-                  <circle
-                    cx={feature.meepleSpot.x}
-                    cy={feature.meepleSpot.y}
-                    r={3}
-                    fill={COLORS.meeple}
-                    stroke="#000"
-                    strokeWidth={0.5}
-                  />
-
-                  {/* Щит */}
-                  {feature.shieldSpot && (
-                    <rect
-                      x={feature.shieldSpot.x - 2.5}
-                      y={feature.shieldSpot.y - 2.5}
-                      width={5}
-                      height={5}
-                      fill={COLORS.shield}
-                      stroke="#fff"
-                      strokeWidth={0.5}
-                      rx={1}
-                    />
-                  )}
-                </g>
-              ))}
+            {/* Споты */}
+            {showSpots && tile.features.map((feature) => (
+              <g key={`spots-${feature.id}`}>
+                <circle cx={feature.meepleSpot.x} cy={feature.meepleSpot.y} r={3} fill={COLORS.meeple} stroke="#000" strokeWidth={0.5} />
+                {feature.shieldSpot && (
+                  <rect x={feature.shieldSpot.x - 2.5} y={feature.shieldSpot.y - 2.5} width={5} height={5} fill={COLORS.shield} stroke="#fff" strokeWidth={0.5} rx={1} />
+                )}
+              </g>
+            ))}
           </svg>
         </div>
 
-        {/* ============================================ */}
         {/* 🎮 3D ВИД */}
-        {/* ============================================ */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div
-            style={{
-              marginBottom: 8,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: 1,
-            }}
-          >
-            3D
-          </div>
+          <div style={{ marginBottom: 8, color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>3D</div>
           <Tile3DView result={result} size={size} />
         </div>
       </div>
 
-      {/* ============================================ */}
-      {/* ⚠️ ПРЕДУПРЕЖДЕНИЯ ГЕНЕРАТОРА / ДИАГНОСТИКА */}
-      {/* ============================================ */}
+      {/* ⚠️ ПРЕДУПРЕЖДЕНИЯ */}
       {(generation.warnings.length > 0 || missingGeometry.length > 0) && (
-        <div
-          style={{
-            maxWidth: size * 2 + 32,
-            padding: 8,
-            borderRadius: 6,
-            background: 'rgba(239,68,68,0.12)',
-            border: '1px solid rgba(239,68,68,0.35)',
-            color: '#fecaca',
-            fontSize: 12,
-            lineHeight: 1.4,
-          }}
-        >
+        <div style={{ maxWidth: size * 2 + 32, padding: 8, borderRadius: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fecaca', fontSize: 12, lineHeight: 1.4 }}>
           {generation.warnings.length > 0 && (
             <>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                ⚠️ Предупреждения генератора
-              </div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Предупреждения генератора</div>
               <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {generation.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
+                {generation.warnings.map((w) => <li key={w}>{w}</li>)}
               </ul>
             </>
           )}
-
           {missingGeometry.length > 0 && (
             <>
-              <div
-                style={{
-                  fontWeight: 700,
-                  marginTop: generation.warnings.length > 0 ? 8 : 0,
-                  marginBottom: 4,
-                }}
-              >
-                🚫 Нет полигонов
-              </div>
-              <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                {missingGeometry.join(', ')}
-              </div>
+              <div style={{ fontWeight: 700, marginTop: generation.warnings.length > 0 ? 8 : 0, marginBottom: 4 }}>🚫 Нет полигонов</div>
+              <div style={{ fontFamily: 'monospace', fontSize: 11 }}>{missingGeometry.join(', ')}</div>
             </>
           )}
         </div>
@@ -822,7 +579,6 @@ SandboxTileView.displayName = 'SandboxTileView';
 // ============================================
 // 🧪 ГЛАВНЫЙ КОНТЕЙНЕР ПЕСОЧНИЦЫ
 // ============================================
-
 export const GeometrySandbox = () => {
   const setLobbyScreen = useGameStore((s) => s.setLobbyScreen);
   const tiles: readonly SandboxTile[] = useLiveTiles();
@@ -842,16 +598,21 @@ export const GeometrySandbox = () => {
   const [showGeometry, setShowGeometry] = useState(true);
 
   // ============================================
-  // 🧬 СОСТОЯНИЕ ГЕНЕРАТИВНОЙ ГЕОМЕТРИИ
+  // 🧬 ГЕНЕРАТИВНАЯ ГЕОМЕТРИЯ
   // ============================================
   const [enableGenerative, setEnableGenerative] = useState(true);
-  const [jitter, setJitter] = useState(0.35);
   const [overwrite, setOverwrite] = useState(false);
   const [roadWidth, setRoadWidth] = useState<number>(ROAD_PARAMS.width);
   const [seedOverride, setSeedOverride] = useState('');
 
   // ============================================
-  // 🔄 ВЕРСИЯ ДЛЯ HOT-RELOAD ДАННЫХ ТАЙЛОВ
+  // 🌟 НОВОЕ: ПАРАМЕТРЫ ШУМА ПЕРЛИНА
+  // ============================================
+  const [noiseEnabled, setNoiseEnabled] = useState(true);
+  const [noiseAmplitude, setNoiseAmplitude] = useState(2.5);
+
+  // ============================================
+  // 🔄 ВЕРСИЯ ДЛЯ HOT-RELOAD
   // ============================================
   const [version, setVersion] = useState(0);
 
@@ -861,13 +622,12 @@ export const GeometrySandbox = () => {
   );
 
   // ============================================
-  // 📊 СТАТИСТИКА ГЕОМЕТРИИ ПО ВСЕМ ТАЙЛАМ
+  // 📊 СТАТИСТИКА
   // ============================================
   const geometryStats = useMemo(() => {
     let withGeometry = 0;
     let withoutGeometry = 0;
     let derived = 0;
-
     for (const tile of tiles) {
       for (const feat of tile.features) {
         if (feat.geometry?.kind === 'derived') derived++;
@@ -875,47 +635,34 @@ export const GeometrySandbox = () => {
         else withoutGeometry++;
       }
     }
-
     return { withGeometry, withoutGeometry, derived };
   }, [tiles]);
 
   // ============================================
-  // 🧪 ЛОГИ И СИНХРОНИЗАЦИЯ
+  // 🧪 ЛОГИ
   // ============================================
   useEffect(() => {
     console.log('🧪 [Sandbox] Компонент смонтирован');
-    return () => {
-      console.log('🧪 [Sandbox] Компонент размонтирован');
-    };
+    return () => { console.log('🧪 [Sandbox] Компонент размонтирован'); };
   }, []);
 
   useEffect(() => {
     console.log(
-      `⚙️ [Sandbox] Параметры генерации: ` +
+      `⚙️ [Sandbox] Параметры: ` +
       `enable=${enableGenerative}, ` +
-      `jitter=${jitter}, ` +
-      `overwrite=${overwrite}, ` +
-      `roadWidth=${roadWidth}, ` +
+      `noise=${noiseEnabled}, noiseAmp=${noiseAmplitude.toFixed(2)}, ` +
+      `overwrite=${overwrite}, roadWidth=${roadWidth}, ` +
       `seedOverride="${seedOverride}"`
     );
-  }, [
-    enableGenerative,
-    jitter,
-    overwrite,
-    roadWidth,
-    seedOverride,
-  ]);
+  }, [enableGenerative, noiseEnabled, noiseAmplitude, overwrite, roadWidth, seedOverride]);
 
   useEffect(() => {
-    console.log(`🔄 [Sandbox] Данные тайлов обновлены, версия: ${version + 1}`);
     setVersion((v) => v + 1);
   }, [tiles]);
 
   useEffect(() => {
     if (tiles.length === 0) return;
-
     if (!selectedTileId || !tiles.some((t) => t.id === selectedTileId)) {
-      console.log(` [Sandbox] Выбран первый доступный тайл: ${tiles[0].id}`);
       setSelectedTileId(tiles[0].id);
     }
   }, [tiles, selectedTileId]);
@@ -946,142 +693,46 @@ export const GeometrySandbox = () => {
       <div
         className={styles.modalCard}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '95vw',
-          height: '95vh',
-          maxWidth: '95vw',
-          maxHeight: '95vh',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+        style={{ width: '95vw', height: '95vh', maxWidth: '95vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}
       >
-        {/* ============================================ */}
-        {/* 🧾 ЗАГОЛОВОК */}
-        {/* ============================================ */}
+        {/* Заголовок */}
         <div className={styles.modalHeader}>
           <div style={{ width: 36 }} />
           <h2 className={styles.modalTitle}>
             🧪 Песочница геометрии
             {version > 1 && (
-              <span
-                style={{
-                  marginLeft: 8,
-                  fontSize: 11,
-                  color: '#4ade80',
-                  fontWeight: 400,
-                }}
-              >
-                ⟳v{version}
-              </span>
+              <span style={{ marginLeft: 8, fontSize: 11, color: '#4ade80', fontWeight: 400 }}>⟳v{version}</span>
             )}
           </h2>
-          <button
-            className={styles.modalCloseBtn}
-            onClick={handleClose}
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
+          <button className={styles.modalCloseBtn} onClick={handleClose} aria-label="Закрыть">×</button>
         </div>
 
-        {/* ============================================ */}
-        {/* 📄 ТЕЛО ПЕСОЧНИЦЫ */}
-        {/* ============================================ */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 16,
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          {/* ======================================== */}
-          {/* 🎛 ЛЕВАЯ ПАНЕЛЬ УПРАВЛЕНИЯ */}
-          {/* ======================================== */}
-          <div
-            style={{
-              width: 290,
-              flexShrink: 0,
-              overflowY: 'auto',
-              paddingRight: 8,
-              borderRight: '1px solid rgba(255,255,255,0.08)',
-            }}
-          >
-            <div
-              style={{
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 700,
-                marginBottom: 10,
-                letterSpacing: 0.5,
-              }}
-            >
+        {/* Тело */}
+        <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+          {/* 🎛 ЛЕВАЯ ПАНЕЛЬ */}
+          <div style={{ width: 290, flexShrink: 0, overflowY: 'auto', paddingRight: 8, borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 10, letterSpacing: 0.5 }}>
               🎛 Управление
             </div>
 
             {/* Выбор тайла */}
-            <label
-              style={{
-                display: 'block',
-                color: '#ccc',
-                fontSize: 13,
-                marginBottom: 6,
-              }}
-            >
-              Тайл
-            </label>
+            <label style={{ display: 'block', color: '#ccc', fontSize: 13, marginBottom: 6 }}>Тайл</label>
             <select
               value={selectedTileId}
               onChange={(e) => handleTileClick(e.target.value)}
-              style={{
-                width: '100%',
-                background: '#111827',
-                color: '#e5e7eb',
-                border: '1px solid #374151',
-                borderRadius: 6,
-                padding: '8px 10px',
-                fontSize: 13,
-                marginBottom: 12,
-              }}
+              style={{ width: '100%', background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 6, padding: '8px 10px', fontSize: 13, marginBottom: 12 }}
             >
               {tiles.map((tile) => (
-                <option key={tile.id} value={tile.id}>
-                  {tile.id} (×{tile.quantity})
-                </option>
+                <option key={tile.id} value={tile.id}>{tile.id} (×{tile.quantity})</option>
               ))}
             </select>
 
             {/* Слои */}
-            <div
-              style={{
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 700,
-                marginBottom: 8,
-                letterSpacing: 0.5,
-              }}
-            >
-              👁 Слои
-            </div>
-
+            <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, marginBottom: 8, letterSpacing: 0.5 }}>👁 Слои</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {layerToggles.map(({ label, value, set }) => (
-                <label
-                  key={label}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    color: '#ccc',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={(e) => set(e.target.checked)}
-                  />
+                <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} />
                   {label}
                 </label>
               ))}
@@ -1090,199 +741,101 @@ export const GeometrySandbox = () => {
             <Legend />
 
             {/* ======================================== */}
-            {/* 🧬 ПАНЕЛЬ ГЕНЕРАТИВНОЙ ГЕОМЕТРИИ */}
+            {/* 🧬 ГЕНЕРАТИВНАЯ ГЕОМЕТРИЯ */}
             {/* ======================================== */}
-            <div
-              style={{
-                marginTop: 12,
-                paddingTop: 12,
-                borderTop: '1px solid rgba(255,255,255,0.12)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              <div
-                style={{
-                  color: '#fff',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  letterSpacing: 0.5,
-                }}
-              >
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
                 🧬 Генеративная геометрия
               </div>
 
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: '#ccc',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={enableGenerative}
-                  onChange={(e) => setEnableGenerative(e.target.checked)}
-                />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={enableGenerative} onChange={(e) => setEnableGenerative(e.target.checked)} />
                 Включить генерацию из портов
               </label>
 
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  color: '#ccc',
-                  fontSize: 13,
-                }}
-              >
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={overwrite} disabled={!enableGenerative} onChange={(e) => setOverwrite(e.target.checked)} />
+                Перегенерировать поверх ручной геометрии
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
+                <span style={{ minWidth: 110 }}>🛣️ Ширина дорог: {roadWidth}</span>
+                <input
+                  type="number" min={4} max={40} step={1} value={roadWidth} disabled={!enableGenerative}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    if (Number.isFinite(next)) setRoadWidth(Math.max(4, Math.min(40, next)));
+                  }}
+                  style={{ width: 70, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
+                <span style={{ minWidth: 110 }}>🔑 Seed override</span>
+                <input
+                  type="text" value={seedOverride} onChange={(e) => setSeedOverride(e.target.value)}
+                  placeholder="по умолчанию artId" disabled={!enableGenerative}
+                  style={{ width: 140, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
+                />
+              </label>
+            </div>
+
+            {/* ======================================== */}
+            {/* 🌟 НОВОЕ: ШУМ ПЕРЛИНА */}
+            {/* ======================================== */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+                🌊 Шум Перлина
+              </div>
+
+              {/* Вкл/Выкл шума */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={noiseEnabled}
+                  onChange={(e) => setNoiseEnabled(e.target.checked)}
+                />
+                Включить шум (органическая неровность)
+              </label>
+
+              {/* Слайдер амплитуды */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
                 <span style={{ minWidth: 110 }}>
-                  🎲 Jitter: {jitter.toFixed(2)}
+                  📐 Амплитуда: {noiseAmplitude.toFixed(1)}
                 </span>
                 <input
                   type="range"
                   min={0}
-                  max={1}
-                  step={0.05}
-                  value={jitter}
-                  disabled={!enableGenerative}
-                  onChange={(e) => setJitter(Number(e.target.value))}
-                  style={{ width: 140 }}
-                />
-              </label>
-
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: '#ccc',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={overwrite}
-                  disabled={!enableGenerative}
-                  onChange={(e) => setOverwrite(e.target.checked)}
-                />
-                Перегенерировать поверх ручной геометрии
-              </label>
-
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  color: '#ccc',
-                  fontSize: 13,
-                }}
-              >
-                <span style={{ minWidth: 110 }}>
-                  🛣️ Ширина дорог: {roadWidth}
-                </span>
-                <input
-                  type="number"
-                  min={4}
-                  max={40}
-                  step={1}
-                  value={roadWidth}
-                  disabled={!enableGenerative}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    if (Number.isFinite(next)) {
-                      setRoadWidth(Math.max(4, Math.min(40, next)));
-                    }
-                  }}
-                  style={{
-                    width: 70,
-                    background: '#111827',
-                    color: '#e5e7eb',
-                    border: '1px solid #374151',
-                    borderRadius: 4,
-                    padding: '4px 6px',
-                  }}
-                />
-              </label>
-
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  color: '#ccc',
-                  fontSize: 13,
-                }}
-              >
-                <span style={{ minWidth: 110 }}>
-                  🔑 Seed override
-                </span>
-                <input
-                  type="text"
-                  value={seedOverride}
-                  onChange={(e) => setSeedOverride(e.target.value)}
-                  placeholder="по умолчанию artId"
-                  disabled={!enableGenerative}
-                  style={{
-                    width: 140,
-                    background: '#111827',
-                    color: '#e5e7eb',
-                    border: '1px solid #374151',
-                    borderRadius: 4,
-                    padding: '4px 6px',
-                  }}
+                  max={5}
+                  step={0.1}
+                  value={noiseAmplitude}
+                  disabled={!noiseEnabled}
+                  onChange={(e) => setNoiseAmplitude(Number(e.target.value))}
+                  style={{ width: 140, opacity: noiseEnabled ? 1 : 0.4 }}
                 />
               </label>
 
               <div style={{ fontSize: 11, color: '#888', lineHeight: 1.35 }}>
-                Seed нужен для детерминированной рандомизации.
-                Одинаковый seed + одинаковый jitter дают одинаковую геометрию.
+                Амплитуда определяет силу неровности контуров.
+                0 = идеальные формы, 2.5 = умеренная, 5 = сильная.
+                Точки на границе тайла не смещаются.
               </div>
             </div>
 
-            {/* ======================================== */}
             {/* 📊 СТАТИСТИКА */}
-            {/* ======================================== */}
-            <div
-              style={{
-                marginTop: 12,
-                paddingTop: 12,
-                borderTop: '1px solid rgba(255,255,255,0.12)',
-                fontSize: 12,
-                color: '#888',
-              }}
-            >
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
-                📊 Статистика
-              </div>
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: 12, color: '#888' }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>📊 Статистика</div>
               <p style={{ margin: '4px 0' }}>✅ С геометрией: {geometryStats.withGeometry}</p>
               <p style={{ margin: '4px 0' }}>🌾 Derived (поля): {geometryStats.derived}</p>
               <p style={{ margin: '4px 0' }}>⬜ Без геометрии: {geometryStats.withoutGeometry}</p>
             </div>
           </div>
 
-          {/* ======================================== */}
-          {/* 🖼 ПРАВАЯ ЧАСТЬ: ПРЕВЬЮ ТАЙЛА */}
-          {/* ======================================== */}
-          <div
-            style={{
-              flex: 1,
-              minWidth: 320,
-              overflow: 'auto',
-              paddingLeft: 8,
-            }}
-          >
+          {/* 🖼 ПРАВАЯ ЧАСТЬ */}
+          <div style={{ flex: 1, minWidth: 320, overflow: 'auto', paddingLeft: 8 }}>
             {selectedTile ? (
               <>
-                <div
-                  key={version}
-                  style={{ display: 'flex', justifyContent: 'center' }}
-                >
+                <div key={version} style={{ display: 'flex', justifyContent: 'center' }}>
                   <SandboxTileView
                     tile={selectedTile}
                     size={360}
@@ -1292,52 +845,30 @@ export const GeometrySandbox = () => {
                     showPorts={showPorts}
                     showGeometry={showGeometry}
                     enableGenerative={enableGenerative}
-                    jitter={jitter}
                     overwrite={overwrite}
                     roadWidth={roadWidth}
                     seedOverride={seedOverride}
+                    noiseEnabled={noiseEnabled}
+                    noiseAmplitude={noiseAmplitude}
                   />
                 </div>
-
                 <div style={{ marginTop: 12, fontSize: 12, color: '#aaa' }}>
-                  <p
-                    style={{
-                      margin: '4px 0',
-                      color: '#fff',
-                      fontWeight: 600,
-                    }}
-                  >
+                  <p style={{ margin: '4px 0', color: '#fff', fontWeight: 600 }}>
                     {selectedTile.id}
                     {selectedTile.artId && selectedTile.artId !== selectedTile.id
                       ? ` (art: ${selectedTile.artId})`
                       : ''}{' '}
                     (×{selectedTile.quantity})
                   </p>
-
                   {selectedTile.features.map((feat) => {
                     const kind = feat.geometry?.kind ?? 'none';
-                    const statusIcon =
-                      kind === 'derived'
-                        ? '🌾'
-                        : kind === 'none'
-                          ? '⬜'
-                          : '✅';
-
+                    const statusIcon = kind === 'derived' ? '🌾' : kind === 'none' ? '⬜' : '✅';
                     return (
                       <p key={feat.id} style={{ margin: '2px 0' }}>
-                        <span style={{ color: getFeatureFill(feat) }}>
-                          {statusIcon} {feat.id}
-                        </span>
-                        {' · '}
-                        {feat.type}
-                        {' · '}
-                        {kind}
+                        <span style={{ color: getFeatureFill(feat) }}>{statusIcon} {feat.id}</span>
+                        {' · '}{feat.type}{' · '}{kind}
                         {feat.ports.length > 0 && (
-                          <>
-                            {' · ports: ['}
-                            {feat.ports.join(', ')}
-                            {']'}
-                          </>
+                          <>{' · ports: ['}{feat.ports.join(', ')}{']'}</>
                         )}
                       </p>
                     );
@@ -1345,14 +876,7 @@ export const GeometrySandbox = () => {
                 </div>
               </>
             ) : (
-              <div
-                style={{
-                  color: '#888',
-                  fontSize: 14,
-                  padding: 24,
-                  textAlign: 'center',
-                }}
-              >
+              <div style={{ color: '#888', fontSize: 14, padding: 24, textAlign: 'center' }}>
                 Нет выбранных тайлов
               </div>
             )}

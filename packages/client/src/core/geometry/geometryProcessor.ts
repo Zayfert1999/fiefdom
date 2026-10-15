@@ -2,14 +2,9 @@
 // ============================================
 // 🏭 ГЕОМЕТРИЧЕСКИЙ ПРОЦЕССОР ТАЙЛОВ
 // ============================================
-// Пайплайн (5 этапов):
-//   1. Тесселяция всех фич (area → Ring, line → TessellatedLine)
-//   2. Генерация декораций (площади на перекрёстках)
-//   3. Обрезка дорог (вычитание препятствий)
-//   4. Вычисление полей (квадрат тайла − всё остальное)
-//   5. Привязка полигонов к полевым фичам по споту
-//
-// 🌟 СТЕН УДАЛЕНЫ — пайплайн упростился.
+// 🌟 ИЗМЕНЕНО:
+//   • Типы импортируются из ./types (не определяются здесь)
+//   • applyGeometryNoise из ./geometryPostProcessor
 // ============================================
 import type { TileFeature } from '@fiefdom/shared/core/types';
 import type { Ring, Polygon, MultiPolygon } from '@fiefdom/shared/core/geometry.types';
@@ -17,270 +12,222 @@ import { tessellateArea, tessellateLine, type TessellatedLine } from './tessella
 import { subtractPolygons } from './booleanOps';
 import { generatePlazas } from './generators/plaza';
 import { computeFieldPolygons, assignFieldFeatures } from './generators/field';
+import { applyGeometryNoise, type NoiseOptions } from './geometryPostProcessor';
+// 🌟 Типы из нового файла
+import type {
+    TessellationResult,
+    DecorationResult,
+    ClippingResult,
+    FieldComputationResult,
+    AssignmentResult,
+    TileGeometryResult,
+} from './types';
 
-// ============================================
-// 📦 ИНТЕРФЕЙСЫ РЕЗУЛЬТАТОВ ЭТАПОВ
-// ============================================
+// Реэкспортируем типы для совместимости
+export type {
+    TessellationResult,
+    DecorationResult,
+    ClippingResult,
+    FieldComputationResult,
+    AssignmentResult,
+    TileGeometryResult,
+};
 
-/** Результат этапа 1: тесселяция всех фич */
-export interface TessellationResult {
-  /** Области (города, монастыри): featureId → MultiPolygon */
-  readonly areas: ReadonlyMap<string, MultiPolygon>;
-  /** Дороги: featureId → TessellatedLine */
-  readonly lines: ReadonlyMap<string, TessellatedLine>;
-}
-
-/** Результат этапа 2: генерация декораций */
-export interface DecorationResult {
-  /** Геометрия площадей (для отладки) */
-  readonly plazaGeometries: readonly import('@fiefdom/shared/core/geometry.types').AreaGeometry[];
-  /** Сгенерированные площади: массив Ring */
-  readonly plazas: readonly Ring[];
-  // 🌟 СТЕН БОЛЬШЕ НЕТ
-}
-
-/** Результат этапа 3: обрезка дорог */
-export interface ClippingResult {
-  readonly clippedLines: ReadonlyMap<string, MultiPolygon>;
-}
-
-/** Результат этапа 4: вычисление полей */
-export interface FieldComputationResult {
-  readonly fieldPolygons: readonly Polygon[];
-}
-
-/** Результат этапа 5: привязка полигонов к полевым фичам */
-export interface AssignmentResult {
-  readonly fieldGeometries: ReadonlyMap<string, MultiPolygon>;
-}
-
-/** Финальный результат процессора */
-export interface TileGeometryResult {
-  readonly tessellation: TessellationResult;
-  readonly decorations: DecorationResult;
-  readonly clipping: ClippingResult;
-  readonly fields: FieldComputationResult;
-  readonly assignments: AssignmentResult;
+/** Опции процессора */
+export interface ProcessOptions {
+    /** Seed для шума Перлина. Если не указан — шум не применяется */
+    readonly noiseSeed?: string;
+    /** Параметры шума (амплитуда, частота) */
+    readonly noise?: Partial<Omit<NoiseOptions, 'seed'>>;
 }
 
 // ============================================
-// 🛠️ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// 🛠️ ХЕЛПЕРЫ
 // ============================================
-
-/** Строит замкнутый Ring дороги из TessellatedLine */
 function buildRoadPolygon(tessellated: TessellatedLine): Ring {
-  const reversedRight = [...tessellated.right].reverse();
-  return [...tessellated.left, ...reversedRight];
+    const reversedRight = [...tessellated.right].reverse();
+    return [...tessellated.left, ...reversedRight];
 }
 
 // ============================================
-// 🏭 ГЛАВНАЯ ФУНКЦИЯ ПРОЦЕССОРА
+// 🏭 ГЛАВНАЯ ФУНКЦИЯ
 // ============================================
-
-/**
- * 🏭 Запускает полный пайплайн обработки геометрии тайла.
- * 🌟 Без стен — 5 этапов вместо 5.5.
- */
 export function processTileGeometry(
-  features: readonly TileFeature[]
+    features: readonly TileFeature[],
+    options?: ProcessOptions
 ): TileGeometryResult {
-  console.log(`🏭 [GeometryProcessor] Начало обработки ${features.length} фич`);
+    console.log(`🏭 [GeometryProcessor] Начало обработки ${features.length} фич`);
 
-  // Этап 1: Тесселяция
-  const tessellation = tessellate(features);
+    // Этап 1: Тесселяция
+    let tessellation = tessellate(features);
 
-  // Этап 2: Декорации (площади)
-  const decorations = generateDecorations(tessellation);
+    // Этап 2: 🌊 Шум Перлина
+    if (options?.noiseSeed) {
+        tessellation = applyGeometryNoise(tessellation, {
+            seed: options.noiseSeed,
+            ...options.noise,
+        });
+    }
 
-  // Этап 3: Обрезка дорог
-  const clipping = clipLines(tessellation, decorations);
+    // Этап 3: Декорации (площади)
+    const decorations = generateDecorations(tessellation);
 
-  // Этап 4: Вычисление полей
-  const fields = computeFields(tessellation, clipping, decorations);
+    // Этап 4: Обрезка дорог
+    const clipping = clipLines(tessellation, decorations);
 
-  // Этап 5: Привязка
-  const assignments = assignFieldPolygons(features, fields);
+    // Этап 5: Вычисление полей
+    const fields = computeFields(tessellation, clipping, decorations);
 
-  console.log(
-    `✅ [GeometryProcessor] Завершено: ` +
-    `${tessellation.areas.size} областей, ` +
-    `${tessellation.lines.size} дорог, ` +
-    `${decorations.plazas.length} площадей, ` +
-    `${fields.fieldPolygons.length} полей, ` +
-    `${assignments.fieldGeometries.size} привязок`
-  );
+    // Этап 6: Привязка
+    const assignments = assignFieldPolygons(features, fields);
 
-  return { tessellation, decorations, clipping, fields, assignments };
+    console.log(
+        `✅ [GeometryProcessor] Завершено: ` +
+        `${tessellation.areas.size} областей, ${tessellation.lines.size} дорог, ` +
+        `${decorations.plazas.length} площадей, ${fields.fieldPolygons.length} полей, ` +
+        `${assignments.fieldGeometries.size} привязок`
+    );
+
+    return { tessellation, decorations, clipping, fields, assignments };
 }
+
+// ... [функции tessellate, generateDecorations, clipLines,
+//      computeFields, assignFieldPolygons, computeTileGeometry
+//      остаются БЕЗ ИЗМЕНЕНИЙ из текущей версии] ...
 
 // ============================================
 // ЭТАП 1: ТЕССЕЛЯЦИЯ
 // ============================================
-
 function tessellate(features: readonly TileFeature[]): TessellationResult {
-  const areas = new Map<string, MultiPolygon>();
-  const lines = new Map<string, TessellatedLine>();
+    const areas = new Map<string, MultiPolygon>();
+    const lines = new Map<string, TessellatedLine>();
 
-  for (const feature of features) {
-    if (!feature.geometry) continue;
-    if (feature.geometry.kind === 'derived') continue;
+    for (const feature of features) {
+        if (!feature.geometry) continue;
+        if (feature.geometry.kind === 'derived') continue;
 
-    if (feature.geometry.kind === 'area') {
-      const ring = tessellateArea(feature.geometry);
-      const polygon: Polygon = [ring];
-      const mp: MultiPolygon = [polygon];
-      areas.set(feature.id, mp);
-      console.log(`📐 [Tessellate] Area "${feature.id}": ${ring.length} точек`);
-    } else if (feature.geometry.kind === 'line') {
-      const tessellated = tessellateLine(feature.geometry);
-      lines.set(feature.id, tessellated);
-      console.log(
-        `📐 [Tessellate] Line "${feature.id}": ` +
-        `${tessellated.center.length} точек оси`
-      );
+        if (feature.geometry.kind === 'area') {
+            const ring = tessellateArea(feature.geometry);
+            areas.set(feature.id, [[ring]]);
+            console.log(`📐 [Tessellate] Area "${feature.id}": ${ring.length} точек`);
+        } else if (feature.geometry.kind === 'line') {
+            const tessellated = tessellateLine(feature.geometry);
+            lines.set(feature.id, tessellated);
+            console.log(
+                `📐 [Tessellate] Line "${feature.id}": ` +
+                `${tessellated.center.length} точек оси`
+            );
+        }
     }
-  }
 
-  return { areas, lines };
+    return { areas, lines };
 }
 
 // ============================================
-// ЭТАП 2: ДЕКОРАЦИИ
+// ЭТАП 3: ДЕКОРАЦИИ
 // ============================================
-
 function generateDecorations(
     tessellation: TessellationResult
 ): DecorationResult {
-    // 🌟 Вызов генератора площадей
     const plazaGeometries = generatePlazas(tessellation.lines);
     const plazas = plazaGeometries.map(geo => tessellateArea(geo));
-    
     console.log(`🏛️ [Decorations] Сгенерировано ${plazas.length} площадей`);
     return { plazaGeometries, plazas };
 }
 
 // ============================================
-// ЭТАП 3: ОБРЕЗКА ДОРОГ
+// ЭТАП 4: ОБРЕЗКА ДОРОГ
 // ============================================
-
 function clipLines(
-  tessellation: TessellationResult,
-  decorations: DecorationResult
+    tessellation: TessellationResult,
+    decorations: DecorationResult
 ): ClippingResult {
-  const clippedLines = new Map<string, MultiPolygon>();
+    const clippedLines = new Map<string, MultiPolygon>();
+    const obstacles: Polygon[] = [];
 
-  // Собираем все препятствия как массив Polygon
-  const obstacles: Polygon[] = [];
-
-  // 1. Области (города, монастыри)
-  for (const multiPolygon of tessellation.areas.values()) {
-    for (const polygon of multiPolygon) {
-      obstacles.push(polygon);
+    for (const mp of tessellation.areas.values()) {
+        for (const polygon of mp) obstacles.push(polygon);
     }
-  }
-
-  // 2. Декорации (площади) — Ring → Polygon
-  for (const plaza of decorations.plazas) {
-    obstacles.push([plaza]);
-  }
-
-  // 🌟 СТЕН БОЛЬШЕ НЕТ — препятствий меньше
-
-  console.log(
-    `✂️ [Clip] Препятствий для обрезки: ${obstacles.length} ` +
-    `(${tessellation.areas.size} областей + ${decorations.plazas.length} площадей)`
-  );
-
-  // Если нет препятствий — дороги не обрезаются
-  if (obstacles.length === 0) {
-    for (const [featureId, tessellated] of tessellation.lines) {
-      const ring = buildRoadPolygon(tessellated);
-      clippedLines.set(featureId, [[ring]]);
+    for (const plaza of decorations.plazas) {
+        obstacles.push([plaza]);
     }
+
+    console.log(`✂️ [Clip] Препятствий: ${obstacles.length}`);
+
+    if (obstacles.length === 0) {
+        for (const [id, tess] of tessellation.lines) {
+            clippedLines.set(id, [[buildRoadPolygon(tess)]]);
+        }
+        return { clippedLines };
+    }
+
+    for (const [id, tess] of tessellation.lines) {
+        const ring = buildRoadPolygon(tess);
+        let clipped: MultiPolygon = [[ring]];
+
+        for (const obstacle of obstacles) {
+            clipped = subtractPolygons(clipped, [obstacle]);
+            if (clipped.length === 0) break;
+        }
+
+        if (clipped.length > 0) {
+            clippedLines.set(id, clipped);
+        } else {
+            console.warn(`⚠️ [Clip] Дорога "${id}" полностью вырезана`);
+        }
+    }
+
     return { clippedLines };
-  }
-
-  for (const [featureId, tessellated] of tessellation.lines) {
-    const ring = buildRoadPolygon(tessellated);
-    let clipped: MultiPolygon = [[ring]];
-
-    for (const obstacle of obstacles) {
-      clipped = subtractPolygons(clipped, [obstacle]);
-      if (clipped.length === 0) break;
-    }
-
-    if (clipped.length > 0) {
-      clippedLines.set(featureId, clipped);
-      console.log(
-        `✂️ [Clip] Дорога "${featureId}": ${clipped.length} полигон(ов) после обрезки`
-      );
-    } else {
-      console.warn(
-        `⚠️ [Clip] Дорога "${featureId}" полностью вырезана препятствиями`
-      );
-    }
-  }
-
-  return { clippedLines };
 }
 
 // ============================================
-// ЭТАП 4: ВЫЧИСЛЕНИЕ ПОЛЕЙ
+// ЭТАП 5: ВЫЧИСЛЕНИЕ ПОЛЕЙ
 // ============================================
-
 function computeFields(
     tessellation: TessellationResult,
     clipping: ClippingResult,
     decorations: DecorationResult
 ): FieldComputationResult {
-    const subtractList: Polygon[] = [];
+    const obstacles: Polygon[] = [];
 
-    // 1. Области (города, монастыри)
-    for (const multiPolygon of tessellation.areas.values()) {
-        for (const polygon of multiPolygon) subtractList.push(polygon);
+    for (const mp of tessellation.areas.values()) {
+        for (const p of mp) obstacles.push(p);
     }
-    // 2. Обрезанные дороги
-    for (const multiPolygon of clipping.clippedLines.values()) {
-        for (const polygon of multiPolygon) subtractList.push(polygon);
+    for (const mp of clipping.clippedLines.values()) {
+        for (const p of mp) obstacles.push(p);
     }
-    // 3. Декорации (площади)
     for (const plaza of decorations.plazas) {
-        subtractList.push([plaza]);
+        obstacles.push([plaza]);
     }
 
-    // 🌟 Вызов генератора полей
-    const fieldPolygons = computeFieldPolygons(subtractList);
-    
+    const fieldPolygons = computeFieldPolygons(obstacles);
     return { fieldPolygons };
 }
 
 // ============================================
-// ЭТАП 5: ПРИВЯЗКА ПОЛИГОНОВ
+// ЭТАП 6: ПРИВЯЗКА
 // ============================================
-
 function assignFieldPolygons(
     features: readonly TileFeature[],
     fields: FieldComputationResult
 ): AssignmentResult {
-    // 🌟 Вызов генератора привязки
     const fieldGeometries = assignFieldFeatures(features, fields.fieldPolygons);
     return { fieldGeometries };
 }
 
 // ============================================
-// 📤 ЭКСПОРТ ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ
+// 📤 ОБРАТНАЯ СОВМЕСТИМОСТЬ
 // ============================================
-
-/** @deprecated Используйте `processTileGeometry` вместо этой функции */
+/** @deprecated Используйте `processTileGeometry` */
 export function computeTileGeometry(features: readonly TileFeature[]): {
-  plazas: readonly Ring[];
-  clippedLines: Map<string, MultiPolygon>;
-  fieldGeometries: Map<string, MultiPolygon>;
+    plazas: readonly Ring[];
+    clippedLines: Map<string, MultiPolygon>;
+    fieldGeometries: Map<string, MultiPolygon>;
 } {
-  const result = processTileGeometry(features);
-  return {
-    plazas: result.decorations.plazas,
-    clippedLines: result.clipping.clippedLines as Map<string, MultiPolygon>,
-    fieldGeometries: result.assignments.fieldGeometries as Map<string, MultiPolygon>,
-  };
+    const result = processTileGeometry(features);
+    return {
+        plazas: result.decorations.plazas,
+        clippedLines: result.clipping.clippedLines as Map<string, MultiPolygon>,
+        fieldGeometries: result.assignments.fieldGeometries as Map<string, MultiPolygon>,
+    };
 }

@@ -2,70 +2,54 @@
 // ============================================
 // 📦 ЭКСПОРТ ГЕОМЕТРИЧЕСКИХ МОДУЛЕЙ
 // ============================================
-// Единая точка импорта для клиентских компонентов:
-//   import { processTileGeometry, toPathD } from '@/core/geometry';
-
 export { processTileGeometry, computeTileGeometry } from './geometryProcessor';
+export type { ProcessOptions } from './geometryProcessor';
+
+// 🌟 Типы из нового файла
 export type {
-  TileGeometryResult,
-  TessellationResult,
-  DecorationResult,
-  ClippingResult,
-  FieldComputationResult,
-  AssignmentResult,
-} from './geometryProcessor';
+    TileGeometryResult,
+    TessellationResult,
+    DecorationResult,
+    ClippingResult,
+    FieldComputationResult,
+    AssignmentResult,
+} from './types';
 
 export { toPathD, ringToPathD } from './geometryToSvg';
-
 export {
-  subtractPolygons,
-  subtractOne,
-  unionPolygons,
-  intersectPolygons,
-  TILE_SQUARE,
+    subtractPolygons, subtractOne, unionPolygons, intersectPolygons, TILE_SQUARE,
 } from './booleanOps';
-
 export {
-  tessellateArea,
-  tessellateLine,
-  tessellateFeature,
-  TESSELLATION,
+    tessellateArea, tessellateLine, tessellateFeature, TESSELLATION,
 } from './tessellate';
 export type { TessellatedLine } from './tessellate';
-
-
 export {
-  pointInRing,
-  pointInPolygon,
-  multiPolygonContainsPoint,
+    pointInRing, pointInPolygon, multiPolygonContainsPoint,
 } from './geometryPointInPolygon';
 
-// Типы реэкспортируем из shared для удобства
-export type {
-  Point,
-  Ring,
-  Polygon,
-  MultiPolygon,
-  AreaGeometry,
-  LineGeometry,
-  FeatureGeometry,
-} from '@fiefdom/shared/core/geometry.types';
+// 🌊 Шум Перлина
+export { createNoise2D, createFBM } from './generators/perlin';
+export type { Noise2D } from './generators/perlin';
 
-// ============================================
-// 🧩 ГЕНЕРАТОРЫ ГЕОМЕТРИИ ПО ПОРТАМ
-// ============================================
+// 🔧 Пост-процессор
+export { applyGeometryNoise, NOISE_PARAMS } from './geometryPostProcessor';
+export type { NoiseOptions } from './geometryPostProcessor';
+
+// Генераторы
 export {
     withGeneratedGeometry,
     generateFeatureGeometries,
     CITY_PARAMS,
     ROAD_PARAMS,
-    // 🌟 НОВЫЕ ЭКСПОРТЫ
+    MONASTERY_PARAMS,
     generatePlazas,
     computeFieldPolygons,
     assignFieldFeatures,
 } from './generators';
+export type { GenerateOptions, GeneratedGeometries } from './generators';
 
+// Типы из shared
 export type {
-    GenerateOptions,
-    GeneratedGeometries,
-} from './generators';
+    Point, Ring, Polygon, MultiPolygon,
+    AreaGeometry, LineGeometry, FeatureGeometry,
+} from '@fiefdom/shared/core/geometry.types';

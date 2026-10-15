@@ -2,7 +2,7 @@
 // ============================================
 // 🛠️ УНИВЕРСАЛЬНЫЙ ПОСТРОИТЕЛЬ SVG PATH
 // ============================================
-import type { Ring, Polygon, MultiPolygon } from '../../../../shared/src/core/geometry.types';
+import type { Ring, Polygon, MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 
 // ============================================
 // 🔍 ОПРЕДЕЛЕНИЕ ТИПА ПО ВЛОЖЕННОСТИ

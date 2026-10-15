@@ -9,7 +9,7 @@ import type {
   LineGeometry,
   OutlineSegment,
   PathSegment,
-} from '../../../../shared/src/core/geometry.types';
+} from '@fiefdom/shared/core/geometry.types';
 
 /** Количество сегментов на одну кривую Безье */
 export const TESSELLATION = 8;

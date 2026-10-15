@@ -15,12 +15,6 @@ import { PORTS_PER_SIDE, getPortSide } from '@fiefdom/shared/core/portUtils';
 /** Сторона тайла: 0=N, 1=E, 2=S, 3=W (как Dir в shared) */
 export type Side = 0 | 1 | 2 | 3;
 
-/** Генератор псевдослучайных чисел [0, 1) */
-export type Rng = () => number;
-
-/** Фабрика свежего генератора с тем же seed (нужна для отката на эталон) */
-export type RngFactory = () => Rng;
-
 /** Половина стороны тайла: система координат [-50, 50] */
 export const HALF = 50;
 

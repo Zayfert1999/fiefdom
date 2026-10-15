@@ -2,7 +2,7 @@
 // ============================================
 // 📐 ПРОВЕРКА ТОЧКИ ВНУТРИ ПОЛИГОНА
 // ============================================
-import type { Point, Ring, Polygon, MultiPolygon } from '../../../../shared/src/core/geometry.types';
+import type { Point, Ring, Polygon, MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 
 /**
  * Алгоритм лучевого трассирования (ray casting).

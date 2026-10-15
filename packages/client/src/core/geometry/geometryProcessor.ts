@@ -11,12 +11,12 @@
 //
 // 🌟 СТЕН УДАЛЕНЫ — пайплайн упростился.
 // ============================================
-import type { TileFeature, Spot } from '@fiefdom/shared/core/types';
-import type { Point, Ring, Polygon, MultiPolygon } from '@fiefdom/shared/core/geometry.types';
+import type { TileFeature } from '@fiefdom/shared/core/types';
+import type { Ring, Polygon, MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 import { tessellateArea, tessellateLine, type TessellatedLine } from './tessellate';
-import { subtractPolygons, TILE_SQUARE } from './booleanOps';
-import { pointInPolygon } from './geometryPointInPolygon';
-import { generatePlazas } from './proceduralGeometry';
+import { subtractPolygons } from './booleanOps';
+import { generatePlazas } from './generators/plaza';
+import { computeFieldPolygons, assignFieldFeatures } from './generators/field';
 
 // ============================================
 // 📦 ИНТЕРФЕЙСЫ РЕЗУЛЬТАТОВ ЭТАПОВ
@@ -145,19 +145,18 @@ function tessellate(features: readonly TileFeature[]): TessellationResult {
 }
 
 // ============================================
-// ЭТАП 2: ДЕКОРАЦИИ (без стен)
+// ЭТАП 2: ДЕКОРАЦИИ
 // ============================================
 
 function generateDecorations(
-  tessellation: TessellationResult
+    tessellation: TessellationResult
 ): DecorationResult {
-  // Площади на перекрёстках дорог
-  const plazaGeometries = generatePlazas(tessellation.lines);
-  const plazas = plazaGeometries.map(geo => tessellateArea(geo));
-
-  console.log(`🏛️ [Decorations] Сгенерировано ${plazas.length} площадей`);
-
-  return { plazaGeometries, plazas };
+    // 🌟 Вызов генератора площадей
+    const plazaGeometries = generatePlazas(tessellation.lines);
+    const plazas = plazaGeometries.map(geo => tessellateArea(geo));
+    
+    console.log(`🏛️ [Decorations] Сгенерировано ${plazas.length} площадей`);
+    return { plazaGeometries, plazas };
 }
 
 // ============================================
@@ -230,38 +229,29 @@ function clipLines(
 // ============================================
 
 function computeFields(
-  tessellation: TessellationResult,
-  clipping: ClippingResult,
-  decorations: DecorationResult
+    tessellation: TessellationResult,
+    clipping: ClippingResult,
+    decorations: DecorationResult
 ): FieldComputationResult {
-  const subtractList: Polygon[] = [];
+    const subtractList: Polygon[] = [];
 
-  // 1. Области (города, монастыри)
-  for (const multiPolygon of tessellation.areas.values()) {
-    for (const polygon of multiPolygon) {
-      subtractList.push(polygon);
+    // 1. Области (города, монастыри)
+    for (const multiPolygon of tessellation.areas.values()) {
+        for (const polygon of multiPolygon) subtractList.push(polygon);
     }
-  }
-
-  // 2. Обрезанные дороги
-  for (const multiPolygon of clipping.clippedLines.values()) {
-    for (const polygon of multiPolygon) {
-      subtractList.push(polygon);
+    // 2. Обрезанные дороги
+    for (const multiPolygon of clipping.clippedLines.values()) {
+        for (const polygon of multiPolygon) subtractList.push(polygon);
     }
-  }
+    // 3. Декорации (площади)
+    for (const plaza of decorations.plazas) {
+        subtractList.push([plaza]);
+    }
 
-  // 3. Декорации (площади) — Ring → Polygon
-  for (const plaza of decorations.plazas) {
-    subtractList.push([plaza]);
-  }
-
-  // 🌟 СТЕН БОЛЬШЕ НЕТ
-
-  // Вычитаем всё из квадрата тайла
-  const tileMultiPolygon: MultiPolygon = [[TILE_SQUARE]];
-  const fieldMultiPolygon = subtractPolygons(tileMultiPolygon, subtractList);
-
-  return { fieldPolygons: fieldMultiPolygon };
+    // 🌟 Вызов генератора полей
+    const fieldPolygons = computeFieldPolygons(subtractList);
+    
+    return { fieldPolygons };
 }
 
 // ============================================
@@ -269,67 +259,12 @@ function computeFields(
 // ============================================
 
 function assignFieldPolygons(
-  features: readonly TileFeature[],
-  fields: FieldComputationResult
+    features: readonly TileFeature[],
+    fields: FieldComputationResult
 ): AssignmentResult {
-  const fieldGeometries = new Map<string, MultiPolygon>();
-  const used = new Set<number>();
-
-  const fieldFeatures = features.filter(
-    f => f.type === 'field' && f.geometry?.kind === 'derived'
-  );
-
-  if (fieldFeatures.length === 0 || fields.fieldPolygons.length === 0) {
-    console.log(
-      `🔗 [Assign] Пропуск: ${fieldFeatures.length} полей, ` +
-      `${fields.fieldPolygons.length} полигонов`
-    );
+    // 🌟 Вызов генератора привязки
+    const fieldGeometries = assignFieldFeatures(features, fields.fieldPolygons);
     return { fieldGeometries };
-  }
-
-  console.log(
-    `🔗 [Assign] Привязка ${fieldFeatures.length} полей к ` +
-    `${fields.fieldPolygons.length} полигонам`
-  );
-
-  for (const field of fieldFeatures) {
-    const rawSpot = field.meepleSpot;
-    const spot: Spot = Array.isArray(rawSpot) ? rawSpot[0] : rawSpot;
-    const spotPoint: Point = [spot.x, spot.y];
-
-    let assigned = false;
-
-    for (let i = 0; i < fields.fieldPolygons.length; i++) {
-      if (used.has(i)) continue;
-
-      if (pointInPolygon(spotPoint, fields.fieldPolygons[i])) {
-        fieldGeometries.set(field.id, [fields.fieldPolygons[i]]);
-        used.add(i);
-        assigned = true;
-        console.log(
-          `🔗 [Assign] Поле "${field.id}" → полигон #${i} ` +
-          `(spot: ${spot.x}, ${spot.y})`
-        );
-        break;
-      }
-    }
-
-    if (!assigned) {
-      console.warn(
-        `⚠️ [Assign] Не найден полигон для поля "${field.id}" ` +
-        `(spot: ${spot.x}, ${spot.y}). Проверьте геометрию.`
-      );
-    }
-  }
-
-  const unusedCount = fields.fieldPolygons.length - used.size;
-  if (unusedCount > 0) {
-    console.warn(
-      `⚠️ [Assign] Осталось нераспределённых полигонов: ${unusedCount}`
-    );
-  }
-
-  return { fieldGeometries };
 }
 
 // ============================================

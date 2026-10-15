@@ -1,78 +1,44 @@
-// packages/shared/src/core/proceduralGeometry.ts
+// packages/client/src/core/geometry/generators/plaza.ts
 // ============================================
-// 🏛️ ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ ПЛОЩАДЕЙ
+// 🏛️ ГЕНЕРАЦИЯ ПЛОЩАДЕЙ НА ПЕРЕКРЁСТКАХ ДОРОГ
 // ============================================
-// Площади генерируются автоматически на пересечении 2+ дорог.
+// Площади генерируются автоматически там, где пересекаются 2+ дороги.
+// Форма площади: "протоптанные тропинки" (вдоль дорог, со скруглёнными углами).
 //
-// Форма площади: "протоптанные тропинки"
-// Площадь идёт ВДОЛЬ дорог, со скруглёнными углами между ними.
-//
-// 🌟 АРХИТЕКТУРА:
-//   Принимает УЖЕ ТЕССЕЛИРОВАННЫЕ дороги из Этапа 1 процессора.
+// АРХИТЕКТУРА:
+//   Принимает УЖЕ ТЕССЕЛИРОВАННЫЕ дороги из пайплайна.
 //   Не тесселирует дороги заново — использует кэш.
-//
-// Алгоритм:
-//   1. Берём конечные точки осевых линий из кэша
-//   2. Кластеризуем точки (группируем близкие = перекрёсток)
-//   3. Для каждого кластера:
-//      a. Определяем направления дорог от центра
-//      b. Вычисляем края на расстоянии PLAZA_DEPTH вдоль дорог
-//      c. Соединяем края соседних дорог вогнутыми кривыми
 // ============================================
-
-import type { Point, AreaGeometry, OutlineSegment } from '../../../../shared/src/core/geometry.types';
-import type { TessellatedLine } from './tessellate';
+import type { Point, AreaGeometry, OutlineSegment } from '@fiefdom/shared/core/geometry.types';
+import type { TessellatedLine } from '../tessellate';
 
 // ============================================
 // ⚙️ КОНСТАНТЫ
 // ============================================
-
 /** Допуск для кластеризации точек (юниты) */
 const CLUSTER_TOLERANCE = 3;
 
-/**
- * Глубина площади вдоль дороги (юниты).
- * Точки краёв вычисляются на этом расстоянии от центра.
- * Больше значение = площадь длиннее вдоль дорог.
- */
+/** Глубина площади вдоль дороги (юниты). Больше = площадь длиннее. */
 const PLAZA_DEPTH = 20;
 
-/**
- * Глубина вогнутости кривой между дорогами (0..1).
- * 0.0 = прямая линия (нет среза угла)
- * 1.0 = кривая проходит через центр
- * 0.3 = умеренный срез (протоптанная тропинка)
- */
+/** Глубина вогнутости кривой между дорогами (0..1). 0.3 = умеренный срез. */
 const CURVE_DEPTH = 0.1;
 
-/**
- * Порог для определения противоположных направлений.
- * dot product < -0.9 → угол > ~154° → считаем противоположными.
- */
+/** Порог для определения противоположных направлений (dot product < -0.9). */
 const OPPOSITE_THRESHOLD = -0.9;
 
 // ============================================
 // 📐 ГЕНЕРАЦИЯ ГЕОМЕТРИИ ПЛОЩАДИ
 // ============================================
-
 /**
  * Строит AreaGeometry площади как "протоптанные тропинки".
- *
- * Контур обходит перекрёсток по часовой стрелке:
- *   • Кривая: от правого края дороги i к левому краю дороги i+1
- *     (вогнутая, срезает угол — люди ходили по диагонали)
- *   • Прямая: поперёк дороги i+1 (от левого края к правому)
- *
- * @param center    Центр площади (точка пересечения осевых линий)
- * @param roadInfos Информация о каждой дороге: направление и полуширина
- * @returns AreaGeometry, готовая к тесселяции
+ * Контур обходит перекрёсток по часовой стрелке.
  */
 function generatePlazaGeometry(
     center: Point,
     roadInfos: Array<{ dir: Point; halfWidth: number }>
 ): AreaGeometry {
     const n = roadInfos.length;
-
     // Сортируем дороги по часовой стрелке
     const sorted = [...roadInfos].sort((a, b) =>
         Math.atan2(b.dir[1], b.dir[0]) - Math.atan2(a.dir[1], a.dir[0])
@@ -80,9 +46,7 @@ function generatePlazaGeometry(
 
     // Вычисляем края каждой дороги НА РАССТОЯНИИ PLAZA_DEPTH от центра
     const edgePoints: Array<{ left: Point; right: Point }> = [];
-
     for (const { dir, halfWidth } of sorted) {
-        // Точка на расстоянии PLAZA_DEPTH вдоль дороги от центра
         const alongX = center[0] + dir[0] * PLAZA_DEPTH;
         const alongY = center[1] + dir[1] * PLAZA_DEPTH;
 
@@ -90,20 +54,12 @@ function generatePlazaGeometry(
         const perpX = -dir[1];
         const perpY = dir[0];
 
-        // Левый и правый края в удалённой точке
-        const left: Point = [
-            alongX + perpX * halfWidth,
-            alongY + perpY * halfWidth,
-        ];
-        const right: Point = [
-            alongX - perpX * halfWidth,
-            alongY - perpY * halfWidth,
-        ];
-
-        edgePoints.push({ left, right });
+        edgePoints.push({
+            left: [alongX + perpX * halfWidth, alongY + perpY * halfWidth],
+            right: [alongX - perpX * halfWidth, alongY - perpY * halfWidth],
+        });
     }
 
-    // Стартовая точка — правый край первой дороги
     const start = edgePoints[0].right;
     const outline: OutlineSegment[] = [];
 
@@ -123,45 +79,28 @@ function generatePlazaGeometry(
             outline.push({ type: 'line', to });
         } else {
             // Вогнутая кривая (срез угла между дорогами)
-            // Контрольная точка смещена К центру
             const midX = (from[0] + to[0]) / 2;
             const midY = (from[1] + to[1]) / 2;
-
             const controlPoint: Point = [
                 midX + (center[0] - midX) * CURVE_DEPTH,
                 midY + (center[1] - midY) * CURVE_DEPTH,
             ];
-
-            outline.push({
-                type: 'quadratic',
-                cp: controlPoint,
-                to,
-            });
+            outline.push({ type: 'quadratic', cp: controlPoint, to });
         }
 
-        // Прямая поперёк следующей дороги (от левого края к правому)
-        // Пропускаем для последней итерации (замыкание через close)
+        // Прямая поперёк следующей дороги
         if (next !== 0) {
-            outline.push({
-                type: 'line',
-                to: edgePoints[next].right,
-            });
+            outline.push({ type: 'line', to: edgePoints[next].right });
         }
     }
-
     outline.push({ type: 'close' });
 
-    return {
-        kind: 'area',
-        start,
-        outline,
-    };
+    return { kind: 'area', start, outline };
 }
 
 // ============================================
-// 📍 КЛАСТЕРИЗАЦИЯ
+// 📍 КЛАСТЕРИЗАЦИЯ И ХЕЛПЕРЫ
 // ============================================
-
 function distance(a: Point, b: Point): number {
     return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2);
 }
@@ -177,13 +116,10 @@ function averagePoint(points: Point[]): Point {
 function clusterPointIndices(points: Point[], tolerance: number): number[][] {
     const clusters: number[][] = [];
     const used = new Set<number>();
-
     for (let i = 0; i < points.length; i++) {
         if (used.has(i)) continue;
-
         const cluster: number[] = [i];
         used.add(i);
-
         for (let j = i + 1; j < points.length; j++) {
             if (used.has(j)) continue;
             if (distance(points[i], points[j]) <= tolerance) {
@@ -191,14 +127,11 @@ function clusterPointIndices(points: Point[], tolerance: number): number[][] {
                 used.add(j);
             }
         }
-
         clusters.push(cluster);
     }
-
     return clusters;
 }
 
-// Вычисляем полуширину из тесселированных контуров
 function getHalfWidth(tessellated: TessellatedLine): number {
     const left = tessellated.left[0];
     const right = tessellated.right[0];
@@ -208,34 +141,25 @@ function getHalfWidth(tessellated: TessellatedLine): number {
 }
 
 // ============================================
-// 🏛️ ОСНОВНАЯ ФУНКЦИЯ
+// 🏛️ ОСНОВНАЯ ФУНКЦИЯ (PUBLIC API)
 // ============================================
-
 /**
  * Генерирует площади на перекрёстках дорог.
- *
- * 🌟 ПРИНИМАЕТ КЭШ тесселированных дорог из Этапа 1 процессора.
- * НЕ тесселирует дороги заново.
- *
- * Возвращает AreaGeometry (НЕ тесселированные).
- * Тесселяция происходит в Этапе 2 процессора.
- *
- * @param tessellatedLines Кэш тесселированных дорог из Этапа 1
+ * Принимает кэш тесселированных дорог. НЕ тесселирует их заново.
+ * 
+ * @param tessellatedLines Кэш тесселированных дорог
  * @returns Массив AreaGeometry площадей
  */
 export function generatePlazas(
     tessellatedLines: ReadonlyMap<string, TessellatedLine>
 ): AreaGeometry[] {
-    // Нужно минимум 2 дороги для перекрёстка
     if (tessellatedLines.size < 2) return [];
 
-    // 🌟 Собираем данные из КЭША (без повторной тесселяции!)
-    const featureIds: string[] = [];
+    // Собираем данные из КЭША
     const endpoints: Point[] = [];
     const roadHalfWidths: number[] = [];
 
-    for (const [featureId, tessellated] of tessellatedLines) {
-        featureIds.push(featureId);
+    for (const [, tessellated] of tessellatedLines) {
         endpoints.push(tessellated.center[0]);
         endpoints.push(tessellated.center[tessellated.center.length - 1]);
         roadHalfWidths.push(getHalfWidth(tessellated));
@@ -243,7 +167,6 @@ export function generatePlazas(
 
     // Кластеризуем точки (близкие = одна точка пересечения)
     const clusterIndices = clusterPointIndices(endpoints, CLUSTER_TOLERANCE);
-
     const plazaGeometries: AreaGeometry[] = [];
 
     for (const indices of clusterIndices) {
@@ -262,7 +185,6 @@ export function generatePlazas(
             if (seenRoads.has(roadIdx)) continue;
             seenRoads.add(roadIdx);
 
-            // Противоположный конец дороги
             const otherPointIdx = roadIdx * 2 + (pointIdx % 2 === 0 ? 1 : 0);
             if (indexSet.has(otherPointIdx)) continue;
 
@@ -280,23 +202,22 @@ export function generatePlazas(
 
         if (roadInfos.length < 2) continue;
 
-        // Проверяем, что есть хотя бы 2 уникальных направления
+        // Проверяем уникальность направлений
         const uniqueDirs = new Set<string>();
         for (const { dir } of roadInfos) {
-            const key = `${Math.abs(dir[0]).toFixed(2)},${Math.abs(dir[1]).toFixed(2)}`;
-            uniqueDirs.add(key);
+            uniqueDirs.add(`${Math.abs(dir[0]).toFixed(2)},${Math.abs(dir[1]).toFixed(2)}`);
         }
         if (uniqueDirs.size < 2) continue;
 
         const plazaGeo = generatePlazaGeometry(center, roadInfos);
         plazaGeometries.push(plazaGeo);
-
+        
         console.log(
-            `🏛️ [Plaza] Площадь сгенерирована: ` +
+            `🏛️ [PlazaGenerator] Площадь сгенерирована: ` +
             `центр=(${center[0].toFixed(1)}, ${center[1].toFixed(1)}), ` +
             `дорог=${roadInfos.length}`
         );
     }
-
+    
     return plazaGeometries;
 }

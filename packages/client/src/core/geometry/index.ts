@@ -33,7 +33,6 @@ export {
 } from './tessellate';
 export type { TessellatedLine } from './tessellate';
 
-export { generatePlazas } from './proceduralGeometry';
 
 export {
   pointInRing,
@@ -51,3 +50,22 @@ export type {
   LineGeometry,
   FeatureGeometry,
 } from '@fiefdom/shared/core/geometry.types';
+
+// ============================================
+// 🧩 ГЕНЕРАТОРЫ ГЕОМЕТРИИ ПО ПОРТАМ
+// ============================================
+export {
+    withGeneratedGeometry,
+    generateFeatureGeometries,
+    CITY_PARAMS,
+    ROAD_PARAMS,
+    // 🌟 НОВЫЕ ЭКСПОРТЫ
+    generatePlazas,
+    computeFieldPolygons,
+    assignFieldFeatures,
+} from './generators';
+
+export type {
+    GenerateOptions,
+    GeneratedGeometries,
+} from './generators';

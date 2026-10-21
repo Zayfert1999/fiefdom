@@ -21,8 +21,10 @@ export {
 } from './booleanOps';
 export {
     tessellateArea, tessellateLine, tessellateFeature, TESSELLATION,
+    TESSELLATION_CONFIG, DEFAULT_TESSELLATION_PARAMS,
+    resolveTessellationParams, computeLineNormals,
 } from './tessellate';
-export type { TessellatedLine } from './tessellate';
+export type { TessellatedLine, TessellationParams } from './tessellate';
 export {
     pointInRing, pointInPolygon, multiPolygonContainsPoint,
 } from './geometryPointInPolygon';
@@ -32,8 +34,10 @@ export { createNoise2D, createFBM } from './generators/perlin';
 export type { Noise2D } from './generators/perlin';
 
 // 🔧 Пост-процессор
-export { applyGeometryNoise, NOISE_PARAMS } from './geometryPostProcessor';
-export type { NoiseOptions } from './geometryPostProcessor';
+export {
+    applyGeometryNoise, NOISE_PARAMS, resolveNoiseSettings, measureOutOfTile,
+} from './geometryPostProcessor';
+export type { NoiseOptions, NoiseSettings, EdgeFadeCurve } from './geometryPostProcessor';
 
 // Генераторы
 export {

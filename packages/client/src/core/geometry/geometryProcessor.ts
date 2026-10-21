@@ -5,10 +5,17 @@
 // 🌟 ИЗМЕНЕНО:
 //   • Типы импортируются из ./types (не определяются здесь)
 //   • applyGeometryNoise из ./geometryPostProcessor
+//   • Параметры тесселяции (`options.tessellation`) пробрасываются
+//     во все вызовы tessellateArea / tessellateLine
 // ============================================
 import type { TileFeature } from '@fiefdom/shared/core/types';
 import type { Ring, Polygon, MultiPolygon } from '@fiefdom/shared/core/geometry.types';
-import { tessellateArea, tessellateLine, type TessellatedLine } from './tessellate';
+import {
+    tessellateArea,
+    tessellateLine,
+    type TessellatedLine,
+    type TessellationParams,
+} from './tessellate';
 import { subtractPolygons } from './booleanOps';
 import { generatePlazas } from './generators/plaza';
 import { computeFieldPolygons, assignFieldFeatures } from './generators/field';
@@ -37,8 +44,10 @@ export type {
 export interface ProcessOptions {
     /** Seed для шума Перлина. Если не указан — шум не применяется */
     readonly noiseSeed?: string;
-    /** Параметры шума (амплитуда, частота) */
+    /** Параметры шума (амплитуды, частоты, октавы, края тайла, сглаживание...) */
     readonly noise?: Partial<Omit<NoiseOptions, 'seed'>>;
+    /** Параметры тесселяции (плотность, min/max точек...) */
+    readonly tessellation?: Partial<TessellationParams>;
 }
 
 // ============================================
@@ -59,7 +68,7 @@ export function processTileGeometry(
     console.log(`🏭 [GeometryProcessor] Начало обработки ${features.length} фич`);
 
     // Этап 1: Тесселяция
-    let tessellation = tessellate(features);
+    let tessellation = tessellate(features, options?.tessellation);
 
     // Этап 2: 🌊 Шум Перлина
     if (options?.noiseSeed) {
@@ -70,7 +79,7 @@ export function processTileGeometry(
     }
 
     // Этап 3: Декорации (площади)
-    const decorations = generateDecorations(tessellation);
+    const decorations = generateDecorations(tessellation, options?.tessellation);
 
     // Этап 4: Обрезка дорог
     const clipping = clipLines(tessellation, decorations);
@@ -98,7 +107,10 @@ export function processTileGeometry(
 // ============================================
 // ЭТАП 1: ТЕССЕЛЯЦИЯ
 // ============================================
-function tessellate(features: readonly TileFeature[]): TessellationResult {
+function tessellate(
+    features: readonly TileFeature[],
+    params?: Partial<TessellationParams>
+): TessellationResult {
     const areas = new Map<string, MultiPolygon>();
     const lines = new Map<string, TessellatedLine>();
 
@@ -107,11 +119,11 @@ function tessellate(features: readonly TileFeature[]): TessellationResult {
         if (feature.geometry.kind === 'derived') continue;
 
         if (feature.geometry.kind === 'area') {
-            const ring = tessellateArea(feature.geometry);
+            const ring = tessellateArea(feature.geometry, params);
             areas.set(feature.id, [[ring]]);
             console.log(`📐 [Tessellate] Area "${feature.id}": ${ring.length} точек`);
         } else if (feature.geometry.kind === 'line') {
-            const tessellated = tessellateLine(feature.geometry);
+            const tessellated = tessellateLine(feature.geometry, params);
             lines.set(feature.id, tessellated);
             console.log(
                 `📐 [Tessellate] Line "${feature.id}": ` +
@@ -127,10 +139,11 @@ function tessellate(features: readonly TileFeature[]): TessellationResult {
 // ЭТАП 3: ДЕКОРАЦИИ
 // ============================================
 function generateDecorations(
-    tessellation: TessellationResult
+    tessellation: TessellationResult,
+    params?: Partial<TessellationParams>
 ): DecorationResult {
     const plazaGeometries = generatePlazas(tessellation.lines);
-    const plazas = plazaGeometries.map(geo => tessellateArea(geo));
+    const plazas = plazaGeometries.map(geo => tessellateArea(geo, params));
     console.log(`🏛️ [Decorations] Сгенерировано ${plazas.length} площадей`);
     return { plazaGeometries, plazas };
 }

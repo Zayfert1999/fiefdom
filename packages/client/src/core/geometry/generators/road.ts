@@ -41,6 +41,13 @@ export const ROAD_PARAMS = {
   straightStub: 20,
   /** Глубина дуги города для тупиковой дороги */
   cityArcDepth: 30,
+  /**
+   * Заход тупиковой дороги ПОД город/монастырь (юниты).
+   * Дорога всё равно вычитается из контура города в пайплайне,
+   * но без захода шум на контуре города оставляет щель между
+   * торцом дороги и городом.
+   */
+  endOverlap: 6,
 } as const;
 
 export interface RoadResult {
@@ -125,9 +132,9 @@ function build(
     let reach = HALF;
 
     if (ctx.monasteryHalf !== null) {
-      reach = HALF - ctx.monasteryHalf;
+      reach = HALF - ctx.monasteryHalf + P.endOverlap;
     } else if (ctx.cityArcSides.has(side)) {
-      reach = arcDepth.get(side) ?? P.cityArcDepth;
+      reach = (arcDepth.get(side) ?? P.cityArcDepth) + P.endOverlap;
     }
 
     return rotatePath([0, -HALF], [line([0, -HALF + reach])], side, width);

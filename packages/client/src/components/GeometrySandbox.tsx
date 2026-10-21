@@ -14,21 +14,34 @@
 // Пайплайн:
 // tile.features
 //   → generateFeatureGeometries()
-//   → processTileGeometry()
+//   → processTileGeometry({ tessellation, noise })
 //   → SVG / 3D visualization
+//
+// 🌟 Все параметры тесселяции и шума настраиваются в левой панели
+//    (см. SandboxParamControls.tsx). Показывается число вершин
+//    и максимальный выход геометрии за границу тайла.
 // ============================================
 
-import { useState, useMemo, memo, useCallback, useEffect } from 'react';
+import { useState, useMemo, memo, useCallback, useEffect, useDeferredValue } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { useLiveTiles } from '@/hooks/useLiveTiles';
 import { Tile3DView } from './Tile3DView';
+import {
+  NoiseControls,
+  TessellationControls,
+  ParamCheckbox,
+} from './SandboxParamControls';
 import {
   processTileGeometry,
   toPathD,
   ringToPathD,
   generateFeatureGeometries,
+  measureOutOfTile,
   ROAD_PARAMS,
+  NOISE_PARAMS,
+  DEFAULT_TESSELLATION_PARAMS,
 } from '@/core/geometry';
+import type { NoiseSettings, TessellationParams } from '@/core/geometry';
 import type { TileFeature, Port } from '@fiefdom/shared/core/types';
 import type { MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 import styles from '@/components/styles/modal.module.css';
@@ -316,9 +329,11 @@ interface SandboxTileViewProps {
   overwrite: boolean;
   roadWidth: number;
   seedOverride?: string;
-  // 🌟 Шум Перлина
+  // 🌊 Шум Перлина и 📐 тесселяция
   noiseEnabled: boolean;
-  noiseAmplitude: number;
+  noise: NoiseSettings;
+  tessParams: TessellationParams;
+  showVertices: boolean;
 }
 
 const SandboxTileView = memo(({
@@ -334,7 +349,9 @@ const SandboxTileView = memo(({
   roadWidth,
   seedOverride,
   noiseEnabled,
-  noiseAmplitude,
+  noise,
+  tessParams,
+  showVertices,
 }: SandboxTileViewProps) => {
   // ============================================
   // 🔑 SEED (для шума, не для генераторов)
@@ -384,22 +401,15 @@ const SandboxTileView = memo(({
   // 🏭 ПРОЦЕССОР С ШУМОМ ПЕРЛИНА
   // ============================================
   const result = useMemo(() => {
-    console.log(
-      `🏭 [Sandbox] Процессор: "${tile.id}", ` +
-      `noise=${noiseEnabled}, amp=${noiseAmplitude}`
-    );
+    console.log(`🏭 [Sandbox] Процессор: "${tile.id}", noise=${noiseEnabled}`);
 
-    // 🌟 Передаём параметры шума в процессор
-    const processed = processTileGeometry(generation.features, {
+    // 🌟 Все параметры приходят из панелей песочницы
+    return processTileGeometry(generation.features, {
       noiseSeed: noiseEnabled ? seed : undefined,
-      noise: {
-        areaAmplitude: noiseAmplitude,
-        lineAmplitude: noiseAmplitude * 0.6,
-      },
+      noise,
+      tessellation: tessParams,
     });
-
-    return processed;
-  }, [generation.features, tile.id, seed, noiseEnabled, noiseAmplitude]);
+  }, [generation.features, tile.id, seed, noiseEnabled, noise, tessParams]);
 
   // ============================================
   // 🧱 ПОРЯДОК ОТРИСОВКИ
@@ -412,6 +422,25 @@ const SandboxTileView = memo(({
   );
 
   const { tessellation, decorations, clipping, assignments } = result;
+
+  // Максимальный выход геометрии за квадрат тайла (0 = всё внутри)
+  const overshoot = useMemo(() => measureOutOfTile(tessellation), [tessellation]);
+
+  // Число вершин после тесселяции и шума
+  const vertexStats = useMemo(() => {
+    const rows: { id: string; points: number }[] = [];
+    for (const [id, multi] of tessellation.areas) {
+      const points = multi.reduce(
+        (sum, polygon) => sum + polygon.reduce((acc, ring) => acc + ring.length, 0),
+        0
+      );
+      rows.push({ id, points });
+    }
+    for (const [id, line] of tessellation.lines) {
+      rows.push({ id, points: line.center.length });
+    }
+    return rows;
+  }, [tessellation]);
 
   // ============================================
   // 🩺 ДИАГНОСТИКА
@@ -468,6 +497,13 @@ const SandboxTileView = memo(({
               </g>
             )}
 
+            {/* Граница тайла (видно, если геометрия выходит за неё) */}
+            <rect
+              x={-50} y={-50} width={100} height={100}
+              fill="none" stroke="#ef4444" strokeWidth={0.4} strokeDasharray="2 1.5" opacity={0.7}
+              pointerEvents="none"
+            />
+
             {/* Оси */}
             {showAxes && (
               <g>
@@ -517,6 +553,32 @@ const SandboxTileView = memo(({
               <path key={`plaza-${index}`} d={ringToPathD(plaza)} fill={PLAZA_COLOR} fillOpacity={0.8} pointerEvents="none" />
             ))}
 
+            {/* Вершины тесселяции: жёлтые — контуры, голубые — ось дороги, розовые — края дороги */}
+            {showVertices && (
+              <g pointerEvents="none">
+                {Array.from(tessellation.areas.entries()).flatMap(([id, multi]) =>
+                  multi.flatMap((polygon, pi) =>
+                    polygon.flatMap((ring, ri) =>
+                      ring.map(([x, y], i) => (
+                        <circle key={`va-${id}-${pi}-${ri}-${i}`} cx={x} cy={y} r={0.55} fill="#fde047" />
+                      ))
+                    )
+                  )
+                )}
+                {Array.from(tessellation.lines.entries()).flatMap(([id, line]) => [
+                  ...line.center.map(([x, y], i) => (
+                    <circle key={`vc-${id}-${i}`} cx={x} cy={y} r={0.6} fill="#38bdf8" />
+                  )),
+                  ...line.left.map(([x, y], i) => (
+                    <circle key={`vl-${id}-${i}`} cx={x} cy={y} r={0.4} fill="#f472b6" />
+                  )),
+                  ...line.right.map(([x, y], i) => (
+                    <circle key={`vr-${id}-${i}`} cx={x} cy={y} r={0.4} fill="#f472b6" />
+                  )),
+                ])}
+              </g>
+            )}
+
             {/* Порты */}
             {showPorts && tile.features.map((feature) => (
               <g key={`ports-${feature.id}`}>
@@ -550,6 +612,20 @@ const SandboxTileView = memo(({
           <div style={{ marginBottom: 8, color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>3D</div>
           <Tile3DView result={result} size={size} />
         </div>
+      </div>
+
+      {/* 🩺 ДИАГНОСТИКА ТЕССЕЛЯЦИИ И ШУМА */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12, color: '#aaa' }}>
+        <span style={{ color: overshoot > 0 ? '#fca5a5' : '#86efac', fontWeight: 600 }}>
+          {overshoot > 0
+            ? `⚠️ Выход за тайл: ${overshoot.toFixed(2)} ед.`
+            : '✅ Вся геометрия внутри тайла'}
+        </span>
+        {vertexStats.map((row) => (
+          <span key={row.id} style={{ fontFamily: 'monospace' }}>
+            {row.id}: {row.points} т.
+          </span>
+        ))}
       </div>
 
       {/* ⚠️ ПРЕДУПРЕЖДЕНИЯ */}
@@ -596,6 +672,7 @@ export const GeometrySandbox = () => {
   const [showSpots, setShowSpots] = useState(true);
   const [showPorts, setShowPorts] = useState(true);
   const [showGeometry, setShowGeometry] = useState(true);
+  const [showVertices, setShowVertices] = useState(false);
 
   // ============================================
   // 🧬 ГЕНЕРАТИВНАЯ ГЕОМЕТРИЯ
@@ -606,10 +683,33 @@ export const GeometrySandbox = () => {
   const [seedOverride, setSeedOverride] = useState('');
 
   // ============================================
-  // 🌟 НОВОЕ: ПАРАМЕТРЫ ШУМА ПЕРЛИНА
+  // 🌊 ПАРАМЕТРЫ ШУМА ПЕРЛИНА И 📐 ТЕССЕЛЯЦИИ
   // ============================================
   const [noiseEnabled, setNoiseEnabled] = useState(true);
-  const [noiseAmplitude, setNoiseAmplitude] = useState(2.5);
+  const [noiseParams, setNoiseParams] = useState<NoiseSettings>({ ...NOISE_PARAMS });
+  const [tessParams, setTessParams] = useState<TessellationParams>({ ...DEFAULT_TESSELLATION_PARAMS });
+
+  // Пока ползунок тянут, тяжёлый пайплайн (булевы операции + 3D) догоняет с задержкой
+  const deferredNoise = useDeferredValue(noiseParams);
+  const deferredTess = useDeferredValue(tessParams);
+
+  const patchNoise = useCallback(
+    (patch: Partial<NoiseSettings>) => setNoiseParams((prev) => ({ ...prev, ...patch })),
+    []
+  );
+  const patchTess = useCallback(
+    (patch: Partial<TessellationParams>) => setTessParams((prev) => ({ ...prev, ...patch })),
+    []
+  );
+  const resetNoise = useCallback(() => setNoiseParams({ ...NOISE_PARAMS }), []);
+  const resetTess = useCallback(() => setTessParams({ ...DEFAULT_TESSELLATION_PARAMS }), []);
+
+  /** Копирует текущие параметры в буфер — чтобы перенести удачные значения в код */
+  const handleCopyParams = useCallback(() => {
+    const json = JSON.stringify({ tessellation: tessParams, noise: noiseParams }, null, 2);
+    console.log('📋 [Sandbox] Параметры:\n' + json);
+    void navigator.clipboard?.writeText(json);
+  }, [tessParams, noiseParams]);
 
   // ============================================
   // 🔄 ВЕРСИЯ ДЛЯ HOT-RELOAD
@@ -650,11 +750,11 @@ export const GeometrySandbox = () => {
     console.log(
       `⚙️ [Sandbox] Параметры: ` +
       `enable=${enableGenerative}, ` +
-      `noise=${noiseEnabled}, noiseAmp=${noiseAmplitude.toFixed(2)}, ` +
+      `noise=${noiseEnabled}, ` +
       `overwrite=${overwrite}, roadWidth=${roadWidth}, ` +
       `seedOverride="${seedOverride}"`
     );
-  }, [enableGenerative, noiseEnabled, noiseAmplitude, overwrite, roadWidth, seedOverride]);
+  }, [enableGenerative, noiseEnabled, overwrite, roadWidth, seedOverride]);
 
   useEffect(() => {
     setVersion((v) => v + 1);
@@ -686,6 +786,7 @@ export const GeometrySandbox = () => {
     { label: '🔶 Споты', value: showSpots, set: setShowSpots },
     { label: '📍 Порты', value: showPorts, set: setShowPorts },
     { label: '🎨 Геометрия', value: showGeometry, set: setShowGeometry },
+    { label: '🔹 Вершины тесселяции', value: showVertices, set: setShowVertices },
   ];
 
   return (
@@ -710,7 +811,7 @@ export const GeometrySandbox = () => {
         {/* Тело */}
         <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
           {/* 🎛 ЛЕВАЯ ПАНЕЛЬ */}
-          <div style={{ width: 290, flexShrink: 0, overflowY: 'auto', paddingRight: 8, borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ width: 330, flexShrink: 0, overflowY: 'auto', paddingRight: 8, borderRight: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 10, letterSpacing: 0.5 }}>
               🎛 Управление
             </div>
@@ -769,56 +870,56 @@ export const GeometrySandbox = () => {
                   style={{ width: 70, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
                 />
               </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
-                <span style={{ minWidth: 110 }}>🔑 Seed override</span>
-                <input
-                  type="text" value={seedOverride} onChange={(e) => setSeedOverride(e.target.value)}
-                  placeholder="по умолчанию artId" disabled={!enableGenerative}
-                  style={{ width: 140, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
-                />
-              </label>
             </div>
 
             {/* ======================================== */}
-            {/* 🌟 НОВОЕ: ШУМ ПЕРЛИНА */}
+            {/* 📐 ТЕССЕЛЯЦИЯ */}
+            {/* ======================================== */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+                📐 Тесселяция
+              </div>
+              <TessellationControls params={tessParams} onChange={patchTess} onReset={resetTess} />
+            </div>
+
+            {/* ======================================== */}
+            {/* 🌊 ШУМ ПЕРЛИНА */}
             {/* ======================================== */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
                 🌊 Шум Перлина
               </div>
 
-              {/* Вкл/Выкл шума */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={noiseEnabled}
-                  onChange={(e) => setNoiseEnabled(e.target.checked)}
-                />
-                Включить шум (органическая неровность)
-              </label>
+              <ParamCheckbox
+                label="Включить шум (органическая неровность)"
+                checked={noiseEnabled}
+                onChange={setNoiseEnabled}
+              />
 
-              {/* Слайдер амплитуды */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
-                <span style={{ minWidth: 110 }}>
-                  📐 Амплитуда: {noiseAmplitude.toFixed(1)}
-                </span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13, opacity: noiseEnabled ? 1 : 0.4 }}>
+                <span style={{ minWidth: 90 }}>🔑 Seed шума</span>
                 <input
-                  type="range"
-                  min={0}
-                  max={5}
-                  step={0.1}
-                  value={noiseAmplitude}
-                  disabled={!noiseEnabled}
-                  onChange={(e) => setNoiseAmplitude(Number(e.target.value))}
-                  style={{ width: 140, opacity: noiseEnabled ? 1 : 0.4 }}
+                  type="text" value={seedOverride} onChange={(e) => setSeedOverride(e.target.value)}
+                  placeholder="по умолчанию artId" disabled={!noiseEnabled}
+                  style={{ flex: 1, minWidth: 0, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
                 />
               </label>
 
-              <div style={{ fontSize: 11, color: '#888', lineHeight: 1.35 }}>
-                Амплитуда определяет силу неровности контуров.
-                0 = идеальные формы, 2.5 = умеренная, 5 = сильная.
-                Точки на границе тайла не смещаются.
+              <NoiseControls
+                params={noiseParams}
+                onChange={patchNoise}
+                onReset={resetNoise}
+                disabled={!noiseEnabled}
+              />
+
+              <div>
+                <button
+                  type="button"
+                  onClick={handleCopyParams}
+                  style={{ background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}
+                >
+                  📋 Копировать все параметры (JSON)
+                </button>
               </div>
             </div>
 
@@ -849,7 +950,9 @@ export const GeometrySandbox = () => {
                     roadWidth={roadWidth}
                     seedOverride={seedOverride}
                     noiseEnabled={noiseEnabled}
-                    noiseAmplitude={noiseAmplitude}
+                    noise={deferredNoise}
+                    tessParams={deferredTess}
+                    showVertices={showVertices}
                   />
                 </div>
                 <div style={{ marginTop: 12, fontSize: 12, color: '#aaa' }}>

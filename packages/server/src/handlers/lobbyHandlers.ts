@@ -1,11 +1,11 @@
 // packages/server/src/handlers/lobbyHandlers.ts
-// 🌟 Обработчики событий лобби (create/join/leave/ready/start/reconnect/session-check)
+// 🌟 Обработчики событий лобби (create/join/leave/ready/kick/start/reconnect/session-check)
 
 import type { Server, Socket } from 'socket.io';
 import type { RoomManager } from '../rooms/RoomManager';
 import { Room } from '../rooms/Room';
 import { PlayerConnection } from '../state/PlayerConnection';
-import { Player } from '@fiefdom/shared/core/types';
+import type { Player } from '@fiefdom/shared/core/types';
 import {
   CreateRoomSchema,
   JoinRoomSchema,
@@ -15,6 +15,7 @@ import {
   CheckActiveSchema,
 } from '@fiefdom/shared/protocol/schemas';
 import { logger } from '../utils/logger';
+import { emitError, onSafe } from '../utils/socketUtils';
 
 // ============================================
 // 🌟 ХЕЛПЕРЫ
@@ -41,6 +42,18 @@ function generatePlayerId(): string {
   return `player_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/** Профиль нового игрока с начальными значениями */
+function createPlayerProfile(name: string): Player {
+  return {
+    id: generatePlayerId(),
+    name,
+    color: '', // назначит Room.addPlayer
+    meepleCount: 8,
+    score: 0,
+    pointsByCategory: { road: 0, city: 0, field: 0, monastery: 0 },
+  };
+}
+
 // ============================================
 // 🌟 РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
 // ============================================
@@ -48,57 +61,81 @@ function generatePlayerId(): string {
 export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: RoomManager): void {
 
   // ============================================
+  // 🚪 ВЫХОД ИЗ ТЕКУЩЕЙ КОМНАТЫ (общая логика)
+  // Используется: кнопка «Выйти», создание/вход в другую комнату.
+  // ============================================
+  const leaveCurrentRoom = (): void => {
+    const { roomId, playerId } = socket.data;
+    if (!roomId || !playerId) return;
+
+    // Сразу очищаем данные сокета — дальше он «нигде не состоит»
+    delete socket.data.roomId;
+    delete socket.data.playerId;
+
+    const room = roomManager.getRoom(roomId);
+    const conn = room?.players.get(playerId);
+    if (!room || !conn) return;
+
+    logger.info('[Lobby]', `👋 Игрок ${playerId} вышел из ${roomId}`);
+
+    // 🌟 В идущей игре игрок остаётся в gameState (очередь ходов, очки, миплы),
+    // поэтому удалять его из room.players нельзя — иначе состояние игры и комнаты
+    // разойдутся. Помечаем как отключённого: остальные увидят «отключился».
+    if (room.isGameStarted) {
+      room.markPlayerDisconnected(playerId);
+      socket.leave(roomId);
+      roomManager.notifyRoomsChanged();
+      return;
+    }
+
+    // Лобби: полное удаление игрока
+    room.removePlayer(playerId);
+
+    // Уведомляем остальных (игрок уже удалён из room.players → сам не получит)
+    room.broadcast('lobby:player-left', {
+      playerId,
+      newHostId: room.hostId,
+    });
+
+    // Удаляем пустую комнату
+    if (room.players.size === 0) {
+      room.dispose();
+      roomManager.removeRoom(roomId);
+      logger.info('[Lobby]', `🗑️ Комната ${roomId} удалена (пуста)`);
+      return;
+    }
+
+    roomManager.notifyRoomsChanged();
+  };
+
+  // ============================================
   // 🏠 СОЗДАНИЕ КОМНАТЫ
   // ============================================
-  socket.on('lobby:create-room', (data) => {
+  onSafe(socket, 'lobby:create-room', (data) => {
     const parsed = CreateRoomSchema.safeParse(data);
     if (!parsed.success) {
-      socket.emit('error', { code: 'INVALID_DATA', message: 'Неверные данные комнаты' });
+      emitError(socket, 'INVALID_DATA');
       logger.warn('[Lobby]', 'Невалидные данные create-room', parsed.error.format());
       return;
     }
 
-    // 🌟 Берём preferredColor (опциональный)
-    const { playerName, settings, preferredColor } = parsed.data as {
-      playerName: string;
-      settings: any;
-      preferredColor?: string;
-    };
-
-    // 🌟 Валидация имени
+    const { playerName, settings, preferredColor } = parsed.data;
     const validatedName = validatePlayerName(playerName);
+
+    // 🌟 Один сокет — одна комната: выходим из прежней, чтобы не плодить
+    // «призрачные» комнаты и не терять привязку сокета
+    leaveCurrentRoom();
 
     const roomId = roomManager.generateRoomId();
 
-    // Создаём профиль игрока-хоста (цвет будет назначен в addPlayer)
-    const hostPlayer: Player = {
-      id: generatePlayerId(),
-      name: validatedName,
-      color: '', // назначит Room.addPlayer
-      meepleCount: 8,
-      score: 0,
-      pointsByCategory: { road: 0, city: 0, field: 0, monastery: 0 },
-    };
+    const hostPlayer = createPlayerProfile(validatedName);
     const hostConn = new PlayerConnection(hostPlayer, socket);
     socket.data.playerId = hostPlayer.id;
     socket.data.roomId = roomId;
 
-    const room = new Room(roomId, settings, hostConn);
-
-    // 🌟 Переопределяем цвет через addPlayer с preferredColor
-    // (хост уже добавлен в конструкторе Room, но цвет может быть другим)
-    // Если preferredColor есть и свободен — используем его
-    if (preferredColor) {
-      const usedColors = new Set(
-        Array.from(room.players.values()).map(p => p.player.color)
-      );
-      if (!usedColors.has(preferredColor)) {
-        hostPlayer.color = preferredColor;
-        logger.info('[Lobby]', `Хосту назначен предпочтительный цвет: ${preferredColor}`);
-      }
-    }
-
-    roomManager.addRoom(room);
+    // Цвет (с учётом предпочтения) назначается внутри конструктора Room
+    const room = new Room(roomId, settings, hostConn, preferredColor);
+    roomManager.addRoom(room); // → уведомит подписчиков браузера комнат
 
     // 🌟 Хосту — уведомление о создании
     socket.emit('lobby:room-created', { roomId, playerId: hostPlayer.id });
@@ -114,103 +151,94 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   // ============================================
   // 🚪 ПРИСОЕДИНЕНИЕ К КОМНАТЕ
   // ============================================
-  socket.on('lobby:join-room', (data) => {
+  onSafe(socket, 'lobby:join-room', (data) => {
     const parsed = JoinRoomSchema.safeParse(data);
     if (!parsed.success) {
-      socket.emit('error', { code: 'INVALID_DATA', message: 'Неверные данные' });
+      emitError(socket, 'INVALID_DATA');
       return;
     }
 
-    const { roomId, playerName, preferredColor } = parsed.data as {
-      roomId: string;
-      playerName: string;
-      preferredColor?: string;
-    };
+    const { roomId: rawRoomId, playerName, preferredColor } = parsed.data;
+    const roomId = rawRoomId.toUpperCase();
 
     const room = roomManager.getRoom(roomId);
 
     if (!room) {
-      socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Комната не найдена' });
+      emitError(socket, 'ROOM_NOT_FOUND');
+      return;
+    }
+
+    // 🌟 Повторный join в ту же комнату — просто отдаём актуальный снапшот
+    if (socket.data.roomId === roomId && socket.data.playerId && room.players.has(socket.data.playerId)) {
+      socket.emit('lobby:room-joined', { snapshot: room.getSnapshot(socket.data.playerId) });
+      return;
+    }
+
+    // 🌟 В идущую игру присоединиться нельзя: игрок попал бы в room.players,
+    // но не в gameState → рассинхрон (вернуться в игру можно только через reconnect)
+    if (room.isGameStarted) {
+      emitError(socket, 'GAME_ALREADY_STARTED');
       return;
     }
     if (room.isFull) {
-      socket.emit('error', { code: 'ROOM_FULL', message: 'Комната заполнена' });
+      emitError(socket, 'ROOM_FULL');
       return;
     }
 
-    const validatedName = validatePlayerName(playerName);
+    // Все проверки пройдены — выходим из прежней комнаты (если были в ней)
+    leaveCurrentRoom();
 
-    const newPlayer: Player = {
-      id: generatePlayerId(),
-      name: validatedName,
-      color: '',
-      meepleCount: 8,
-      score: 0,
-      pointsByCategory: { road: 0, city: 0, field: 0, monastery: 0 },
-    };
+    const validatedName = validatePlayerName(playerName);
+    const newPlayer = createPlayerProfile(validatedName);
     const newConn = new PlayerConnection(newPlayer, socket);
     socket.data.playerId = newPlayer.id;
     socket.data.roomId = roomId;
 
     room.addPlayer(newConn, preferredColor);
 
-    // 🌟 НОВОЕ: рассылаем снапшот новому игроку
+    // Новому игроку — снапшот
     socket.emit('lobby:room-joined', {
       snapshot: room.getSnapshot(newPlayer.id),
     });
 
-    // Остальным — что пришёл новый (оставляем как есть)
+    // Остальным — что пришёл новый
     socket.to(roomId).emit('lobby:player-joined', newConn.toLobbyPlayer(false));
+
+    roomManager.notifyRoomsChanged();
     logger.info('[Lobby]', `${validatedName} присоединился к ${roomId} (color=${newPlayer.color})`);
   });
 
   // ============================================
   // 👋 ЯВНЫЙ ВЫХОД ИЗ КОМНАТЫ (кнопка "Выйти")
   // ============================================
-  const handleLeaveRoom = () => {
-    const { roomId, playerId } = socket.data;
-    if (!roomId || !playerId) return;
-
-    const room = roomManager.getRoom(roomId);
-    if (!room) return;
-
-    logger.info('[Lobby]', `👋 Игрок ${playerId} вышел из ${roomId}`);
-
-    // Полное удаление игрока
-    room.removePlayer(playerId);
-
-    // Уведомляем остальных
-    socket.to(roomId).emit('lobby:player-left', {
-      playerId,
-      newHostId: room.hostId,
-    });
-
-    // Удаляем пустую комнату
-    if (room.players.size === 0) {
-      room.dispose();
-      roomManager.removeRoom(roomId);
-      logger.info('[Lobby]', `🗑️ Комната ${roomId} удалена (пуста)`);
-    }
-
-    // Очищаем данные socket
-    delete socket.data.roomId;
-    delete socket.data.playerId;
-  };
+  onSafe(socket, 'lobby:leave-room', () => {
+    leaveCurrentRoom();
+  });
 
   // ============================================
   // 🔌 DISCONNECT (перезагрузка страницы, потеря связи)
   // ============================================
-  const handleDisconnect = (reason: string) => {
+  socket.on('disconnect', (reason: string) => {
     const { roomId, playerId } = socket.data;
     logger.info('[Server]', `❌ Клиент отключился: ${socket.id} (причина: ${reason})`);
 
     if (!roomId || !playerId) return;
 
     const room = roomManager.getRoom(roomId);
-    if (!room) return;
+    const conn = room?.players.get(playerId);
+    if (!room || !conn) return;
+
+    // 🌟 Игрок мог уже переподключиться с НОВОГО сокета (reload, авто-reconnect).
+    // Запоздалый disconnect старого сокета не должен помечать его отключённым —
+    // иначе живой игрок перестанет получать события.
+    if (conn.socket !== socket) {
+      logger.info('[Server]', `↪️ Disconnect устаревшего сокета ${socket.id} игнорируется (игрок ${playerId} уже на новом)`);
+      return;
+    }
 
     // НЕ удаляем игрока — только помечаем как отключённого
     room.markPlayerDisconnected(playerId);
+    roomManager.notifyRoomsChanged();
 
     // Проверяем, все ли игроки отключились
     const allDisconnected = Array.from(room.players.values())
@@ -219,58 +247,69 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     if (allDisconnected) {
       logger.info('[Server]', `⏱️ Все игроки отключились в комнате ${roomId} — ожидание cleanup`);
     }
-  };
-
-  socket.on('lobby:leave-room', handleLeaveRoom);
-  socket.on('disconnect', handleDisconnect);
+  });
 
   // ============================================
   // ✅ ГОТОВНОСТЬ
   // ============================================
-  socket.on('lobby:set-ready', (ready: boolean) => {
-    // 🌟 НОВОЕ: валидация через Zod
+  onSafe(socket, 'lobby:set-ready', (ready) => {
     const parsed = SetReadySchema.safeParse(ready);
     if (!parsed.success) {
       logger.warn('[Lobby]', 'Невалидные данные set-ready', parsed.error.format());
+      emitError(socket, 'INVALID_DATA');
       return;
     }
-    const { roomId, playerId } = socket.data;
-    const room = roomManager.getRoom(roomId);
-    const conn = room?.players.get(playerId);
-    if (!room || !conn) return;
 
-    conn.isReady = ready;
-    room.broadcast('lobby:player-ready', { playerId, isReady: ready });
-    logger.info('[Lobby]', `${conn.name} ready=${ready}`);
+    const { roomId, playerId } = socket.data;
+    const room = roomId ? roomManager.getRoom(roomId) : undefined;
+    const conn = playerId ? room?.players.get(playerId) : undefined;
+    if (!room || !conn) {
+      emitError(socket, 'NOT_IN_ROOM');
+      return;
+    }
+    if (room.isGameStarted) {
+      emitError(socket, 'GAME_ALREADY_STARTED');
+      return;
+    }
+
+    conn.isReady = parsed.data;
+    room.broadcast('lobby:player-ready', { playerId, isReady: parsed.data });
+    logger.info('[Lobby]', `${conn.name} ready=${parsed.data}`);
   });
 
   // ============================================
-  // 👢 КИК ИГРОКА (только хост)
+  // 👢 КИК ИГРОКА (только хост, только в лобби)
   // ============================================
-  socket.on('lobby:kick-player', (data) => {
-    // 🌟 НОВОЕ: валидация через Zod
+  onSafe(socket, 'lobby:kick-player', (data) => {
     const parsed = KickPlayerSchema.safeParse(data);
     if (!parsed.success) {
       logger.warn('[Lobby]', 'Невалидные данные kick-player', parsed.error.format());
-      socket.emit('error', { code: 'INVALID_DATA', message: 'Неверные данные' });
+      emitError(socket, 'INVALID_DATA');
       return;
     }
 
-    const { playerId: kickedId } = data;
+    const { playerId: kickedId } = parsed.data;
     const { roomId, playerId: kickerId } = socket.data;
 
-    if (!roomId || !kickerId) return;
-
-    const room = roomManager.getRoom(roomId);
-    if (!room) return;
+    const room = roomId ? roomManager.getRoom(roomId) : undefined;
+    if (!room || !kickerId) {
+      emitError(socket, 'NOT_IN_ROOM');
+      return;
+    }
 
     if (room.hostId !== kickerId) {
-      socket.emit('error', { code: 'NOT_HOST', message: 'Только хост может кикать игроков' });
+      emitError(socket, 'NOT_HOST', 'Только хост может исключать игроков');
+      return;
+    }
+
+    // 🌟 В идущей игре исключать нельзя: игрок остался бы в очереди ходов
+    if (room.isGameStarted) {
+      emitError(socket, 'GAME_ALREADY_STARTED');
       return;
     }
 
     if (kickedId === kickerId) {
-      socket.emit('error', { code: 'INVALID_ACTION', message: 'Нельзя кикнуть себя' });
+      emitError(socket, 'INVALID_ACTION', 'Нельзя исключить самого себя');
       return;
     }
 
@@ -280,19 +319,38 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     logger.info('[Lobby]', `👢 Хост ${kickerId} кикнул игрока ${kickedId} из комнаты ${roomId}`);
 
     kickedConn.emit('lobby:kicked');
+
+    // 🌟 Отвязываем сокет кикнутого от комнаты, чтобы он не мог слать события «из неё»
+    if (kickedConn.socket) {
+      delete kickedConn.socket.data.roomId;
+      delete kickedConn.socket.data.playerId;
+    }
+
     room.removePlayer(kickedId);
     room.broadcast('lobby:player-kicked', { playerId: kickedId });
+    roomManager.notifyRoomsChanged();
   });
 
   // ============================================
   // 🚀 СТАРТ ИГРЫ (только хост)
   // ============================================
-  socket.on('lobby:start-game', () => {
+  onSafe(socket, 'lobby:start-game', () => {
     const { roomId, playerId } = socket.data;
-    const room = roomManager.getRoom(roomId);
-    if (!room) return;
+    const room = roomId ? roomManager.getRoom(roomId) : undefined;
+    if (!room) {
+      emitError(socket, 'NOT_IN_ROOM');
+      return;
+    }
     if (room.hostId !== playerId) {
-      socket.emit('error', { code: 'NOT_HOST', message: 'Только хост может начать игру' });
+      emitError(socket, 'NOT_HOST', 'Только хост может начать игру');
+      return;
+    }
+
+    // 🌟 Раньше проверок не было: можно было стартовать в одиночку,
+    // с неготовыми игроками и даже перезапустить уже идущую игру
+    const blocker = room.getStartBlocker();
+    if (blocker) {
+      emitError(socket, blocker);
       return;
     }
 
@@ -303,35 +361,29 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     // ВАЖНО: это ДО beginTurn(), чтобы снапшот пришёл ПЕРЕД game:your-turn
     for (const conn of room.players.values()) {
       if (conn.isDisconnected) continue;
-
-      // 🌟 НОВОЕ: используем getSnapshot вместо ручной сборки
-      const snapshot = room.getSnapshot(conn.id);
-      conn.emit('game:started', { snapshot });
+      conn.emit('game:started', { snapshot: room.getSnapshot(conn.id) });
     }
 
     logger.info('[Lobby]', `🎮 Игра началась в комнате ${roomId} (gameStartTime=${room.gameState.gameStartTime})`);
+
+    // Комната перешла в состояние «идёт игра» — обновляем браузер комнат
+    roomManager.notifyRoomsChanged();
 
     // 🌟 ШАГ 3: Начинаем первый ход (broadcastState + game:your-turn)
     room.startFirstTurn();
   });
 
   // ============================================
-  // 🔍 ПРОВЕРКА АКТИВНЫХ ИГР (новая кнопка "Продолжить")
+  // 🔍 ПРОВЕРКА АКТИВНЫХ ИГР (кнопка "Продолжить")
   // ============================================
-  socket.on('session:check-active', (data) => {
-    // 🌟 НОВОЕ: валидация через Zod
+  onSafe(socket, 'session:check-active', (data) => {
     const parsed = CheckActiveSchema.safeParse(data);
     if (!parsed.success) {
       logger.warn('[Session]', 'Невалидные данные check-active', parsed.error.format());
       socket.emit('session:active-games', { game: null });
       return;
     }
-    const { playerId } = data;
-
-    if (!playerId) {
-      socket.emit('session:active-games', { game: null });
-      return;
-    }
+    const { playerId } = parsed.data;
 
     logger.info('[Session]', `🔍 Проверка активных игр для ${playerId}`);
 
@@ -344,16 +396,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       logger.info('[Session]', 'Активных игр не найдено');
     }
 
-    socket.emit('session:active-games', {
-      game: lastGame,
-    });
+    socket.emit('session:active-games', { game: lastGame });
   });
 
   // ============================================
   // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ (только по playerId)
   // ============================================
-  socket.on('lobby:reconnect', (data) => {
-    // Валидация через Zod
+  onSafe(socket, 'lobby:reconnect', (data) => {
     const parsed = ReconnectSchema.safeParse(data);
     if (!parsed.success) {
       logger.warn('[Lobby]', 'Невалидные данные reconnect', parsed.error.format());
@@ -367,19 +416,24 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     const room = roomManager.getRoom(roomId);
     if (!room) {
       socket.emit('lobby:reconnect-failed', {
-        reason: 'Комната не найдена (возможно, была удалена)'
+        reason: 'Комната не найдена (возможно, была удалена)',
       });
       return;
+    }
+
+    // Этот сокет мог состоять в другой комнате — выходим из неё
+    if (socket.data.roomId && socket.data.roomId !== roomId) {
+      leaveCurrentRoom();
     }
 
     const result = room.reconnectPlayer(playerId, socket);
 
     if (result.success && result.snapshot) {
-      // 🌟 Отправляем единый snapshot
       socket.emit('lobby:reconnect-success', { snapshot: result.snapshot });
+      roomManager.notifyRoomsChanged();
     } else {
       socket.emit('lobby:reconnect-failed', {
-        reason: result.reason || 'Неизвестная ошибка'
+        reason: result.reason || 'Неизвестная ошибка',
       });
     }
   });

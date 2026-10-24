@@ -1,17 +1,34 @@
 // packages/server/src/rooms/RoomManager.ts
 // 🌟 Реестр всех активных комнат. Создание, поиск, удаление.
+// Также отвечает за список публичных комнат (браузер комнат) и уведомление
+// подписчиков об изменениях.
 
+import type { RoomInfo } from '@fiefdom/shared/protocol/events';
 import type { Room } from './Room';
 import { logger } from '../utils/logger';
+
+/** Максимум комнат в одном ответе браузера */
+const MAX_LISTED_ROOMS = 50;
+
+/** Окно склейки уведомлений: серия изменений → одна рассылка */
+const NOTIFY_DEBOUNCE_MS = 300;
+
+/** Можно ли сейчас войти в комнату из списка */
+const isJoinable = (info: RoomInfo): boolean =>
+  !info.isPlaying && info.playerCount < info.maxPlayers;
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
 
-  // 🌟 НОВОЕ: Интервал очистки (каждые 60 секунд)
+  // 🌟 Интервал очистки (каждые 60 секунд)
   private cleanupInterval: ReturnType<typeof setInterval>;
 
   // Таймаут: если все игроки отключены более 5 минут — удаляем комнату
   private readonly DISCONNECT_TIMEOUT_MS = 5 * 60 * 1000;
+
+  // 🌟 Подписчики на изменение списка комнат + debounce-таймер
+  private changeListeners = new Set<() => void>();
+  private notifyTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.cleanupInterval = setInterval(() => this.cleanupZombieRooms(), 60_000);
@@ -35,6 +52,7 @@ export class RoomManager {
   addRoom(room: Room): void {
     this.rooms.set(room.id, room);
     logger.info('[RoomManager]', `Комната ${room.id} создана (всего: ${this.rooms.size})`);
+    this.notifyRoomsChanged();
   }
 
   getRoom(roomId: string): Room | undefined {
@@ -44,14 +62,64 @@ export class RoomManager {
   removeRoom(roomId: string): void {
     this.rooms.delete(roomId);
     logger.info('[RoomManager]', `Комната ${roomId} удалена (осталось: ${this.rooms.size})`);
+    this.notifyRoomsChanged();
   }
 
-  /** Список публичных комнат для браузера лобби */
-  listPublicRooms() {
+  // ============================================
+  // 🔎 БРАУЗЕР КОМНАТ
+  // ============================================
+
+  /**
+   * Список публичных комнат для браузера лобби.
+   * - приватные и «пустые» (все игроки отключены) комнаты скрыты
+   * - сначала комнаты, в которые можно войти, затем — по числу игроков
+   * - не больше MAX_LISTED_ROOMS записей
+   */
+  listPublicRooms(): RoomInfo[] {
     return Array.from(this.rooms.values())
-      .filter(r => !r.settings.isPrivate)
-      .map(r => r.toRoomInfo());
+      .filter(r => !r.settings.isPrivate && r.hasConnectedPlayers)
+      .map(r => r.toRoomInfo())
+      .sort((a, b) =>
+        Number(isJoinable(b)) - Number(isJoinable(a)) ||
+        b.playerCount - a.playerCount
+      )
+      .slice(0, MAX_LISTED_ROOMS);
   }
+
+  /**
+   * Подписаться на изменения списка комнат.
+   * @returns функция отписки
+   */
+  onRoomsChanged(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Сообщить, что список комнат мог измениться
+   * (создание/удаление, вход/выход, старт игры, disconnect/reconnect).
+   * Уведомления склеиваются: серия вызовов за NOTIFY_DEBOUNCE_MS → один вызов слушателей.
+   */
+  notifyRoomsChanged(): void {
+    if (this.notifyTimer) return;
+
+    this.notifyTimer = setTimeout(() => {
+      this.notifyTimer = null;
+      for (const listener of this.changeListeners) {
+        try {
+          listener();
+        } catch (err) {
+          logger.error('[RoomManager]', 'Ошибка в слушателе изменения списка комнат', err);
+        }
+      }
+    }, NOTIFY_DEBOUNCE_MS);
+  }
+
+  // ============================================
+  // 🧹 ОЧИСТКА
+  // ============================================
 
   private cleanupZombieRooms(): void {
     const now = Date.now();
@@ -79,9 +147,9 @@ export class RoomManager {
     }
 
     for (const roomId of roomsToRemove) {
-      const room = this.rooms.get(roomId);
-      room?.dispose();
-      this.rooms.delete(roomId);
+      this.rooms.get(roomId)?.dispose();
+      // 🌟 removeRoom (а не rooms.delete) — чтобы подписчики браузера получили обновление
+      this.removeRoom(roomId);
     }
 
     if (roomsToRemove.length > 0) {
@@ -92,12 +160,20 @@ export class RoomManager {
   // 🌟 Вызывается при остановке сервера
   dispose(): void {
     clearInterval(this.cleanupInterval);
+    if (this.notifyTimer) {
+      clearTimeout(this.notifyTimer);
+      this.notifyTimer = null;
+    }
+    this.changeListeners.clear();
+    for (const room of this.rooms.values()) {
+      room.dispose();
+    }
   }
 
   /**
- * Находим последнюю активную игру игрока.
- * Возвращаем имя и цвет из данных сервера.
- */
+   * Находим последнюю активную игру игрока.
+   * Возвращаем имя и цвет из данных сервера.
+   */
   findLastActiveGameForPlayer(playerId: string): {
     roomId: string;
     playerName: string;

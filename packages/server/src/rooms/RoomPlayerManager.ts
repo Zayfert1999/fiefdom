@@ -137,6 +137,16 @@ export class RoomPlayerManager {
       return { success: false, reason: 'Игрок не найден в комнате' };
     }
 
+    // 🌟 Если у игрока ещё жив старый сокет (сервер не успел заметить обрыв) —
+    // отвязываем его: «последнее подключение побеждает», а запоздалый disconnect
+    // старого сокета не должен помечать игрока отключённым.
+    const oldSocket = conn.socket;
+    if (oldSocket && oldSocket.id !== newSocket.id) {
+      oldSocket.leave(this.roomId);
+      delete oldSocket.data.roomId;
+      delete oldSocket.data.playerId;
+    }
+
     // Восстанавливаем подключение
     newSocket.join(this.roomId);
     conn.markReconnected(newSocket);
@@ -145,19 +155,13 @@ export class RoomPlayerManager {
 
     logger.info('[PlayerManager]', `✅ Игрок ${conn.player.name} восстановлен в комнате ${this.roomId}`);
 
-    // Уведомляем остальных игроков
-    this.broadcaster.broadcast('lobby:player-reconnected', { playerId: oldPlayerId });
+    // Уведомляем ОСТАЛЬНЫХ игроков (самому вернувшемуся это событие не нужно)
+    this.broadcaster.broadcastExcept(oldPlayerId, 'lobby:player-reconnected', { playerId: oldPlayerId });
 
-    // 🌟 Создаём единый snapshot
+    // 🌟 Единый snapshot. Если сейчас ход этого игрока, drawnTile уже внутри snapshot
+    // (и в snapshot.gameState) — клиент сам переводит фазу в placeTile,
+    // отдельный game:your-turn с setTimeout-хаком больше не нужен.
     const snapshot = getSnapshot(oldPlayerId);
-
-    // Если сейчас ход этого игрока и у него есть drawnTile — отправляем отдельно
-    // (для совместимости с game:your-turn обработчиком)
-    if (snapshot.drawnTile) {
-      setTimeout(() => {
-        conn.emit('game:your-turn', { drawnTile: snapshot.drawnTile! });
-      }, 100);
-    }
 
     return { success: true, snapshot };
   }

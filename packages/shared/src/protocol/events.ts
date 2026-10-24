@@ -36,6 +36,7 @@ export interface RoomInfo {
   hostName: string;
   playerCount: number;
   maxPlayers: number;
+  turnTimerSeconds: number;  // 0 = без таймера
   isPrivate: boolean;
   isPlaying: boolean;
 }
@@ -114,6 +115,15 @@ export interface ClientToServerEvents {
   }) => void;
 
   'lobby:leave-room': () => void;
+
+  // --- Браузер комнат ---
+  /** Подписаться на live-обновления списка публичных комнат (сервер сразу пришлёт текущий список) */
+  'lobby:subscribe-rooms': () => void;
+  /** Отписаться от обновлений списка */
+  'lobby:unsubscribe-rooms': () => void;
+  /** Разовый запрос списка (кнопка «Обновить») */
+  'lobby:list-rooms': () => void;
+
   'lobby:set-ready': (ready: boolean) => void;
   'lobby:kick-player': (data: { playerId: string }) => void;
   'lobby:start-game': () => void;  // Только хост
@@ -130,12 +140,6 @@ export interface ClientToServerEvents {
       x: number;
       y: number;
     } | null;  // null = пропуск мипла
-  }) => void;
-
-  // --- Reconnection ---
-  'reconnect': (data: {
-    roomId: string;
-    playerId: string;
   }) => void;
 
   // --- Чат (последняя очередь) ---
@@ -226,12 +230,18 @@ export interface ServerToClientEvents {
     finalScores: Player[];
   }) => void;
 
+  /** Игрок не уложился в таймер — ход пропущен сервером */
+  'game:turn-skipped': (data: {
+    playerId: string;
+  }) => void;
+
   'game:timer-update': (data: {
     remainingSeconds: number;
     deadline?: number;
   }) => void;
 
   // --- Ошибки ---
+  // code — один из ErrorCode (см. errors.ts), message — текст на русском
   'error': (data: {
     code: string;
     message: string;

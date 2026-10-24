@@ -120,6 +120,14 @@ export const createLobbySlice: StateCreator<GameStore, [], [], LobbySlice> = (se
     exitToLobby: () => {
         console.log('🚪 [Store] Выход в лобби');
 
+        // 🌟 Сетевая игра: выходя в меню, нужно ещё и покинуть комнату.
+        // Раньше сбрасывалось только локальное состояние: roomId оставался,
+        // сервер считал игрока «в игре», и первое же game:state-update
+        // возвращало его из меню обратно на игровое поле.
+        if (get().roomId !== null) {
+            get().leaveRoom();
+        }
+
         // Сбрасываем всё игровое состояние
         set({
             lobbyPlayers: [],

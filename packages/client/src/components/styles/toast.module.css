@@ -1,0 +1,141 @@
+/* ============================================
+   🍞 TOAST-УВЕДОМЛЕНИЯ
+   Позиция: правый верхний угол (HUD — по центру сверху, панель действий — снизу).
+   z-index выше лобби-оверлея (9999) и модалок (10000).
+   ============================================ */
+
+.container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  /* Контейнер не перехватывает клики — только сами toast-ы */
+  pointer-events: none;
+}
+
+.toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 12px 14px 14px;
+  overflow: hidden;
+  background: rgba(25, 25, 35, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--toast-accent, #4a90e2);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: toastIn 0.25s ease-out;
+}
+
+.leaving {
+  animation: toastOut 0.2s ease-in forwards;
+}
+
+/* === Типы === */
+.info    { --toast-accent: #4a90e2; }
+.success { --toast-accent: #2ecc71; }
+.warning { --toast-accent: #f39c12; }
+.error   { --toast-accent: #e74c3c; }
+
+.icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.close {
+  flex-shrink: 0;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #fff;
+}
+
+/* === Полоска прогресса (она же таймер жизни) === */
+.progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--toast-accent, #4a90e2);
+  opacity: 0.7;
+  transform-origin: left center;
+  animation-name: toastProgress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* Пауза таймера при наведении — можно спокойно дочитать */
+.toast:hover .progress {
+  animation-play-state: paused;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes toastProgress {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* Пользователям с reduced-motion — без «влёта» (таймер-полоска остаётся: она задаёт время жизни) */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .leaving {
+    animation: none;
+  }
+}
+
+/* Узкие экраны: на всю ширину */
+@media (max-width: 600px) {
+  .container {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}

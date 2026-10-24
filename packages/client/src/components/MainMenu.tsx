@@ -33,8 +33,9 @@ export const MainMenu = () => {
     const serverPing = useGameStore(s => s.serverPing);
     const setLobbyScreen = useGameStore(s => s.setLobbyScreen);
 
-    // 🌟 Локальное состояние для UI (не в store)
-    const [isReconnecting, setIsReconnecting] = useState(false);
+    // 🌟 Флаг «идёт восстановление» живёт в store: его сбрасывают и успех,
+    // и отказ сервера (lobby:reconnect-success / lobby:reconnect-failed)
+    const isReconnecting = useGameStore(s => s.isReconnectingToRoom);
     const [tempName, setTempName] = useState(playerName);  // 🌟 Для input с Enter
 
     const hasNetworkGame = activeGame !== null;
@@ -85,26 +86,26 @@ export const MainMenu = () => {
             }
 
             console.log(`🔄 [MainMenu] Продолжить сетевую игру в комнате ${activeGame.roomId}`);
-            setIsReconnecting(true);
-            useGameStore.setState({ isReconnectingToRoom: true });
-
             const socket = getSocket();
             if (!socket.connected) {
-                setIsReconnecting(false);
-                useGameStore.setState({ isReconnectingToRoom: false });
                 setReconnectError('Нет подключения к серверу');
                 return;
             }
+            useGameStore.setState({ isReconnectingToRoom: true });
 
             socket.emit('lobby:reconnect', {
                 playerId: saved.playerId,
                 roomId: activeGame.roomId,
             });
 
+            // Страховка на случай, если сервер так и не ответил: снимаем «крутилку»
+            // и говорим об этом явно (раньше кнопка молча «оживала» через 5 сек)
             setTimeout(() => {
-                setIsReconnecting(false);
-                useGameStore.setState({ isReconnectingToRoom: false });
-            }, 5000);
+                if (useGameStore.getState().isReconnectingToRoom) {
+                    useGameStore.setState({ isReconnectingToRoom: false });
+                    setReconnectError('Сервер не ответил. Попробуйте ещё раз.');
+                }
+            }, 8000);
             return;
         }
 

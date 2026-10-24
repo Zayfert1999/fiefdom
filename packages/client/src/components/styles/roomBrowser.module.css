@@ -1,0 +1,175 @@
+/* ============================================
+   🔎 БРАУЗЕР КОМНАТ
+   Каркас (overlay/card/title/кнопка «Назад») — из lobby.module.css.
+   Здесь только то, чего там нет: панель, список, строки комнат.
+   ============================================ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.counter {
+  color: #aaa;
+  font-size: 14px;
+}
+
+.refreshButton {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.refreshButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* === Заглушки (загрузка / пусто) === */
+.placeholder {
+  margin-bottom: 16px;
+  padding: 28px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: #aaa;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.placeholderIcon {
+  margin-bottom: 8px;
+  font-size: 32px;
+}
+
+/* === Список === */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  margin: 0 0 16px;
+  padding: 0 4px 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.rowDisabled {
+  opacity: 0.6;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.host {
+  overflow: hidden;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 4px;
+  color: #999;
+  font-size: 12px;
+}
+
+.code {
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+/* === Статусы === */
+.badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge_open {
+  background: rgba(46, 204, 113, 0.18);
+  color: #2ecc71;
+}
+
+.badge_full {
+  background: rgba(243, 156, 18, 0.18);
+  color: #f39c12;
+}
+
+.badge_playing {
+  background: rgba(74, 144, 226, 0.18);
+  color: #6aa9f0;
+}
+
+.slots {
+  flex-shrink: 0;
+  color: #ddd;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* === Кнопка «Войти» (своя: у кнопок лобби width: 100%) === */
+.joinButton {
+  flex-shrink: 0;
+  min-width: 72px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.1s;
+}
+
+.joinButton:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.joinButton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.joinButton:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: #777;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .row {
+    flex-wrap: wrap;
+  }
+
+  .slots {
+    margin-left: auto;
+  }
+}

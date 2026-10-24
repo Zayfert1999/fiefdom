@@ -105,7 +105,14 @@ export class ServerGameState {
     return true;
   }
 
-  // 🌟 ИСПРАВЛЕНО: объединяем placeTile и placeMeeple
+  /**
+   * Применить ход: тайл + (опционально) мипл.
+   *
+   * 🌟 Операция АТОМАРНА: сначала всё валидируется на локальных копиях,
+   * и только потом состояние игры меняется. Раньше тайл ставился на доску
+   * ДО проверки мипла — отказ по миплу (NO_MEEPLES / FEATURE_OCCUPIED) оставлял
+   * на доске «чужой» тайл, drawnTile обнулялся, а ход не завершался.
+   */
   commitMove(
     playerId: string,
     tileData: { x: number; y: number; rotation: 0 | 90 | 180 | 270 },
@@ -113,7 +120,12 @@ export class ServerGameState {
   ): { error?: string } {
     logger.info('[GameState]', `🎴 commitMove: игрок=${playerId}`);
 
-    // Валидация: чей ход?
+    // ============================================
+    // 1. ВАЛИДАЦИЯ (состояние НЕ меняется)
+    // ============================================
+    if (this.phase !== 'playing') {
+      return { error: 'GAME_NOT_STARTED' };
+    }
     if (playerId !== this.currentPlayer.id) {
       return { error: 'NOT_YOUR_TURN' };
     }
@@ -124,17 +136,44 @@ export class ServerGameState {
       return { error: 'CELL_OCCUPIED' };
     }
 
-    // Валидация размещения тайла
     const rotatedFeatures = rotateFeatures(this.drawnTile.features, tileData.rotation);
     if (!isValidPlacement(this.board, tileData.x, tileData.y, rotatedFeatures)) {
       return { error: 'INVALID_PLACEMENT' };
     }
 
-    // Применяем тайл
+    const player = this.currentPlayer;
+    if (meepleData) {
+      if (player.meepleCount <= 0) {
+        return { error: 'NO_MEEPLES' };
+      }
+      // Мипл можно поставить только на область только что положенного тайла
+      if (!rotatedFeatures.some(f => f.id === meepleData.featureId)) {
+        return { error: 'FEATURE_NOT_FOUND' };
+      }
+    }
+
+    // ============================================
+    // 2. ПРИМЕНЯЕМ НА КОПИЯХ (applyTileToBoardAndRM не мутирует исходные board/RM)
+    // ============================================
     const { newBoard, newRM } = applyTileToBoardAndRM(
       this.board, this.regionManager, this.drawnTile,
       tileData.x, tileData.y, tileData.rotation
     );
+
+    const featureKey: FeatureKey = `${tileData.x},${tileData.y}:${meepleData?.featureId ?? ''}`;
+    if (meepleData) {
+      // Проверка занятости — на ОБЪЕДИНЁННЫХ регионах (после добавления тайла)
+      if (newRM.getFeatureOwners(featureKey).length > 0) {
+        return { error: 'FEATURE_OCCUPIED' };
+      }
+      if (!newBoard.get(`${tileData.x},${tileData.y}`)) {
+        return { error: 'TILE_NOT_FOUND' };
+      }
+    }
+
+    // ============================================
+    // 3. КОММИТ (дальше ошибок быть не может)
+    // ============================================
     this.board = newBoard;
     this.regionManager = newRM;
     this.drawnTile = null;
@@ -142,29 +181,13 @@ export class ServerGameState {
     this.lastPlacedTiles[playerId] = {
       x: tileData.x,
       y: tileData.y,
-      color: this.currentPlayer.color,
+      color: player.color,
     };
 
     logger.info('[GameState]', `✅ Тайл установлен: (${tileData.x}, ${tileData.y})`);
 
-    // Применяем мипла (если есть)
     if (meepleData) {
-      const player = this.currentPlayer;
-      if (player.meepleCount <= 0) {
-        return { error: 'NO_MEEPLES' };
-      }
-
-      const featureKey: FeatureKey = `${tileData.x},${tileData.y}:${meepleData.featureId}`;
-      const owners = this.regionManager.getFeatureOwners(featureKey);
-      if (owners.length > 0) {
-        return { error: 'FEATURE_OCCUPIED' };
-      }
-
-      const tile = this.board.get(`${tileData.x},${tileData.y}`);
-      if (!tile) {
-        return { error: 'TILE_NOT_FOUND' };
-      }
-
+      const tile = this.board.get(`${tileData.x},${tileData.y}`)!;
       tile.meeple = {
         playerId: player.id,
         featureId: meepleData.featureId,

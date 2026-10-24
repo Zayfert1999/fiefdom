@@ -1,11 +1,9 @@
 // App.tsx
-import { useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
+import { useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { getValidPlacementCells } from '@fiefdom/shared/core/tileUtils';
 import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
-import { getSocket } from '@/network/socket';  // 🌟 НОВОЕ
-import { loadConnectionInfo } from '@/network/persistence';
 
 // Статические импорты 
 import { Board } from '@/renderer/Board';
@@ -14,6 +12,7 @@ import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MainMenu } from '@/components/MainMenu';
 import { ReconnectingOverlay } from '@/components/ReconnectingOverlay';
+import { ToastContainer } from '@/components/ToastContainer';
 
 // Ленивый импорт
 const LocalLobby = lazy(() => import('@/components/LocalLobby').then(m => ({ default: m.Lobby })));
@@ -25,7 +24,21 @@ const GeometrySandbox = lazy(() => import('@/components/GeometrySandbox').then(m
 // 🌟 Fallback для Suspense — минимальный, не мешает UX
 const LazyFallback = () => null;  // Или можно <div>Загрузка...</div>
 
+/**
+ * 🌟 Корень приложения: экраны + toast-уведомления поверх любого экрана
+ * (меню, лобби, игра). Контейнер вынесен сюда, чтобы не дублировать его
+ * в каждой ветке рендера AppScreens.
+ */
 export default function App() {
+  return (
+    <>
+      <AppScreens />
+      <ToastContainer />
+    </>
+  );
+}
+
+function AppScreens() {
   // 🎯 ЗНАЧЕНИЯ — рендеримся только когда меняются
   const drawnTile = useGameStore(s => s.drawnTile);
   const phase = useGameStore(s => s.phase);
@@ -62,66 +75,16 @@ export default function App() {
     };
   }, []);
 
-  // 🌟 Защита от повторных вызовов в StrictMode
-  const initializedRef = useRef(false);
-
+  // ============================================
+  // 🔌 ПОДКЛЮЧЕНИЕ К СЕРВЕРУ
+  // ============================================
+  // connectToServer идемпотентен (безопасен при двойном вызове в StrictMode).
+  // Проверка сохранённой сессии («Продолжить») и возврат в комнату после обрыва
+  // выполняются в обработчике connect (network/stateSync/connectionHandlers.ts) —
+  // на КАЖДОМ подключении, а не только на первом.
   useEffect(() => {
-    // Защита от двойного вызова в StrictMode
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
     console.log('🚀 [App] Инициализация — подключение к серверу');
     connectToServer();
-
-    // 🌟 Проверяем активные игры ПОСЛЕ подключения
-    const checkSession = () => {
-      const saved = loadConnectionInfo();
-      if (!saved) {
-        console.log('🔍 [App] Нет сохранённой сессии');
-        return;
-      }
-
-      console.log(`🔍 [App] Проверка активной игры для ${saved.playerId}`);
-
-      const socket = getSocket();
-      if (!socket) {
-        console.warn('⚠️ [App] Сокет не инициализирован');
-        return;
-      }
-
-      const emitCheckActive = () => {
-        console.log(`📤 [App] Отправка session:check-active для ${saved.playerId}`);
-        socket.emit('session:check-active', {
-          playerId: saved.playerId,
-        });
-      };
-
-      if (socket.connected) {
-        // Уже подключён — сразу отправляем
-        emitCheckActive();
-      } else {
-        // Ждём события connect
-        const onConnect = () => {
-          emitCheckActive();
-          socket.off('connect', onConnect);
-        };
-        socket.on('connect', onConnect);
-
-        // Защита: если подключение не удалось в течение 5 сек — отменяем
-        setTimeout(() => {
-          socket.off('connect', onConnect);
-          console.warn('⚠️ [App] Timeout: сокет не подключился за 5 сек');
-        }, 5000);
-      }
-    };
-
-    // Небольшая задержка для инициализации store
-    const timer = setTimeout(checkSession, 100);
-
-    return () => {
-      clearTimeout(timer);
-      initializedRef.current = false;
-    };
   }, [connectToServer]);
 
   // ============================================

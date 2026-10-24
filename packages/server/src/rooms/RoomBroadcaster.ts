@@ -31,6 +31,18 @@ export class RoomBroadcaster {
         }
     }
 
+    /**
+     * Отправить событие всем подключённым игрокам, КРОМЕ одного
+     * (например, «игрок вернулся» не нужно слать самому вернувшемуся).
+     */
+    broadcastExcept(excludePlayerId: string, event: string, data: unknown): void {
+        for (const conn of this.players.values()) {
+            if (conn.id !== excludePlayerId && !conn.isDisconnected) {
+                conn.emit(event, data);
+            }
+        }
+    }
+
     // ============================================
     // 🔄 РАССЫЛКА СОСТОЯНИЯ ИГРЫ
     // ============================================

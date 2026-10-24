@@ -24,12 +24,28 @@ const MEEPLE_VISIBLE_DELAY = 1000; // 1 секунда
 export class RoomGameLoop {
     private turnTimer = new TurnTimer();
 
+    // 🌟 Отложенные шаги (пауза на мипла, анимации регионов, финал).
+    // Хранятся, чтобы dispose() мог их отменить: иначе после удаления комнаты
+    // они продолжили бы двигать игру «в пустоту» и запускать таймеры.
+    private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
+    private disposed = false;
+
     constructor(
         private players: Map<string, PlayerConnection>,
         private gameState: ServerGameState,
         private broadcaster: RoomBroadcaster,
         private settings: RoomSettings
     ) { }
+
+    /** setTimeout с учётом dispose(): после освобождения комнаты колбэк не вызывается */
+    private schedule(fn: () => void, delayMs: number): void {
+        const id = setTimeout(() => {
+            this.pendingTimeouts.delete(id);
+            if (this.disposed) return;
+            fn();
+        }, delayMs);
+        this.pendingTimeouts.add(id);
+    }
 
     // ============================================
     // 🚀 СТАРТ ИГРЫ
@@ -74,6 +90,7 @@ export class RoomGameLoop {
      * Начало хода текущего игрока: выдача тайла + таймер.
      */
     private beginTurn(): void {
+        if (this.disposed) return;
         const gs = this.gameState;
         logger.info('[GameLoop]', `🔄 beginTurn: игрок ${gs.currentPlayer.name}`);
 
@@ -101,7 +118,11 @@ export class RoomGameLoop {
      * ⏰ Таймаут: авто-пропуск хода.
      */
     private handleTimeout(): void {
-        logger.warn('[GameLoop]', `Игрок ${this.gameState.currentPlayer.name} не успел → пропуск хода`);
+        const skippedPlayer = this.gameState.currentPlayer;
+        logger.warn('[GameLoop]', `Игрок ${skippedPlayer.name} не успел → пропуск хода`);
+
+        // 🌟 Сообщаем всем, чей ход пропущен (клиенты покажут toast)
+        this.broadcaster.broadcast('game:turn-skipped', { playerId: skippedPlayer.id });
 
         // Возвращаем тайл в колоду и передаём ход
         this.gameState.skipTurn();
@@ -151,6 +172,10 @@ export class RoomGameLoop {
     ): { success: boolean; error?: string } {
         const gs = this.gameState;
 
+        if (this.disposed || gs.phase !== 'playing') {
+            return { success: false, error: 'GAME_NOT_STARTED' };
+        }
+
         // ============================================
         // ФАЗА 1: Применяем тайл + мипл (БЕЗ регионов)
         // ============================================
@@ -184,7 +209,7 @@ export class RoomGameLoop {
         // ============================================
         logger.info('[GameLoop]', `⏱️ Фаза 2: пауза ${MEEPLE_VISIBLE_DELAY}мс (все видят мипла)`);
 
-        setTimeout(() => {
+        this.schedule(() => {
             // ============================================
             // ФАЗА 3: Проверяем завершённые регионы
             // ============================================
@@ -217,7 +242,7 @@ export class RoomGameLoop {
                 const animationDelay = completedRegions.length * 3000;
                 logger.info('[GameLoop]', `⏱️ Фаза 4: ждём ${animationDelay}мс (анимация регионов)`);
 
-                setTimeout(() => {
+                this.schedule(() => {
                     this.proceedToNextTurn();
                 }, animationDelay);
 
@@ -254,7 +279,7 @@ export class RoomGameLoop {
 
         // Ждём анимации перед финальным state
         const animationDelay = finalRegions.length * 3000;
-        setTimeout(() => {
+        this.schedule(() => {
             this.broadcaster.broadcast('game:over', { finalScores: this.gameState.players });
             this.broadcaster.broadcastState();
         }, animationDelay);
@@ -268,6 +293,11 @@ export class RoomGameLoop {
      * Остановить таймер и освободить ресурсы.
      */
     dispose(): void {
+        this.disposed = true;
         this.turnTimer.stop();
+        for (const id of this.pendingTimeouts) {
+            clearTimeout(id);
+        }
+        this.pendingTimeouts.clear();
     }
 }

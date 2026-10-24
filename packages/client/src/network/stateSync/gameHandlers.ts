@@ -1,12 +1,43 @@
 // packages/client/src/network/stateSync/gameHandlers.ts
 // 🌟 Обработчики событий игры.
-// started / state-update / your-turn / move-committed / regions / timer / over
+// started / state-update / your-turn / move-committed / regions / timer / over / error
 
 import type { GameSocket } from '@/network/socket';
 import { useGameStore } from '@/state/useGameStore';
+import { toast } from '@/state/useToastStore';
 import type { FeatureType } from '@fiefdom/shared/core/types';
+import { getErrorMessage } from '@fiefdom/shared/protocol/errors';
 import { applyServerState } from './applyServerState';
+import { FEATURE_LABELS, getDisplayName, isMe } from './helpers';
 
+/**
+ * 🌟 Мы сейчас в сетевой комнате?
+ * После выхода (roomId === null) в пути могут оставаться игровые события —
+ * без этой проверки state-update «выдёргивал» бы игрока из меню обратно на поле.
+ */
+const inRoom = (): boolean => useGameStore.getState().roomId !== null;
+
+/** Сейчас мой ход? */
+const isMyTurn = (): boolean => {
+  const s = useGameStore.getState();
+  return s.playerId !== null && s.players[s.currentTurn]?.id === s.playerId;
+};
+
+/** Toast-ы по завершённым регионам: «🏰 Город завершён · Аня +8» */
+function toastCompletedRegions(
+  regions: Array<{ type: string; points: number; winners: string[] }>
+): void {
+  for (const region of regions) {
+    // Регион без победителей (нет миплов) очков не принёс — сообщать нечего
+    if (region.winners.length === 0) continue;
+
+    const label = FEATURE_LABELS[region.type] ?? { icon: '🏁', title: 'Регион' };
+    const winners = region.winners.map(getDisplayName).join(', ');
+    toast.success(`${label.icon} ${label.title} завершён · ${winners} +${region.points}`, {
+      duration: 4500,
+    });
+  }
+}
 
 /**
  * 🌟 Регистрирует обработчики событий игры.
@@ -17,10 +48,12 @@ import { applyServerState } from './applyServerState';
  * - game:your-turn — ваш ход
  * - game:move-committed — ход принят сервером
  * - game:regions-completed — завершённые регионы
- * - game:next-turn — передача хода
+ * - game:next-turn — передача хода (сервер пока не шлёт)
+ * - game:turn-skipped — ход пропущен по таймеру
  * - game:timer-update — обновление таймера
  * - game:final-scoring — финальный подсчёт
  * - game:over — конец игры
+ * - error — ошибки сервера
  *
  * @param socket Типизированный socket
  */
@@ -31,7 +64,6 @@ export function registerGameHandlers(socket: GameSocket): void {
   socket.on('game:started', ({ snapshot }) => {
     console.log(`🎮 [StateSync] Игра началась! myId=${snapshot.yourPlayerId}`);
 
-    // 🌟 НОВОЕ: применяем снапшот вместо ручной сборки
     const store = useGameStore.getState();
 
     // 1. Мета-данные комнаты
@@ -46,26 +78,30 @@ export function registerGameHandlers(socket: GameSocket): void {
     store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId);
 
     // 4. Сетевой статус игроков → networkLobbyPlayers
-    const lobbyPlayers = snapshot.players.map(p => ({
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      isReady: p.network.isReady,
-      isHost: p.network.isHost,
-      isDisconnected: p.network.isDisconnected,
-    }));
-    store._setLobbyPlayers(lobbyPlayers);
+    store._setLobbyPlayers(
+      snapshot.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        isReady: p.network.isReady,
+        isHost: p.network.isHost,
+        isDisconnected: p.network.isDisconnected,
+      }))
+    );
 
     // 5. Игровое состояние
     if (snapshot.gameState) {
       applyServerState(snapshot.gameState);
     }
+
+    toast.success('🎮 Игра началась!');
   });
 
   // ============================================
   // 🔄 ОБНОВЛЕНИЕ СОСТОЯНИЯ
   // ============================================
   socket.on('game:state-update', ({ gameState }) => {
+    if (!inRoom()) return;
     console.log(`🔄 [StateSync] Получено обновление состояния`);
 
     // Сбрасываем таймер
@@ -79,6 +115,7 @@ export function registerGameHandlers(socket: GameSocket): void {
   // 🎴 ВАШ ХОД
   // ============================================
   socket.on('game:your-turn', ({ drawnTile }) => {
+    if (!inRoom()) return;
     console.log(`🎴 [StateSync] Мой ход! Тайл: ${drawnTile.id}`);
 
     // Сбрасываем таймер при начале хода
@@ -89,20 +126,31 @@ export function registerGameHandlers(socket: GameSocket): void {
       drawnTile,
       phase: 'placeTile',
     });
+
+    toast.info('🎴 Ваш ход', { dedupeKey: 'your-turn', duration: 2500 });
   });
 
   // ============================================
   // ✅ ХОД ПРИНЯТ СЕРВЕРОМ
   // ============================================
-  socket.on('game:move-committed', ({ playerId }) => {
+  socket.on('game:move-committed', ({ playerId, meeple }) => {
+    if (!inRoom()) return;
     console.log(`🎴 [StateSync] Ход принят сервером: игрок ${playerId}`);
-    // Состояние придёт через game:state-update
+    // Состояние придёт через game:state-update.
+    // О своём ходе сообщать не нужно — только о ходах соперников.
+    if (isMe(playerId)) return;
+
+    toast.info(
+      `${getDisplayName(playerId)} поставил тайл${meeple ? ' и мипла' : ''}`,
+      { duration: 2500 }
+    );
   });
 
   // ============================================
   // 🏆 ЗАВЕРШЁННЫЕ РЕГИОНЫ
   // ============================================
   socket.on('game:regions-completed', ({ regions }) => {
+    if (!inRoom()) return;
     console.log(`🏆 [StateSync] Завершено регионов: ${regions.length}`);
 
     // КЛЮЧЕВОЕ: используем processCompletedRegionsInStore
@@ -114,19 +162,22 @@ export function registerGameHandlers(socket: GameSocket): void {
     useGameStore.getState().processCompletedRegionsInStore(
       regions.map(r => ({
         rootKey: r.rootKey,
-        type: r.type as any,
+        type: r.type as FeatureType,
         points: r.points,
         winners: r.winners,
         allMeepleOwners: r.allMeepleOwners,
         featureKeys: r.featureKeys,
       }))
     );
+
+    toastCompletedRegions(regions);
   });
 
   // ============================================
   // 🔁 ПЕРЕДАЧА ХОДА
   // ============================================
   socket.on('game:next-turn', ({ nextPlayerId }) => {
+    if (!inRoom()) return;
     // Сбрасываем таймер при смене хода
     useGameStore.getState().setTurnTimerRemaining(null);
     useGameStore.getState().setTurnDeadline(null);
@@ -136,17 +187,38 @@ export function registerGameHandlers(socket: GameSocket): void {
   });
 
   // ============================================
+  // ⏰ ХОД ПРОПУЩЕН ПО ТАЙМЕРУ
+  // ============================================
+  socket.on('game:turn-skipped', ({ playerId }) => {
+    if (!inRoom()) return;
+    if (isMe(playerId)) {
+      toast.warning('⏰ Время вышло — ваш ход пропущен', { dedupeKey: 'turn-timer' });
+    } else {
+      toast.warning(`⏰ ${getDisplayName(playerId)} не успел — ход пропущен`);
+    }
+  });
+
+  // ============================================
   // ⏱️ ОБНОВЛЕНИЕ ТАЙМЕРА
   // ============================================
   socket.on('game:timer-update', ({ remainingSeconds, deadline }) => {
+    if (!inRoom()) return;
+    const store = useGameStore.getState();
+
     // Сохраняем в store для GameHUD
-    useGameStore.getState().setTurnTimerRemaining(remainingSeconds);
+    store.setTurnTimerRemaining(remainingSeconds);
     if (deadline !== undefined) {
-      useGameStore.getState().setTurnDeadline(deadline);
+      store.setTurnDeadline(deadline);
     }
 
-    if (remainingSeconds <= 5) {
-      console.log(`⏰ [StateSync] Осталось ${remainingSeconds} сек`);
+    // Предупреждаем только того, чей сейчас ход, и только если таймер «длинный»
+    // (иначе предупреждение появилось бы сразу в начале хода)
+    const total = store.roomSettings?.turnTimerSeconds ?? 0;
+    if (total > 10 && isMyTurn() && (remainingSeconds === 10 || remainingSeconds === 5)) {
+      toast.warning(`⏱️ Осталось ${remainingSeconds} сек`, {
+        dedupeKey: 'turn-timer',
+        duration: 2500,
+      });
     }
   });
 
@@ -154,6 +226,7 @@ export function registerGameHandlers(socket: GameSocket): void {
   // 🏁 ФИНАЛЬНЫЙ ПОДСЧЁТ И КОНЕЦ ИГРЫ
   // ============================================
   socket.on('game:final-scoring', ({ regions }) => {
+    if (!inRoom()) return;
     console.log(`🏆 [StateSync] Финальный подсчёт: ${regions.length} регионов`);
 
     useGameStore.getState().processCompletedRegionsInStore(
@@ -162,9 +235,12 @@ export function registerGameHandlers(socket: GameSocket): void {
         type: r.type as FeatureType,
       }))
     );
+
+    toast.info('🏁 Колода закончилась — финальный подсчёт очков');
   });
 
   socket.on('game:over', ({ finalScores }) => {
+    if (!inRoom()) return;
     console.log(`🏁 [StateSync] Игра окончена!`);
     useGameStore.setState({
       phase: 'gameOver',
@@ -172,12 +248,17 @@ export function registerGameHandlers(socket: GameSocket): void {
     });
     // Фиксируем время окончания игры
     useGameStore.getState().setGameEndTime(Date.now());
+
+    toast.success('🏁 Игра окончена!');
   });
 
   // ============================================
   // ⚠️ ОШИБКИ СЕРВЕРА
+  // Раньше только писались в console — пользователь не видел, почему
+  // «ничего не происходит» (например, ход отклонён).
   // ============================================
   socket.on('error', ({ code, message }) => {
     console.error(`🚫 [StateSync] Ошибка сервера: [${code}] ${message}`);
+    toast.error(message || getErrorMessage(code), { dedupeKey: `error:${code}` });
   });
 }

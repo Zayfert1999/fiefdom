@@ -11,6 +11,7 @@ import { RoomPlayerManager } from './RoomPlayerManager';
 import { RoomBroadcaster } from './RoomBroadcaster';
 import { RoomGameLoop } from './RoomGameLoop';
 import type { RoomSnapshot, SnapshotPlayer } from '@fiefdom/shared/protocol/events';
+import type { ErrorCode } from '@fiefdom/shared/protocol/errors';
 import { logger } from '../utils/logger';
 
 /**
@@ -32,7 +33,7 @@ export class Room {
   private playerManager: RoomPlayerManager;
   private gameLoop: RoomGameLoop;
 
-  constructor(id: string, settings: RoomSettings, host: PlayerConnection) {
+  constructor(id: string, settings: RoomSettings, host: PlayerConnection, preferredColor?: string) {
     this.id = id;
     this.settings = settings;
     this.hostId = host.id;
@@ -53,8 +54,8 @@ export class Room {
       this.settings
     );
 
-    // Добавляем хоста в комнату
-    this.playerManager.addPlayer(host);
+    // Добавляем хоста в комнату (цвет назначается с учётом предпочтения)
+    this.playerManager.addPlayer(host, preferredColor);
   }
 
   // ============================================
@@ -88,6 +89,24 @@ export class Room {
   /** Пометить игрока как отключённого */
   markPlayerDisconnected(playerId: string): void {
     this.playerManager.markPlayerDisconnected(playerId);
+  }
+
+  /**
+   * 🌟 Повторно отправить игроку актуальное состояние (state-update + your-turn).
+   * Используется, когда сервер отклонил ход: клиент к этому моменту уже перевёл
+   * себя в фазу endTurn, и без ресинка он остался бы в ней навсегда.
+   */
+  resyncPlayer(playerId: string): void {
+    const conn = this.players.get(playerId);
+    if (!conn || conn.isDisconnected || !this.gameState.isGameStarted) return;
+
+    conn.emit('game:state-update', {
+      gameState: this.gameState.serializeForPlayer(playerId),
+    });
+
+    if (this.gameState.currentPlayer?.id === playerId && this.gameState.drawnTile) {
+      conn.emit('game:your-turn', { drawnTile: this.gameState.drawnTile });
+    }
   }
 
   /** Восстановить игрока в комнате */
@@ -144,6 +163,7 @@ export class Room {
       hostName: host?.name ?? 'Unknown',
       playerCount: this.players.size,
       maxPlayers: this.settings.maxPlayers,
+      turnTimerSeconds: this.settings.turnTimerSeconds,
       isPrivate: this.settings.isPrivate,
       isPlaying: this.gameState.isGameStarted,
     };
@@ -220,8 +240,37 @@ export class Room {
     return this.players.size >= this.settings.maxPlayers;
   }
 
+  /** Сколько игроков сейчас онлайн */
+  get connectedCount(): number {
+    let count = 0;
+    for (const conn of this.players.values()) {
+      if (!conn.isDisconnected) count++;
+    }
+    return count;
+  }
+
+  /** Есть ли в комнате хотя бы один подключённый игрок */
+  get hasConnectedPlayers(): boolean {
+    return this.connectedCount > 0;
+  }
+
+  /**
+   * 🌟 Что мешает стартовать игру (null — можно стартовать).
+   * Серверная проверка зеркалит условия кнопки «Начать игру» на клиенте:
+   * кнопку можно обойти, поэтому сервер обязан проверять сам.
+   */
+  getStartBlocker(): ErrorCode | null {
+    if (this.gameState.isGameStarted) return 'GAME_ALREADY_STARTED';
+
+    const all = Array.from(this.players.values());
+    if (all.length < 2) return 'NOT_ENOUGH_PLAYERS';
+    if (all.some(p => p.isDisconnected || !p.isReady)) return 'NOT_ALL_READY';
+
+    return null;
+  }
+
   get canStart(): boolean {
-    return this.players.size >= 2 && !this.gameState.isGameStarted;
+    return this.getStartBlocker() === null;
   }
 
   get isGameStarted(): boolean {

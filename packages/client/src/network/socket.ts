@@ -11,7 +11,8 @@ import type {
 // 🌟 Типизированный socket
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-// 🌟 URL сервера (в dev — через Vite proxy, в prod — из env)
+// 🌟 URL сервера: из env (VITE_SERVER_URL), по умолчанию — локальный сервер.
+// Сервер должен разрешать origin клиента (см. CORS_ORIGINS на сервере).
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
 let socket: GameSocket | null = null;
@@ -27,7 +28,9 @@ export function getSocket(): GameSocket {
       reconnection: true,          // Авто-reconnect
       reconnectionDelay: 1000,     // 1 сек между попытками
       reconnectionDelayMax: 5000,  // Максимум 5 сек
-      reconnectionAttempts: 10,    // Максимум 10 попыток
+      // Сервер хранит игрока в комнате ~5 минут → пытаемся вернуться примерно столько же
+      // (60 попыток × до 5 сек). 10 попыток = ~40 сек, после чего игра терялась.
+      reconnectionAttempts: 60,
       transports: ['websocket', 'polling'],
     });
 

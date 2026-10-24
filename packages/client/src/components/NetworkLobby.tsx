@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { SessionSettings } from '@/components/lobby/SessionSettings';
+import { RoomBrowser } from '@/components/lobby/RoomBrowser';
 
 // 🌟 Единый CSS-модуль для всех лобби
 import styles from '@/components/styles/lobby.module.css';
 
 export const NetworkLobby = () => {
-  const [screen, setScreen] = useState<'main' | 'create' | 'join' | 'waiting'>('main');
+  const [screen, setScreen] = useState<'main' | 'create' | 'join' | 'browse' | 'waiting'>('main');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
   // 🌟 Используем имя и цвет из uiSlice (главное меню)
@@ -53,7 +54,8 @@ export const NetworkLobby = () => {
     if (!profileName.trim()) return;
     createRoom(profileName.trim(), {
       isPrivate,
-      turnTimerSeconds: turnTimer,
+      // 🌟 Значение из поля может быть пустым/дробным/вне диапазона — сервер такое отклонит
+      turnTimerSeconds: Math.min(300, Math.max(0, Math.floor(turnTimer) || 0)),
       maxPlayers: 5,
       // 🌟 Передаём настройки сессии по умолчанию
       showRegions,
@@ -137,6 +139,10 @@ export const NetworkLobby = () => {
             🏠 Создать комнату
           </button>
 
+          <button onClick={() => setScreen('browse')} className={styles.buttonPrimary}>
+            🔎 Список комнат
+          </button>
+
           <button onClick={() => setScreen('join')} className={styles.buttonPrimary}>
             🚪 Присоединиться по коду
           </button>
@@ -165,7 +171,7 @@ export const NetworkLobby = () => {
               onChange={(e) => setIsPrivate(e.target.checked)}
               className={styles.settingCheckbox}
             />
-            <span className={styles.settingLabel}>🔒 Приватная комната (по коду)</span>
+            <span className={styles.settingLabel}>🔒 Приватная комната (скрыта из списка, вход по коду)</span>
           </label>
 
           <label className={styles.labelColumn}>
@@ -204,6 +210,13 @@ export const NetworkLobby = () => {
         </div>
       </div>
     );
+  }
+
+  // ============================================
+  // 🔎 БРАУЗЕР КОМНАТ
+  // ============================================
+  if (screen === 'browse') {
+    return <RoomBrowser onBack={() => setScreen('main')} />;
   }
 
   // ============================================

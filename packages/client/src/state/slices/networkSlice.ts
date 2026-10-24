@@ -6,8 +6,10 @@ import type { StateCreator } from 'zustand';
 import type {
   RoomSettings,
   LobbyPlayer,
+  RoomInfo,
 } from '@fiefdom/shared/protocol/events';
-import { getSocket, destroySocket } from '@/network/socket';
+import { getSocket, destroySocket, type GameSocket } from '@/network/socket';
+import { toast } from '@/state/useToastStore';
 import type { GameStore } from '../useGameStore';
 import { registerStateSync, unregisterStateSync } from '@/network/stateSync';
 import {
@@ -18,6 +20,18 @@ import {
 } from '@/network/persistence';
 
 
+
+/**
+ * 🌟 Проверка связи перед отправкой.
+ * socket.io буферизует emit() при обрыве и доставляет позже — игрок нажал
+ * «Создать комнату» без сети, а комната появилась бы через минуту после
+ * реконнекта. Лучше сразу честно сказать «нет связи».
+ */
+function ensureConnected(socket: GameSocket): boolean {
+  if (socket.connected) return true;
+  toast.error('Нет подключения к серверу', { dedupeKey: 'no-connection' });
+  return false;
+}
 
 export type LobbyScreen = 'modeSelect' | 'localLobby' | 'networkLobby' | 'geometrySandbox';
 
@@ -39,6 +53,12 @@ export interface NetworkSlice {
   networkLobbyPlayers: LobbyPlayer[];
   isHost: boolean;
 
+  // === Браузер комнат ===
+  /** Список публичных комнат (null — ещё не загружен) */
+  roomList: RoomInfo[] | null;
+  /** Открыт ли браузер комнат (нужно, чтобы переподписаться после реконнекта) */
+  isBrowsingRooms: boolean;
+
   // === Действия: подключение ===
   connectToServer: () => void;
   disconnectFromServer: () => void;
@@ -50,6 +70,11 @@ export interface NetworkSlice {
   setReady: (ready: boolean) => void;
   kickPlayer: (playerId: string) => void;
   startNetworkGame: () => void;
+
+  // === Действия: браузер комнат ===
+  startRoomBrowsing: () => void;
+  stopRoomBrowsing: () => void;
+  refreshRoomList: () => void;
 
   // === Действия: игра (отправка намерений на сервер) ===
   sendCommitMove: (
@@ -65,6 +90,7 @@ export interface NetworkSlice {
   _setLobbyPlayers: (players: LobbyPlayer[]) => void;
   _setRoomSettings: (settings: RoomSettings) => void;
   _setHost: (isHost: boolean) => void;
+  _setRoomList: (rooms: RoomInfo[]) => void;
   _saveConnectionInfo: (playerId: string, roomId: string) => void;
 }
 
@@ -80,6 +106,8 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   roomSettings: null,
   networkLobbyPlayers: [],
   isHost: false,
+  roomList: null,
+  isBrowsingRooms: false,
 
   setLobbyScreen: (screen) => {
     console.log(`🎮 [Network] Экран лобби: ${screen}`);
@@ -115,6 +143,8 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
       roomSettings: null,
       networkLobbyPlayers: [],
       isHost: false,
+      roomList: null,
+      isBrowsingRooms: false,
       lobbyScreen: 'modeSelect',
     });
   },
@@ -125,6 +155,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
 
   createRoom: (playerName, settings, preferredColor) => {
     const socket = getSocket();
+    if (!ensureConnected(socket)) return;
     console.log(`🏠 [Network] Создание комнаты: ${playerName} (цвет: ${preferredColor})`, settings);
     savePlayerName(playerName);
     socket.emit('lobby:create-room', { playerName, settings, preferredColor });
@@ -132,6 +163,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
 
   joinRoom: (roomId, playerName, preferredColor) => {
     const socket = getSocket();
+    if (!ensureConnected(socket)) return;
     console.log(`🚪 [Network] Присоединение к комнате ${roomId}: ${playerName} (цвет: ${preferredColor})`);
     savePlayerName(playerName);
     socket.emit('lobby:join-room', { roomId, playerName, preferredColor });
@@ -140,7 +172,8 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   leaveRoom: () => {
     const socket = getSocket();
     console.log(`👋 [Network] Выход из комнаты`);
-    socket.emit('lobby:leave-room');
+    // Без связи выход всё равно выполняем локально (сервер сам пометит отключение)
+    if (socket.connected) socket.emit('lobby:leave-room');
     // Очищаем данные комнаты при выходе
     clearConnectionInfo();
 
@@ -157,20 +190,47 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
 
   setReady: (ready) => {
     const socket = getSocket();
+    if (!ensureConnected(socket)) return;
     console.log(`✅ [Network] Готовность: ${ready}`);
     socket.emit('lobby:set-ready', ready);
   },
 
   kickPlayer: (playerId) => {
     const socket = getSocket();
+    if (!ensureConnected(socket)) return;
     console.log(`👢 [Network] Кик игрока: ${playerId}`);
     socket.emit('lobby:kick-player', { playerId });
   },
 
   startNetworkGame: () => {
     const socket = getSocket();
+    if (!ensureConnected(socket)) return;
     console.log(`🚀 [Network] Запрос старта игры`);
     socket.emit('lobby:start-game');
+  },
+
+  // ============================================
+  // 🔎 БРАУЗЕР КОМНАТ
+  // ============================================
+
+  startRoomBrowsing: () => {
+    set({ isBrowsingRooms: true });
+    const socket = getSocket();
+    // Если связи нет — подписка уйдёт из обработчика connect (см. connectionHandlers)
+    if (socket.connected) socket.emit('lobby:subscribe-rooms');
+  },
+
+  stopRoomBrowsing: () => {
+    // Список сбрасываем, чтобы при повторном открытии не мелькали устаревшие данные
+    set({ isBrowsingRooms: false, roomList: null });
+    const socket = getSocket();
+    if (socket.connected) socket.emit('lobby:unsubscribe-rooms');
+  },
+
+  refreshRoomList: () => {
+    const socket = getSocket();
+    if (!ensureConnected(socket)) return;
+    socket.emit('lobby:list-rooms');
   },
 
   // ============================================
@@ -182,6 +242,9 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
     meeple: { featureId: string; x: number; y: number } | null
   ) => {
     const socket = getSocket();
+    // 🌟 Не буферизуем ход: после реконнекта сервер пришлёт снапшот,
+    // и клиент вернётся в фазу размещения тайла (сервер этот ход так и не получил)
+    if (!ensureConnected(socket)) return;
     console.log(`📤 [Network] commit-move → тайл (${tile.x}, ${tile.y}), мипл: ${meeple ? 'да' : 'нет'}`);
     socket.emit('game:commit-move', { tile, meeple });
   },
@@ -208,6 +271,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   _setLobbyPlayers: (players) => set({ networkLobbyPlayers: players }),
   _setRoomSettings: (settings) => set({ roomSettings: settings }),
   _setHost: (isHost) => set({ isHost }),
+  _setRoomList: (rooms) => set({ roomList: rooms }),
   _saveConnectionInfo: (playerId, roomId) => {
     const playerName = loadPlayerName();  // 🌟 Используем импортированную функцию
     if (playerName) {

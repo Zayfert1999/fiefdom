@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`контуры тайлов (без булевых операций) > снимок сигнатур: любое изменение формы тайлов видно в диффе 1`] = `
+{
+  "tile_CCCC-S": "23004e1c",
+  "tile_CCFC": "61c27d33",
+  "tile_CCFC-S": "61c27d33",
+  "tile_CCFF": "dc0f591e",
+  "tile_CCFF-S": "dc0f591e",
+  "tile_CCRC": "103d3100",
+  "tile_CCRC-S": "103d3100",
+  "tile_CFCF": "ea53d812",
+  "tile_CFFC": "c4270392",
+  "tile_CFFF": "2f544291",
+  "tile_CFRR": "43454262",
+  "tile_CRFR": "74e588d3",
+  "tile_CRRC": "187152ae",
+  "tile_CRRC-S": "187152ae",
+  "tile_CRRF": "ccf2cd45",
+  "tile_CRRR": "6c31f7e1",
+  "tile_FCFC": "76940350",
+  "tile_FCFC-S": "76940350",
+  "tile_FFFF-M": "e4292fb1",
+  "tile_FFRF-M": "80d20e20",
+  "tile_FRRF": "05f44ea3",
+  "tile_FRRR": "1effb3bd",
+  "tile_RFRF": "de9d5e1b",
+  "tile_RRRR": "d9175533",
+}
+`;

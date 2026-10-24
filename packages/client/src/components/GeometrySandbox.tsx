@@ -20,6 +20,12 @@
 // 🌟 Все параметры тесселяции и шума настраиваются в левой панели
 //    (см. SandboxParamControls.tsx). Показывается число вершин
 //    и максимальный выход геометрии за границу тайла.
+//
+// 🩺 Три режима правой части:
+//    • «Тайл»    — один тайл (2D + 3D) и список найденных проблем
+//    • «Галерея» — все тайлы сеткой с метриками (GeometryGallery.tsx)
+//    • «Швы»     — случайная доска, подсветка несовпадений на стыках
+//    Аудит и метрики — в core/geometry/geometryAudit.ts.
 // ============================================
 
 import { useState, useMemo, memo, useCallback, useEffect, useDeferredValue } from 'react';
@@ -28,9 +34,11 @@ import { useLiveTiles } from '@/hooks/useLiveTiles';
 import { Tile3DView } from './Tile3DView';
 import {
   NoiseControls,
+  PlazaControls,
   TessellationControls,
   ParamCheckbox,
 } from './SandboxParamControls';
+import { GeometryGallery } from './GeometryGallery';
 import {
   processTileGeometry,
   toPathD,
@@ -40,8 +48,10 @@ import {
   ROAD_PARAMS,
   NOISE_PARAMS,
   DEFAULT_TESSELLATION_PARAMS,
+  DEFAULT_PLAZA_PARAMS,
 } from '@/core/geometry';
-import type { NoiseSettings, TessellationParams } from '@/core/geometry';
+import type { NoiseSettings, PlazaParams, TessellationParams } from '@/core/geometry';
+import { auditGeometry, type AuditPipelineOptions } from '@/core/geometry/geometryAudit';
 import type { TileFeature, Port } from '@fiefdom/shared/core/types';
 import type { MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 import styles from '@/components/styles/modal.module.css';
@@ -333,6 +343,7 @@ interface SandboxTileViewProps {
   noiseEnabled: boolean;
   noise: NoiseSettings;
   tessParams: TessellationParams;
+  plaza: PlazaParams;
   showVertices: boolean;
 }
 
@@ -351,6 +362,7 @@ const SandboxTileView = memo(({
   noiseEnabled,
   noise,
   tessParams,
+  plaza,
   showVertices,
 }: SandboxTileViewProps) => {
   // ============================================
@@ -408,8 +420,9 @@ const SandboxTileView = memo(({
       noiseSeed: noiseEnabled ? seed : undefined,
       noise,
       tessellation: tessParams,
+      plaza,
     });
-  }, [generation.features, tile.id, seed, noiseEnabled, noise, tessParams]);
+  }, [generation.features, tile.id, seed, noiseEnabled, noise, tessParams, plaza]);
 
   // ============================================
   // 🧱 ПОРЯДОК ОТРИСОВКИ
@@ -425,6 +438,21 @@ const SandboxTileView = memo(({
 
   // Максимальный выход геометрии за квадрат тайла (0 = всё внутри)
   const overshoot = useMemo(() => measureOutOfTile(tessellation), [tessellation]);
+
+  // Аудит готового результата: самопересечения, торцы дорог, поля без полигонов...
+  const audit = useMemo(
+    () =>
+      auditGeometry({
+        tileId: tile.id,
+        artId: tile.artId,
+        seed,
+        features: generation.features,
+        result,
+        tessellation: tessParams,
+        warnings: generation.warnings,
+      }),
+    [tile.id, tile.artId, seed, generation.features, generation.warnings, result, tessParams]
+  );
 
   // Число вершин после тесселяции и шума
   const vertexStats = useMemo(() => {
@@ -628,6 +656,22 @@ const SandboxTileView = memo(({
         ))}
       </div>
 
+      {/* 🚦 ПРОБЛЕМЫ, НАЙДЕННЫЕ АУДИТОМ (ошибки генерации показываются ниже отдельно) */}
+      {audit.issues.some((issue) => issue.code !== 'generation') && (
+        <div style={{ fontSize: 12, color: '#ddd', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 6, padding: '8px 12px' }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🚦 Аудит геометрии</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {audit.issues
+              .filter((issue) => issue.code !== 'generation')
+              .map((issue, index) => (
+                <li key={`${issue.code}-${index}`} style={{ color: issue.severity === 'error' ? '#fca5a5' : '#fcd34d' }}>
+                  <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>[{issue.code}]</span> {issue.message}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
+
       {/* ⚠️ ПРЕДУПРЕЖДЕНИЯ */}
       {(generation.warnings.length > 0 || missingGeometry.length > 0) && (
         <div style={{ maxWidth: size * 2 + 32, padding: 8, borderRadius: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fecaca', fontSize: 12, lineHeight: 1.4 }}>
@@ -663,6 +707,7 @@ export const GeometrySandbox = () => {
   // 🎯 ВЫБОР ТАЙЛА
   // ============================================
   const [selectedTileId, setSelectedTileId] = useState<string>(tiles[0]?.id ?? '');
+  const [viewMode, setViewMode] = useState<'tile' | 'gallery' | 'seams'>('tile');
 
   // ============================================
   // 👁️ СЛОИ ВИЗУАЛИЗАЦИИ
@@ -688,10 +733,12 @@ export const GeometrySandbox = () => {
   const [noiseEnabled, setNoiseEnabled] = useState(true);
   const [noiseParams, setNoiseParams] = useState<NoiseSettings>({ ...NOISE_PARAMS });
   const [tessParams, setTessParams] = useState<TessellationParams>({ ...DEFAULT_TESSELLATION_PARAMS });
+  const [plazaParams, setPlazaParams] = useState<PlazaParams>({ ...DEFAULT_PLAZA_PARAMS });
 
   // Пока ползунок тянут, тяжёлый пайплайн (булевы операции + 3D) догоняет с задержкой
   const deferredNoise = useDeferredValue(noiseParams);
   const deferredTess = useDeferredValue(tessParams);
+  const deferredPlaza = useDeferredValue(plazaParams);
 
   const patchNoise = useCallback(
     (patch: Partial<NoiseSettings>) => setNoiseParams((prev) => ({ ...prev, ...patch })),
@@ -701,15 +748,41 @@ export const GeometrySandbox = () => {
     (patch: Partial<TessellationParams>) => setTessParams((prev) => ({ ...prev, ...patch })),
     []
   );
+  // Галерея и доска швов считаются теми же настройками, что и одиночный тайл
+  const pipeline = useMemo<AuditPipelineOptions>(
+    () => ({
+      enableGenerative,
+      overwrite,
+      roadWidth,
+      noiseEnabled,
+      seedOverride,
+      noise: deferredNoise,
+      tessellation: deferredTess,
+      plaza: deferredPlaza,
+    }),
+    [enableGenerative, overwrite, roadWidth, noiseEnabled, seedOverride, deferredNoise, deferredTess, deferredPlaza]
+  );
+  const isPending =
+    noiseParams !== deferredNoise || tessParams !== deferredTess || plazaParams !== deferredPlaza;
+
   const resetNoise = useCallback(() => setNoiseParams({ ...NOISE_PARAMS }), []);
+  const patchPlaza = useCallback(
+    (patch: Partial<PlazaParams>) => setPlazaParams((prev) => ({ ...prev, ...patch })),
+    []
+  );
   const resetTess = useCallback(() => setTessParams({ ...DEFAULT_TESSELLATION_PARAMS }), []);
+  const resetPlaza = useCallback(() => setPlazaParams({ ...DEFAULT_PLAZA_PARAMS }), []);
 
   /** Копирует текущие параметры в буфер — чтобы перенести удачные значения в код */
   const handleCopyParams = useCallback(() => {
-    const json = JSON.stringify({ tessellation: tessParams, noise: noiseParams }, null, 2);
+    const json = JSON.stringify(
+      { tessellation: tessParams, plaza: plazaParams, noise: noiseParams },
+      null,
+      2
+    );
     console.log('📋 [Sandbox] Параметры:\n' + json);
     void navigator.clipboard?.writeText(json);
-  }, [tessParams, noiseParams]);
+  }, [tessParams, plazaParams, noiseParams]);
 
   // ============================================
   // 🔄 ВЕРСИЯ ДЛЯ HOT-RELOAD
@@ -773,6 +846,12 @@ export const GeometrySandbox = () => {
   const handleTileClick = useCallback((id: string) => {
     setSelectedTileId(id);
     console.log(`🧪 [Sandbox] Выбран тайл: ${id}`);
+  }, []);
+
+  const handleOpenFromGallery = useCallback((id: string) => {
+    setSelectedTileId(id);
+    setViewMode('tile');
+    console.log(`🧪 [Sandbox] Открыт из галереи: ${id}`);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -883,6 +962,16 @@ export const GeometrySandbox = () => {
             </div>
 
             {/* ======================================== */}
+            {/* 🏛 ПЛОЩАДИ НА ПЕРЕКРЁСТКАХ */}
+            {/* ======================================== */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+                🏛 Площади
+              </div>
+              <PlazaControls params={plazaParams} onChange={patchPlaza} onReset={resetPlaza} />
+            </div>
+
+            {/* ======================================== */}
             {/* 🌊 ШУМ ПЕРЛИНА */}
             {/* ======================================== */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -934,7 +1023,41 @@ export const GeometrySandbox = () => {
 
           {/* 🖼 ПРАВАЯ ЧАСТЬ */}
           <div style={{ flex: 1, minWidth: 320, overflow: 'auto', paddingLeft: 8 }}>
-            {selectedTile ? (
+            {/* Режим просмотра */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {([
+                ['tile', '🔍 Тайл'],
+                ['gallery', '🖼 Галерея'],
+                ['seams', '🧵 Швы'],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    background: viewMode === mode ? '#2563eb' : '#111827',
+                    color: '#e5e7eb',
+                    border: '1px solid #374151',
+                    borderRadius: 6,
+                    padding: '6px 14px',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {viewMode !== 'tile' ? (
+              <GeometryGallery
+                mode={viewMode}
+                tiles={tiles}
+                pipeline={pipeline}
+                isPending={isPending}
+                onOpenTile={handleOpenFromGallery}
+              />
+            ) : selectedTile ? (
               <>
                 <div key={version} style={{ display: 'flex', justifyContent: 'center' }}>
                   <SandboxTileView
@@ -952,6 +1075,7 @@ export const GeometrySandbox = () => {
                     noiseEnabled={noiseEnabled}
                     noise={deferredNoise}
                     tessParams={deferredTess}
+                    plaza={deferredPlaza}
                     showVertices={showVertices}
                   />
                 </div>

@@ -17,7 +17,7 @@ import {
     type TessellationParams,
 } from './tessellate';
 import { subtractPolygons } from './booleanOps';
-import { generatePlazas } from './generators/plaza';
+import { generatePlazas, type PlazaParams } from './generators/plaza';
 import { computeFieldPolygons, assignFieldFeatures } from './generators/field';
 import { applyGeometryNoise, type NoiseOptions } from './geometryPostProcessor';
 // 🌟 Типы из нового файла
@@ -48,6 +48,8 @@ export interface ProcessOptions {
     readonly noise?: Partial<Omit<NoiseOptions, 'seed'>>;
     /** Параметры тесселяции (плотность, min/max точек...) */
     readonly tessellation?: Partial<TessellationParams>;
+    /** Параметры площадей на перекрёстках (глубина, радиус скругления...) */
+    readonly plaza?: Partial<PlazaParams>;
 }
 
 // ============================================
@@ -79,7 +81,7 @@ export function processTileGeometry(
     }
 
     // Этап 3: Декорации (площади)
-    const decorations = generateDecorations(tessellation, options?.tessellation);
+    const decorations = generateDecorations(tessellation, options?.tessellation, options?.plaza);
 
     // Этап 4: Обрезка дорог
     const clipping = clipLines(tessellation, decorations);
@@ -140,9 +142,10 @@ function tessellate(
 // ============================================
 function generateDecorations(
     tessellation: TessellationResult,
-    params?: Partial<TessellationParams>
+    params?: Partial<TessellationParams>,
+    plazaParams?: Partial<PlazaParams>
 ): DecorationResult {
-    const plazaGeometries = generatePlazas(tessellation.lines);
+    const plazaGeometries = generatePlazas(tessellation.lines, plazaParams);
     const plazas = plazaGeometries.map(geo => tessellateArea(geo, params));
     console.log(`🏛️ [Decorations] Сгенерировано ${plazas.length} площадей`);
     return { plazaGeometries, plazas };

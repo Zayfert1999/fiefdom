@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "SVG_handler": "node scripts/SVG_handler.mjs",
     "clean": "rm -rf dist node_modules"
@@ -43,6 +45,7 @@
     "typescript-eslint": "^8.59.2",
     "typescript-plugin-css-modules": "^5.2.0",
     "vite": "^8.0.12",
-    "vite-plugin-svgr": "^5.2.0"
+    "vite-plugin-svgr": "^5.2.0",
+    "vitest": "^5.0.5"
   }
 }

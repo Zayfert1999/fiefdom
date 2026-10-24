@@ -27,7 +27,8 @@ import { buildContext, type Side } from './sides';
 export { CITY_PARAMS } from './city';
 export { ROAD_PARAMS } from './road';
 export { MONASTERY_PARAMS } from './monastery';
-export { generatePlazas } from './plaza';
+export { generatePlazas, DEFAULT_PLAZA_PARAMS, resolvePlazaParams } from './plaza';
+export type { PlazaParams } from './plaza';
 export { computeFieldPolygons, assignFieldFeatures } from './field';
 
 // ============================================

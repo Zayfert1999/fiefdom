@@ -47,10 +47,12 @@ export {
     ROAD_PARAMS,
     MONASTERY_PARAMS,
     generatePlazas,
+    DEFAULT_PLAZA_PARAMS,
+    resolvePlazaParams,
     computeFieldPolygons,
     assignFieldFeatures,
 } from './generators';
-export type { GenerateOptions, GeneratedGeometries } from './generators';
+export type { GenerateOptions, GeneratedGeometries, PlazaParams } from './generators';
 
 // Типы из shared
 export type {

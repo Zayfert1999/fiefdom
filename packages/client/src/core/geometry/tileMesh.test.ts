@@ -1,0 +1,167 @@
+// packages/client/src/core/geometry/tileMesh.test.ts
+// ============================================
+// 🧪 ТЕСТЫ МЕША ТАЙЛА
+// ============================================
+// Проверяют, что буферы, отданные в three, корректны на ВСЕХ тайлах:
+//   • триангуляция покрывает ровно площадь полигонов (earcut не «съел» дырки)
+//   • нормали согласованы с ориентацией граней (нет вывернутых треугольников)
+//   • геометрия лежит внутри тайла и ниже максимальной высоты
+//   • группы по фичам покрывают весь буфер индексов без дыр и наложений
+//   • ось север-юг не зеркалится (юг = +z, как в 2D)
+//   • стены на границе тайла не строятся, пока их не попросили
+//
+// Тесты не зависят от того, правильно ли clipper вырезал дороги:
+// они проверяют соответствие меша ПОЛИГОНАМ, которые ему дали.
+// ============================================
+import { describe, it, expect } from 'vitest';
+import baseData from '@fiefdom/shared/data/base.json';
+import { rotatePoint } from '@fiefdom/shared/core/tileUtils';
+import { auditTile, type AuditTile, type TileAudit } from './geometryAudit';
+import {
+    DEFAULT_MESH_PARAMS,
+    buildTileMesh,
+    findMeshGroup,
+    tileYaw,
+    type TileMeshData,
+} from './tileMesh';
+
+const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
+const GENERATED = { overwrite: true } as const;
+
+const audits = new Map<string, TileAudit>(tiles.map((t) => [t.id, auditTile(t, GENERATED)]));
+const meshOf = (id: string, params?: Parameters<typeof buildTileMesh>[2]): TileMeshData => {
+    const audit = audits.get(id)!;
+    return buildTileMesh(audit.geometry, audit.features, params);
+};
+
+const ids = tiles.map((t) => t.id);
+const MAX_Y = DEFAULT_MESH_PARAMS.baseHeight + Math.max(...Object.values(DEFAULT_MESH_PARAMS.heights));
+
+/** Число треугольников, у которых геометрическая нормаль противоположна нормали вершины */
+function countInverted(mesh: TileMeshData): number {
+    const P = mesh.positions;
+    const N = mesh.normals;
+    const I = mesh.indices;
+    let inverted = 0;
+    for (let i = 0; i < I.length; i += 3) {
+        const a = I[i] * 3;
+        const b = I[i + 1] * 3;
+        const c = I[i + 2] * 3;
+        const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2];
+        const vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+        const nx = uy * vz - uz * vy;
+        const ny = uz * vx - ux * vz;
+        const nz = ux * vy - uy * vx;
+        if (nx * N[a] + ny * N[a + 1] + nz * N[a + 2] < -1e-9) inverted++;
+    }
+    return inverted;
+}
+
+describe('меш тайла', () => {
+    it.each(ids)('%s: площадь триангуляции совпадает с площадью полигонов', (id) => {
+        expect(meshOf(id).stats.maxTopDeviation).toBeLessThan(1e-6);
+    });
+
+    it.each(ids)('%s: нет вывернутых треугольников', (id) => {
+        expect(countInverted(meshOf(id))).toBe(0);
+    });
+
+    it.each(ids)('%s: геометрия лежит внутри тайла и ниже максимальной высоты', (id) => {
+        const { positions } = meshOf(id);
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (let i = 0; i < positions.length; i += 3) {
+            minX = Math.min(minX, positions[i]);
+            maxX = Math.max(maxX, positions[i]);
+            minY = Math.min(minY, positions[i + 1]);
+            maxY = Math.max(maxY, positions[i + 1]);
+            minZ = Math.min(minZ, positions[i + 2]);
+            maxZ = Math.max(maxZ, positions[i + 2]);
+        }
+        expect(Math.min(minX, minZ)).toBeGreaterThan(-50 - 1e-6);
+        expect(Math.max(maxX, maxZ)).toBeLessThan(50 + 1e-6);
+        expect(minY).toBeGreaterThan(DEFAULT_MESH_PARAMS.baseHeight - 1e-6);
+        expect(maxY).toBeLessThan(MAX_Y + 1e-6);
+    });
+
+    it.each(ids)('%s: группы покрывают индексы без дыр и наложений', (id) => {
+        const mesh = meshOf(id);
+        let cursor = 0;
+        for (const group of mesh.groups) {
+            expect(group.start).toBe(cursor);
+            expect(group.count % 3).toBe(0);
+            cursor += group.count;
+        }
+        expect(cursor).toBe(mesh.indices.length);
+    });
+
+    it.each(ids)('%s: по индексу любого треугольника находится группа', (id) => {
+        const mesh = meshOf(id);
+        const triangles = mesh.indices.length / 3;
+        for (const face of [0, Math.floor(triangles / 2), triangles - 1]) {
+            expect(findMeshGroup(mesh, face)).not.toBeNull();
+        }
+    });
+});
+
+describe('ориентация и стены', () => {
+    it('юг остаётся югом: город CCFC (север, восток, запад) смещён в −z', () => {
+        const mesh = meshOf('tile_CCFC');
+        const P = mesh.positions;
+        const N = mesh.normals;
+
+        // Центроид крышек города по площади треугольников
+        let weighted = 0;
+        let total = 0;
+        for (const group of mesh.groups) {
+            if (group.surface !== 'city') continue;
+            for (let i = group.start; i < group.start + group.count; i += 3) {
+                const a = mesh.indices[i] * 3;
+                const b = mesh.indices[i + 1] * 3;
+                const c = mesh.indices[i + 2] * 3;
+                if (N[a + 1] < 0.99) continue; // только горизонтальные крышки
+                const area =
+                    Math.abs((P[b] - P[a]) * (P[c + 2] - P[a + 2]) - (P[b + 2] - P[a + 2]) * (P[c] - P[a])) / 2;
+                weighted += area * ((P[a + 2] + P[b + 2] + P[c + 2]) / 3);
+                total += area;
+            }
+        }
+        // Зеркало по оси север-юг дало бы положительное значение
+        expect(total).toBeGreaterThan(0);
+        expect(weighted / total).toBeLessThan(0);
+    });
+
+    it('поворот инстанса: rotation.y = −θ даёт тот же результат, что 2D-поворот тайла', () => {
+        // Матрица поворота three вокруг Y (правая система, y вверх)
+        const rotateY = (x: number, z: number, phi: number): [number, number] => [
+            x * Math.cos(phi) + z * Math.sin(phi),
+            -x * Math.sin(phi) + z * Math.cos(phi),
+        ];
+        for (const rotation of [0, 90, 180, 270] as const) {
+            for (const [x, y] of [[0, -50], [50, 0], [13, -27], [-40, 22]]) {
+                const expected = rotatePoint(x, y, rotation); // y 2D == z в 3D
+                const [rx, rz] = rotateY(x, y, tileYaw(rotation));
+                expect(Math.abs(rx - expected.x)).toBeLessThan(1e-9);
+                expect(Math.abs(rz - expected.y)).toBeLessThan(1e-9);
+            }
+        }
+    });
+
+    it.each(ids)('%s: стены по границе тайла не строятся по умолчанию и строятся по запросу', (id) => {
+        const off = meshOf(id);
+        const on = meshOf(id, { boundaryWalls: true });
+        expect(off.stats.skippedBoundaryEdges).toBeGreaterThan(0);
+        expect(on.stats.skippedBoundaryEdges).toBe(0);
+        expect(on.stats.wallQuads).toBeGreaterThan(off.stats.wallQuads);
+        expect(countInverted(on)).toBe(0);
+    });
+
+    it('снимок размеров мешей: рост числа треугольников виден в диффе', () => {
+        const sizes = Object.fromEntries(
+            ids.map((id) => {
+                const { stats } = meshOf(id);
+                return [id, [stats.vertices, stats.triangles]];
+            })
+        );
+        expect(sizes).toMatchSnapshot();
+    });
+});

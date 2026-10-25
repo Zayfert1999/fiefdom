@@ -2,11 +2,12 @@
 // ============================================
 // 🖼 ГАЛЕРЕЯ ТАЙЛОВ И ДОСКА ШВОВ
 // ============================================
-// Два режима поверх текущих параметров песочницы:
+// Три режима поверх текущих параметров песочницы:
 //   • gallery — все тайлы сеткой, с бейджами ошибок/предупреждений
 //   • seams   — случайная доска из совпадающих по портам тайлов;
 //               места, где тип поверхности на стыке не сходится,
 //               подсвечены красным
+//   • board3d — та же доска в 3D (Board3D): инстансинг, тени, пикинг клеток
 //
 // Любое движение ползунка в левой панели пересчитывает всё сразу —
 // видно, как параметр влияет на ВСЕ тайлы, а не на один.
@@ -23,6 +24,8 @@ import {
   type SeamReport,
   type TileAudit,
 } from '@/core/geometry/geometryAudit';
+import { buildTileBundle, type MeshParamsInput, type TileBundle } from '@/core/geometry/tileMesh';
+import { Board3D, type Board3DHover, type BoardPlacement } from './Board3D';
 import { TileGeometryLayers } from './TileGeometryLayers';
 
 // ============================================
@@ -55,16 +58,25 @@ const copyText = (text: string): void => {
 // 🧩 ГЛАВНЫЙ КОМПОНЕНТ
 // ============================================
 interface GeometryGalleryProps {
-  mode: 'gallery' | 'seams';
+  mode: 'gallery' | 'seams' | 'board3d';
   tiles: readonly AuditTile[];
   /** Должен быть мемоизирован снаружи, иначе всё пересчитывается каждый рендер */
   pipeline: AuditPipelineOptions;
   /** Параметры отстают от ползунков (useDeferredValue) */
   isPending?: boolean;
+  /** Параметры меша для 3D (высоты, цвета, стены) */
+  meshParams?: MeshParamsInput;
   onOpenTile: (tileId: string) => void;
 }
 
-export const GeometryGallery = ({ mode, tiles, pipeline, isPending = false, onOpenTile }: GeometryGalleryProps) => {
+export const GeometryGallery = ({
+  mode,
+  tiles,
+  pipeline,
+  isPending = false,
+  meshParams,
+  onOpenTile,
+}: GeometryGalleryProps) => {
   const audits = useMemo(() => auditTiles(tiles, pipeline), [tiles, pipeline]);
 
   return (
@@ -73,7 +85,13 @@ export const GeometryGallery = ({ mode, tiles, pipeline, isPending = false, onOp
       {mode === 'gallery' ? (
         <GalleryGrid audits={audits} onOpenTile={onOpenTile} />
       ) : (
-        <SeamBoard tiles={tiles} audits={audits} onOpenTile={onOpenTile} />
+        <SeamBoard
+          tiles={tiles}
+          audits={audits}
+          view3d={mode === 'board3d'}
+          meshParams={meshParams}
+          onOpenTile={onOpenTile}
+        />
       )}
     </div>
   );
@@ -208,16 +226,22 @@ GalleryCell.displayName = 'GalleryCell';
 interface SeamBoardProps {
   tiles: readonly AuditTile[];
   audits: readonly TileAudit[];
+  /** Рисовать доску в 3D вместо SVG */
+  view3d: boolean;
+  meshParams?: MeshParamsInput;
   onOpenTile: (tileId: string) => void;
 }
 
-const SeamBoard = ({ tiles, audits, onOpenTile }: SeamBoardProps) => {
+const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardProps) => {
   const [cols, setCols] = useState(6);
   const [rows, setRows] = useState(4);
   const [boardSeed, setBoardSeed] = useState('seam-board');
   const [reroll, setReroll] = useState(0);
   const [showVertices, setShowVertices] = useState(false);
   const [showBorders, setShowBorders] = useState(true);
+  const [shadows, setShadows] = useState(true);
+  const [wireframe, setWireframe] = useState(false);
+  const [hover, setHover] = useState<Board3DHover | null>(null);
 
   const board = useMemo(
     () => generateSeamBoard(tiles, cols, rows, `${boardSeed}#${reroll}`),
@@ -225,6 +249,38 @@ const SeamBoard = ({ tiles, audits, onOpenTile }: SeamBoardProps) => {
   );
 
   const auditById = useMemo(() => new Map(audits.map((a) => [a.tileId, a])), [audits]);
+
+  // Меши строятся только для 3D-режима. Один бандл на тайл, дальше работает инстансинг
+  const bundles = useMemo<ReadonlyMap<string, TileBundle>>(() => {
+    if (!view3d) return new Map();
+    return new Map(
+      audits.map((audit) => [
+        audit.tileId,
+        buildTileBundle(
+          { tileId: audit.tileId, artId: audit.artId, features: audit.features, geometry: audit.geometry },
+          meshParams
+        ),
+      ])
+    );
+  }, [view3d, audits, meshParams]);
+
+  const placements = useMemo<BoardPlacement[]>(
+    () =>
+      (board ?? []).map((placed) => ({
+        key: `${placed.col},${placed.row}`,
+        tileId: placed.tile.id,
+        col: placed.col,
+        row: placed.row,
+        rotation: placed.rotation,
+      })),
+    [board]
+  );
+
+  const meshTotals = useMemo(() => {
+    let triangles = 0;
+    for (const placement of placements) triangles += bundles.get(placement.tileId)?.mesh.stats.triangles ?? 0;
+    return triangles;
+  }, [placements, bundles]);
 
   const report: SeamReport | null = useMemo(
     () => (board ? auditSeams(board, auditById) : null),
@@ -269,14 +325,29 @@ const SeamBoard = ({ tiles, audits, onOpenTile }: SeamBoardProps) => {
           />
         </label>
         <button type="button" style={buttonStyle} onClick={() => setReroll((n) => n + 1)}>🎲 Новая доска</button>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-          <input type="checkbox" checked={showBorders} onChange={(e) => setShowBorders(e.target.checked)} />
-          Границы тайлов
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-          <input type="checkbox" checked={showVertices} onChange={(e) => setShowVertices(e.target.checked)} />
-          Вершины
-        </label>
+        {view3d ? (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={shadows} onChange={(e) => setShadows(e.target.checked)} />
+              Тени
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={wireframe} onChange={(e) => setWireframe(e.target.checked)} />
+              Каркас
+            </label>
+          </>
+        ) : (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showBorders} onChange={(e) => setShowBorders(e.target.checked)} />
+              Границы тайлов
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showVertices} onChange={(e) => setShowVertices(e.target.checked)} />
+              Вершины
+            </label>
+          </>
+        )}
         {report && (
           <button type="button" style={buttonStyle} onClick={() => copyText(formatAuditReport(audits, report))}>
             📋 Копировать отчёт
@@ -304,7 +375,33 @@ const SeamBoard = ({ tiles, audits, onOpenTile }: SeamBoardProps) => {
             </span>
           </div>
 
-          <svg
+          {view3d ? (
+            <>
+              <Board3D
+                placements={placements}
+                bundles={bundles}
+                cols={cols}
+                rows={rows}
+                shadows={shadows}
+                wireframe={wireframe}
+                onHover={setHover}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12, color: '#ccc', fontFamily: 'monospace' }}>
+                <span>
+                  {hover
+                    ? `клетка (${hover.col}, ${hover.row})` +
+                      (hover.placement
+                        ? ` · ${hover.placement.tileId} · поворот ${hover.placement.rotation}°`
+                        : ' · пусто') +
+                      (hover.featureId ? ` · ${hover.featureId} [${hover.surface}]` : '')
+                    : 'Наведите курсор на доску'}
+                </span>
+                <span>треугольников на сцене: {meshTotals}</span>
+                <span>ЛКМ — панорама · ПКМ — вращение · колесо — зум</span>
+              </div>
+            </>
+          ) : (
+            <svg
             viewBox={`${-50 - pad} ${-50 - pad} ${cols * 100 + 2 * pad} ${rows * 100 + 2 * pad}`}
             width="100%"
             style={{ display: 'block', maxHeight: '68vh', background: '#0b1020', borderRadius: 6 }}
@@ -340,7 +437,8 @@ const SeamBoard = ({ tiles, audits, onOpenTile }: SeamBoardProps) => {
                 />
               ))
             )}
-          </svg>
+            </svg>
+          )}
 
           {worstPairs.length > 0 && (
             <div style={{ fontSize: 12, color: '#ccc' }}>

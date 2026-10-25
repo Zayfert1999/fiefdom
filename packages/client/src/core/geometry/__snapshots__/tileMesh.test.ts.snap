@@ -1,0 +1,102 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ориентация и стены > снимок размеров мешей: рост числа треугольников виден в диффе 1`] = `
+{
+  "tile_CCCC-S": [
+    120,
+    118,
+  ],
+  "tile_CCFC": [
+    411,
+    279,
+  ],
+  "tile_CCFC-S": [
+    411,
+    279,
+  ],
+  "tile_CCFF": [
+    382,
+    250,
+  ],
+  "tile_CCFF-S": [
+    382,
+    250,
+  ],
+  "tile_CCRC": [
+    603,
+    391,
+  ],
+  "tile_CCRC-S": [
+    603,
+    391,
+  ],
+  "tile_CFCF": [
+    702,
+    440,
+  ],
+  "tile_CFFC": [
+    702,
+    440,
+  ],
+  "tile_CFFF": [
+    353,
+    221,
+  ],
+  "tile_CFRR": [
+    917,
+    557,
+  ],
+  "tile_CRFR": [
+    957,
+    581,
+  ],
+  "tile_CRRC": [
+    946,
+    586,
+  ],
+  "tile_CRRC-S": [
+    946,
+    586,
+  ],
+  "tile_CRRF": [
+    917,
+    557,
+  ],
+  "tile_CRRR": [
+    1339,
+    803,
+  ],
+  "tile_FCFC": [
+    702,
+    440,
+  ],
+  "tile_FCFC-S": [
+    702,
+    440,
+  ],
+  "tile_FFFF-M": [
+    524,
+    314,
+  ],
+  "tile_FFRF-M": [
+    736,
+    438,
+  ],
+  "tile_FRRF": [
+    568,
+    338,
+  ],
+  "tile_FRRR": [
+    990,
+    584,
+  ],
+  "tile_RFRF": [
+    608,
+    362,
+  ],
+  "tile_RRRR": [
+    1277,
+    751,
+  ],
+}
+`;

@@ -19,6 +19,7 @@
     "@react-three/fiber": "9.1.2",
     "clipper2-ts": "2.0.1-18",
     "clsx": "^2.1.1",
+    "earcut": "^3.2.4",
     "framer-motion": "^12.40.0",
     "polyclip-ts": "^0.16.8",
     "react": "^19.2.6",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/earcut": "^3.2.4",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

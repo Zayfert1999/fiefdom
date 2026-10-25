@@ -25,6 +25,7 @@
 //    • «Тайл»    — один тайл (2D + 3D) и список найденных проблем
 //    • «Галерея» — все тайлы сеткой с метриками (GeometryGallery.tsx)
 //    • «Швы»     — случайная доска, подсветка несовпадений на стыках
+//    • «3D доска» — та же доска в 3D (инстансинг, тени, пикинг клеток)
 //    Аудит и метрики — в core/geometry/geometryAudit.ts.
 // ============================================
 
@@ -33,6 +34,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { useLiveTiles } from '@/hooks/useLiveTiles';
 import { Tile3DView } from './Tile3DView';
 import {
+  MeshControls,
   NoiseControls,
   PlazaControls,
   TessellationControls,
@@ -52,6 +54,7 @@ import {
 } from '@/core/geometry';
 import type { NoiseSettings, PlazaParams, TessellationParams } from '@/core/geometry';
 import { auditGeometry, type AuditPipelineOptions } from '@/core/geometry/geometryAudit';
+import { resolveMeshParams, type MeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
 import type { TileFeature, Port } from '@fiefdom/shared/core/types';
 import type { MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 import styles from '@/components/styles/modal.module.css';
@@ -344,6 +347,7 @@ interface SandboxTileViewProps {
   noise: NoiseSettings;
   tessParams: TessellationParams;
   plaza: PlazaParams;
+  meshParams: MeshParams;
   showVertices: boolean;
 }
 
@@ -363,6 +367,7 @@ const SandboxTileView = memo(({
   noise,
   tessParams,
   plaza,
+  meshParams,
   showVertices,
 }: SandboxTileViewProps) => {
   // ============================================
@@ -638,7 +643,7 @@ const SandboxTileView = memo(({
         {/* 🎮 3D ВИД */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ marginBottom: 8, color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>3D</div>
-          <Tile3DView result={result} size={size} />
+          <Tile3DView result={result} size={size} features={generation.features} meshParams={meshParams} />
         </div>
       </div>
 
@@ -707,7 +712,7 @@ export const GeometrySandbox = () => {
   // 🎯 ВЫБОР ТАЙЛА
   // ============================================
   const [selectedTileId, setSelectedTileId] = useState<string>(tiles[0]?.id ?? '');
-  const [viewMode, setViewMode] = useState<'tile' | 'gallery' | 'seams'>('tile');
+  const [viewMode, setViewMode] = useState<'tile' | 'gallery' | 'seams' | 'board3d'>('tile');
 
   // ============================================
   // 👁️ СЛОИ ВИЗУАЛИЗАЦИИ
@@ -734,6 +739,7 @@ export const GeometrySandbox = () => {
   const [noiseParams, setNoiseParams] = useState<NoiseSettings>({ ...NOISE_PARAMS });
   const [tessParams, setTessParams] = useState<TessellationParams>({ ...DEFAULT_TESSELLATION_PARAMS });
   const [plazaParams, setPlazaParams] = useState<PlazaParams>({ ...DEFAULT_PLAZA_PARAMS });
+  const [meshParams, setMeshParams] = useState<MeshParams>(() => resolveMeshParams());
 
   // Пока ползунок тянут, тяжёлый пайплайн (булевы операции + 3D) догоняет с задержкой
   const deferredNoise = useDeferredValue(noiseParams);
@@ -770,19 +776,32 @@ export const GeometrySandbox = () => {
     (patch: Partial<PlazaParams>) => setPlazaParams((prev) => ({ ...prev, ...patch })),
     []
   );
+  const patchMesh = useCallback(
+    (patch: MeshParamsInput) =>
+      setMeshParams((prev) =>
+        resolveMeshParams({
+          ...prev,
+          ...patch,
+          heights: { ...prev.heights, ...patch.heights },
+          colors: { ...prev.colors, ...patch.colors },
+        })
+      ),
+    []
+  );
+  const resetMesh = useCallback(() => setMeshParams(resolveMeshParams()), []);
   const resetTess = useCallback(() => setTessParams({ ...DEFAULT_TESSELLATION_PARAMS }), []);
   const resetPlaza = useCallback(() => setPlazaParams({ ...DEFAULT_PLAZA_PARAMS }), []);
 
   /** Копирует текущие параметры в буфер — чтобы перенести удачные значения в код */
   const handleCopyParams = useCallback(() => {
     const json = JSON.stringify(
-      { tessellation: tessParams, plaza: plazaParams, noise: noiseParams },
+      { tessellation: tessParams, plaza: plazaParams, mesh: meshParams, noise: noiseParams },
       null,
       2
     );
     console.log('📋 [Sandbox] Параметры:\n' + json);
     void navigator.clipboard?.writeText(json);
-  }, [tessParams, plazaParams, noiseParams]);
+  }, [tessParams, plazaParams, meshParams, noiseParams]);
 
   // ============================================
   // 🔄 ВЕРСИЯ ДЛЯ HOT-RELOAD
@@ -972,6 +991,16 @@ export const GeometrySandbox = () => {
             </div>
 
             {/* ======================================== */}
+            {/* 🧱 МЕШ (3D) */}
+            {/* ======================================== */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+                🧱 Меш (3D)
+              </div>
+              <MeshControls params={meshParams} onChange={patchMesh} onReset={resetMesh} />
+            </div>
+
+            {/* ======================================== */}
             {/* 🌊 ШУМ ПЕРЛИНА */}
             {/* ======================================== */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1029,6 +1058,7 @@ export const GeometrySandbox = () => {
                 ['tile', '🔍 Тайл'],
                 ['gallery', '🖼 Галерея'],
                 ['seams', '🧵 Швы'],
+                ['board3d', '🧱 3D доска'],
               ] as const).map(([mode, label]) => (
                 <button
                   key={mode}
@@ -1055,6 +1085,7 @@ export const GeometrySandbox = () => {
                 tiles={tiles}
                 pipeline={pipeline}
                 isPending={isPending}
+                meshParams={meshParams}
                 onOpenTile={handleOpenFromGallery}
               />
             ) : selectedTile ? (
@@ -1076,6 +1107,7 @@ export const GeometrySandbox = () => {
                     noise={deferredNoise}
                     tessParams={deferredTess}
                     plaza={deferredPlaza}
+                    meshParams={meshParams}
                     showVertices={showVertices}
                   />
                 </div>

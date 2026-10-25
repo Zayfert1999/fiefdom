@@ -110,7 +110,7 @@ export class Room {
   }
 
   /** Восстановить игрока в комнате */
-  reconnectPlayer(oldPlayerId: string, newSocket: Socket): {
+  reconnectPlayer(oldPlayerId: string, newSocket: Socket, sessionToken: string): {
     success: boolean;
     reason?: string;
     snapshot?: RoomSnapshot;
@@ -118,6 +118,7 @@ export class Room {
     return this.playerManager.reconnectPlayer(
       oldPlayerId,
       newSocket,
+      sessionToken,
       this.hostId,
       (viewerId) => this.getSnapshot(viewerId)
     );
@@ -219,6 +220,8 @@ export class Room {
       players,
       gameState,
       yourPlayerId: viewerId,
+      // 🔐 Токен виден только владельцу снапшота
+      yourSessionToken: this.players.get(viewerId)?.sessionToken ?? '',
       drawnTile,
     };
   }

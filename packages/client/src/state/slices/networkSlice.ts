@@ -49,6 +49,8 @@ export interface NetworkSlice {
   // === Состояние комнаты ===
   roomId: string | null;
   playerId: string | null;
+  /** 🔐 Секрет сессии (приходит только в нашем снапшоте); нужен для lobby:reconnect */
+  sessionToken: string | null;
   roomSettings: RoomSettings | null;
   networkLobbyPlayers: LobbyPlayer[];
   isHost: boolean;
@@ -91,7 +93,7 @@ export interface NetworkSlice {
   _setRoomSettings: (settings: RoomSettings) => void;
   _setHost: (isHost: boolean) => void;
   _setRoomList: (rooms: RoomInfo[]) => void;
-  _saveConnectionInfo: (playerId: string, roomId: string) => void;
+  _saveConnectionInfo: (playerId: string, roomId: string, sessionToken: string) => void;
 }
 
 export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set) => ({
@@ -103,6 +105,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   connectionError: null,
   roomId: null,
   playerId: null,
+  sessionToken: null,
   roomSettings: null,
   networkLobbyPlayers: [],
   isHost: false,
@@ -140,6 +143,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
       isReconnecting: false,
       roomId: null,
       playerId: null,
+      sessionToken: null,
       roomSettings: null,
       networkLobbyPlayers: [],
       isHost: false,
@@ -180,6 +184,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
     set({
       roomId: null,
       playerId: null,
+      sessionToken: null,
       roomSettings: null,
       networkLobbyPlayers: [],
       isHost: false,
@@ -257,25 +262,20 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   _setReconnecting: (reconnecting) => set({ isReconnecting: reconnecting }),
   _setConnectionError: (error) => set({ connectionError: error }),
   _setRoomInfo: (roomId, playerId) => {
-    console.log(`📥 [Network] _setRoomInfo вызван: room=${roomId}, player=${playerId}`);  // 🌟 ЛОГ
+    console.log(`📥 [Network] _setRoomInfo: room=${roomId}, player=${playerId}`);
+    // В localStorage пишет _saveConnectionInfo — после получения снапшота с токеном
     set({ roomId, playerId });
-    const playerName = loadPlayerName();
-    console.log(`💾 [Network] Загруженное имя: "${playerName}"`);  // 🌟 ЛОГ
-    if (playerName) {
-      saveConnectionInfo(playerId, roomId, playerName);
-      console.log(`💾 [Network] Данные комнаты сохранены в localStorage`);  // 🌟 ЛОГ
-    } else {
-      console.warn(`⚠️ [Network] Имя не найдено — данные НЕ сохранены`);  // 🌟 ЛОГ
-    }
   },
   _setLobbyPlayers: (players) => set({ networkLobbyPlayers: players }),
   _setRoomSettings: (settings) => set({ roomSettings: settings }),
   _setHost: (isHost) => set({ isHost }),
   _setRoomList: (rooms) => set({ roomList: rooms }),
-  _saveConnectionInfo: (playerId, roomId) => {
-    const playerName = loadPlayerName();  // 🌟 Используем импортированную функцию
-    if (playerName) {
-      saveConnectionInfo(playerId, roomId, playerName);
+  _saveConnectionInfo: (playerId, roomId, sessionToken) => {
+    // Токен держим и в store (авто-reconnect после обрыва), и в localStorage (после перезагрузки)
+    set({ sessionToken });
+    const playerName = loadPlayerName();
+    if (playerName && sessionToken) {
+      saveConnectionInfo(playerId, roomId, playerName, sessionToken);
     }
   },
 });

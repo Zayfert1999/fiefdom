@@ -123,6 +123,7 @@ export class RoomPlayerManager {
   reconnectPlayer(
     oldPlayerId: string,
     newSocket: Socket,
+    sessionToken: string,
     hostId: string,
     getSnapshot: (viewerId: string) => RoomSnapshot
   ): {
@@ -134,6 +135,13 @@ export class RoomPlayerManager {
 
     if (!conn) {
       logger.warn('[PlayerManager]', `❌ Reconnect: игрок ${oldPlayerId} не найден в комнате ${this.roomId}`);
+      return { success: false, reason: 'Игрок не найден в комнате' };
+    }
+
+    // 🔐 Без верного токена место не отдаём. Причина в ответе намеренно такая же,
+    // как для «не найден»: по ответу нельзя понять, существует ли playerId.
+    if (!conn.verifySessionToken(sessionToken)) {
+      logger.warn('[PlayerManager]', `🔐 Reconnect отклонён: неверный токен сессии (игрок ${oldPlayerId}, комната ${this.roomId})`);
       return { success: false, reason: 'Игрок не найден в комнате' };
     }
 

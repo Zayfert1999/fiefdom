@@ -96,6 +96,7 @@ export const MainMenu = () => {
             socket.emit('lobby:reconnect', {
                 playerId: saved.playerId,
                 roomId: activeGame.roomId,
+                sessionToken: saved.sessionToken,
             });
 
             // Страховка на случай, если сервер так и не ответил: снимаем «крутилку»

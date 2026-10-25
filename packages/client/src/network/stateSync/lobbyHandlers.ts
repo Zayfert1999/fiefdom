@@ -29,7 +29,7 @@ function applySnapshot(snapshot: RoomSnapshot): void {
   store.setGameStartTime(snapshot.gameStartTime);
 
   // 3. Сохраняем подключение (для надёжности)
-  store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId);
+  store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId, snapshot.yourSessionToken);
 
   // 4. Сетевой статус игроков → networkLobbyPlayers
   const lobbyPlayers: LobbyPlayer[] = snapshot.players.map(p => ({

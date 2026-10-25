@@ -50,7 +50,8 @@ export const PlaceMeepleSchema = z.object({
 
 export const ReconnectSchema = z.object({
   roomId: z.string().length(6),
-  playerId: z.string().min(1),
+  playerId: z.string().min(1).max(64),
+  sessionToken: z.string().min(1).max(128),
 });
 
 export const ChatMessageSchema = z.string().min(1).max(500);
@@ -71,7 +72,8 @@ export const SetReadySchema = z.boolean();
 // 🔍 Проверка активных игр
 // ============================================
 export const CheckActiveSchema = z.object({
-  playerId: z.string().min(1),
+  playerId: z.string().min(1).max(64),
+  sessionToken: z.string().min(1).max(128),
 });
 
 // ============================================

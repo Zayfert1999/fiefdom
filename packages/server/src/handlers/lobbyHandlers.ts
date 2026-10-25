@@ -383,12 +383,12 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       socket.emit('session:active-games', { game: null });
       return;
     }
-    const { playerId } = parsed.data;
+    const { playerId, sessionToken } = parsed.data;
 
     logger.info('[Session]', `🔍 Проверка активных игр для ${playerId}`);
 
-    // Ищем последнюю активную игру для игрока
-    const lastGame = roomManager.findLastActiveGameForPlayer(playerId);
+    // Ищем последнюю активную игру для игрока (только при верном токене сессии)
+    const lastGame = roomManager.findLastActiveGameForPlayer(playerId, sessionToken);
 
     if (lastGame) {
       logger.info('[Session]', `Найдена последняя игра: комната ${lastGame.roomId}`);
@@ -400,7 +400,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
   });
 
   // ============================================
-  // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ (только по playerId)
+  // 🔄 ВОССТАНОВЛЕНИЕ СОЕДИНЕНИЯ (playerId + секретный sessionToken)
   // ============================================
   onSafe(socket, 'lobby:reconnect', (data) => {
     const parsed = ReconnectSchema.safeParse(data);
@@ -410,7 +410,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       return;
     }
 
-    const { playerId, roomId } = parsed.data;
+    const { playerId, roomId, sessionToken } = parsed.data;
     logger.info('[Lobby]', `🔄 Запрос reconnect: ${playerId} → комната ${roomId}`);
 
     const room = roomManager.getRoom(roomId);
@@ -426,7 +426,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
       leaveCurrentRoom();
     }
 
-    const result = room.reconnectPlayer(playerId, socket);
+    const result = room.reconnectPlayer(playerId, socket, sessionToken);
 
     if (result.success && result.snapshot) {
       socket.emit('lobby:reconnect-success', { snapshot: result.snapshot });

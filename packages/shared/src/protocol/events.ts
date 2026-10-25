@@ -88,6 +88,12 @@ export interface RoomSnapshot {
 
   // === Для текущего игрока (приватные данные) ===
   yourPlayerId: string;
+  /**
+   * 🔐 Секрет сессии. Отправляется ТОЛЬКО владельцу (снапшот всегда формируется
+   * под конкретного viewerId) и никогда не попадает в публичные структуры
+   * (LobbyPlayer, SnapshotPlayer, рассылки комнате). Нужен для lobby:reconnect.
+   */
+  yourSessionToken: string;
   drawnTile?: Tile | null;  // Только если сейчас его ход
 }
 
@@ -112,6 +118,7 @@ export interface ClientToServerEvents {
   'lobby:reconnect': (data: {
     playerId: string;
     roomId: string;
+    sessionToken: string;
   }) => void;
 
   'lobby:leave-room': () => void;
@@ -147,6 +154,7 @@ export interface ClientToServerEvents {
 
   'session:check-active': (data: {
     playerId: string;
+    sessionToken: string;
   }) => void;
 
 }

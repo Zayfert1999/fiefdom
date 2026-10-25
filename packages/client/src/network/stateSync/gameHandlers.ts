@@ -75,7 +75,7 @@ export function registerGameHandlers(socket: GameSocket): void {
     store.setGameStartTime(snapshot.gameStartTime);
 
     // 3. Сохраняем подключение
-    store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId);
+    store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId, snapshot.yourSessionToken);
 
     // 4. Сетевой статус игроков → networkLobbyPlayers
     store._setLobbyPlayers(

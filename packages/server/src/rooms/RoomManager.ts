@@ -174,7 +174,7 @@ export class RoomManager {
    * Находим последнюю активную игру игрока.
    * Возвращаем имя и цвет из данных сервера.
    */
-  findLastActiveGameForPlayer(playerId: string): {
+  findLastActiveGameForPlayer(playerId: string, sessionToken: string): {
     roomId: string;
     playerName: string;
     playerColor: string;
@@ -194,7 +194,8 @@ export class RoomManager {
 
     for (const [roomId, room] of this.rooms) {
       const conn = room.players.get(playerId);
-      if (!conn) continue;
+      // 🔐 Чужие игры не раскрываем: нужен и playerId, и токен сессии
+      if (!conn || !conn.verifySessionToken(sessionToken)) continue;
 
       const disconnectedAt = conn.disconnectedAt ?? 0;
 

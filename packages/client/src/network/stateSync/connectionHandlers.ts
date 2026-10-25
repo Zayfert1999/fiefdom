@@ -43,16 +43,23 @@ export function registerConnectionHandlers(socket: GameSocket): void {
     }
     hasConnectedBefore = true;
 
-    if (store.roomId && store.playerId) {
+    if (store.roomId && store.playerId && store.sessionToken) {
       // 🌟 Мы были в комнате → просим сервер вернуть нас на место.
       // Ответ: lobby:reconnect-success (снапшот) или lobby:reconnect-failed.
       console.log(`🔄 [StateSync] Связь восстановлена — возвращаемся в комнату ${store.roomId}`);
-      socket.emit('lobby:reconnect', { playerId: store.playerId, roomId: store.roomId });
+      socket.emit('lobby:reconnect', {
+        playerId: store.playerId,
+        roomId: store.roomId,
+        sessionToken: store.sessionToken,
+      });
     } else {
       // Не в комнате — проверяем, нет ли незавершённой игры (кнопка «Продолжить»)
       const saved = loadConnectionInfo();
       if (saved) {
-        socket.emit('session:check-active', { playerId: saved.playerId });
+        socket.emit('session:check-active', {
+          playerId: saved.playerId,
+          sessionToken: saved.sessionToken,
+        });
       }
     }
 

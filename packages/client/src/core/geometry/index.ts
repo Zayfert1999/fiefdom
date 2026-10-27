@@ -37,7 +37,30 @@ export type { Noise2D } from './generators/perlin';
 export {
     applyGeometryNoise, NOISE_PARAMS, resolveNoiseSettings, measureOutOfTile,
 } from './geometryPostProcessor';
-export type { NoiseOptions, NoiseSettings, EdgeFadeCurve } from './geometryPostProcessor';
+export type {
+    NoiseOptions, NoiseSettings, EdgeFadeCurve, NoiseByType, NoiseFeatureType,
+} from './geometryPostProcessor';
+
+// 🎛 Единый набор параметров (geometryParams.json)
+export {
+    GEOMETRY_PARAMS_VERSION,
+    DEFAULT_GEOMETRY_PARAMS,
+    NOISE_FEATURE_TYPES,
+    resolveGeometryParams,
+    parseGeometryParams,
+    serializeGeometryParams,
+    hashGeometryParams,
+    resolveTileParams,
+    cloneGeometryParams,
+} from './geometryParams';
+export type {
+    GeometryParams,
+    GeometryParamsInput,
+    GenerationParams,
+    TileParamOverride,
+    ResolvedTileParams,
+    ParseGeometryParamsResult,
+} from './geometryParams';
 
 // Генераторы
 export {

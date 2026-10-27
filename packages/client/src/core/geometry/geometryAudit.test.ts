@@ -13,6 +13,7 @@
 // ============================================
 import { describe, it, expect } from 'vitest';
 import baseData from '@fiefdom/shared/data/base.json';
+import { GEOMETRY_PARAMS } from './loadedGeometryParams';
 import {
     CLIPPER_DEPENDENT_CODES,
     auditSeams,
@@ -26,12 +27,16 @@ import {
 
 const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
 
-/** Геометрия строго из портов — как в целевом пайплайне */
-const GENERATED: AuditPipelineOptions = { overwrite: true };
+/**
+ * Геометрия строго из портов — как в целевом пайплайне — с закоммиченными
+ * параметрами (geometryParams.json). Если подкрутить параметры в песочнице и
+ * сохранить, тесты проверят именно их, а снимок сигнатур покажет, что изменилось.
+ */
+const GENERATED: AuditPipelineOptions = { overwrite: true, geometryParams: GEOMETRY_PARAMS };
 
 /** Намеренно сломанные края: торцы дорог наклоняются и вылезают за тайл */
 const BROKEN_EDGES: AuditPipelineOptions = {
-    overwrite: true,
+    ...GENERATED,
     noise: {
         lineAmplitude: 8,
         alignNormals: false,

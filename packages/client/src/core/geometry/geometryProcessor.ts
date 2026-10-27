@@ -76,6 +76,8 @@ export function processTileGeometry(
     if (options?.noiseSeed) {
         tessellation = applyGeometryNoise(tessellation, {
             seed: options.noiseSeed,
+            // Типы фич нужны для настроек шума «по типу» (монастырь ≠ город)
+            featureTypes: new Map(features.map((feature) => [feature.id, feature.type])),
             ...options.noise,
         });
     }

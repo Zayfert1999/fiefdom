@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "generation": {
+    "overwrite": false,
+    "roadWidth": 20
+  },
+  "tessellation": {
+    "curveDensity": 0.3,
+    "minCurveSegments": 4,
+    "maxCurveSegments": 32,
+    "lineDensity": 0.3,
+    "lineSubdivideThreshold": 4,
+    "subdivideBoundaryEdges": true,
+    "minRingPoints": 12,
+    "maxRingPoints": 512,
+    "minLinePoints": 4
+  },
+  "noise": {
+    "areaAmplitude": 2.5,
+    "lineAmplitude": 1.5,
+    "areaFrequency": 0.05,
+    "lineFrequency": 0.02,
+    "octaves": 2,
+    "lacunarity": 2,
+    "gain": 0.5,
+    "useSeedOffset": true,
+    "offsetX": 0,
+    "offsetY": 0,
+    "normalWindow": 2,
+    "smoothIterations": 1,
+    "smoothStrength": 0.5,
+    "minPointDistance": 0.3,
+    "boundaryEpsilon": 0.5,
+    "edgeFadeDistance": 18,
+    "edgeFadeCurve": "smoothstep",
+    "alignNormals": true,
+    "clampToTile": true,
+    "clampMargin": 0,
+    "widthVariation": 0
+  },
+  "noiseByType": {},
+  "plaza": {
+    "depth": 24,
+    "cornerRadius": 12,
+    "cornerRoundness": 1,
+    "clusterTolerance": 3
+  },
+  "mesh": {
+    "baseHeight": 4,
+    "heights": {
+      "field": 4,
+      "road": 2,
+      "plaza": 2,
+      "city": 2,
+      "monastery": 4
+    },
+    "colors": {
+      "base": "#8b7355",
+      "field": "#6a994e",
+      "road": "#c9b38c",
+      "plaza": "#ac9978",
+      "city": "#a67c52",
+      "monastery": "#d47843"
+    },
+    "wallCreaseAngle": 35,
+    "boundaryWalls": false
+  },
+  "tiles": {}
+}

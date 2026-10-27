@@ -26,6 +26,12 @@
 //    • «Галерея» — все тайлы сеткой с метриками (GeometryGallery.tsx)
 //    • «Швы»     — случайная доска, подсветка несовпадений на стыках
 //    • «3D доска» — та же доска в 3D (инстансинг, тени, пикинг клеток)
+//
+// 💾 Все параметры живут в одном объекте GeometryParams (geometryParams.json).
+//    Панель «Файл параметров» сохраняет его на диск (dev-сервер Vite),
+//    показывает несохранённые изменения и умеет загружать/откатывать.
+//    Кроме общих настроек есть шум по типу фичи (город / монастырь / дорога)
+//    и закрепление seed за конкретным тайлом.
 //    Аудит и метрики — в core/geometry/geometryAudit.ts.
 // ============================================
 
@@ -35,11 +41,14 @@ import { useLiveTiles } from '@/hooks/useLiveTiles';
 import { Tile3DView } from './Tile3DView';
 import {
   MeshControls,
+  NoiseByTypeControls,
   NoiseControls,
   PlazaControls,
   TessellationControls,
+  TileOverrideControls,
   ParamCheckbox,
 } from './SandboxParamControls';
+import { SandboxParamsBar } from './SandboxParamsBar';
 import { GeometryGallery } from './GeometryGallery';
 import {
   processTileGeometry,
@@ -47,14 +56,22 @@ import {
   ringToPathD,
   generateFeatureGeometries,
   measureOutOfTile,
-  ROAD_PARAMS,
   NOISE_PARAMS,
   DEFAULT_TESSELLATION_PARAMS,
   DEFAULT_PLAZA_PARAMS,
 } from '@/core/geometry';
-import type { NoiseSettings, PlazaParams, TessellationParams } from '@/core/geometry';
+import type { NoiseByType, NoiseSettings, PlazaParams, TessellationParams } from '@/core/geometry';
 import { auditGeometry, type AuditPipelineOptions } from '@/core/geometry/geometryAudit';
-import { resolveMeshParams, type MeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
+import { resolveMeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
+import {
+  DEFAULT_GEOMETRY_PARAMS,
+  cloneGeometryParams,
+  hashGeometryParams,
+  resolveGeometryParams,
+  resolveTileParams,
+  type GeometryParams,
+} from '@/core/geometry/geometryParams';
+import { GEOMETRY_PARAMS, GEOMETRY_PARAMS_WARNINGS } from '@/core/geometry/loadedGeometryParams';
 import type { TileFeature, Port } from '@fiefdom/shared/core/types';
 import type { MultiPolygon } from '@fiefdom/shared/core/geometry.types';
 import styles from '@/components/styles/modal.module.css';
@@ -339,15 +356,10 @@ interface SandboxTileViewProps {
   showGeometry: boolean;
   // Генеративная геометрия
   enableGenerative: boolean;
-  overwrite: boolean;
-  roadWidth: number;
   seedOverride?: string;
-  // 🌊 Шум Перлина и 📐 тесселяция
   noiseEnabled: boolean;
-  noise: NoiseSettings;
-  tessParams: TessellationParams;
-  plaza: PlazaParams;
-  meshParams: MeshParams;
+  /** Все параметры геометрии (тесселяция, шум, площади, меш, настройки тайлов) */
+  params: GeometryParams;
   showVertices: boolean;
 }
 
@@ -360,23 +372,24 @@ const SandboxTileView = memo(({
   showPorts,
   showGeometry,
   enableGenerative,
-  overwrite,
-  roadWidth,
   seedOverride,
   noiseEnabled,
-  noise,
-  tessParams,
-  plaza,
-  meshParams,
+  params,
   showVertices,
 }: SandboxTileViewProps) => {
   // ============================================
   // 🔑 SEED (для шума, не для генераторов)
   // ============================================
-  const seed = useMemo(
-    () => seedOverride?.trim() || tile.artId || tile.id,
-    [seedOverride, tile.artId, tile.id]
+  // Параметры именно этого тайла: общие + закреплённый seed + шум по artId
+  const tileParams = useMemo(
+    () => resolveTileParams(params, tile.artId ?? tile.id),
+    [params, tile.artId, tile.id]
   );
+  const seed = useMemo(
+    () => seedOverride?.trim() || tileParams.seed || tile.artId || tile.id,
+    [seedOverride, tileParams.seed, tile.artId, tile.id]
+  );
+  const { overwrite, roadWidth } = params.generation;
 
   // ============================================
   // 🧬 ГЕНЕРАЦИЯ ГЕОМЕТРИИ (БЕЗ seed и jitter)
@@ -423,11 +436,11 @@ const SandboxTileView = memo(({
     // 🌟 Все параметры приходят из панелей песочницы
     return processTileGeometry(generation.features, {
       noiseSeed: noiseEnabled ? seed : undefined,
-      noise,
-      tessellation: tessParams,
-      plaza,
+      noise: { ...tileParams.noise, byType: tileParams.noiseByType },
+      tessellation: params.tessellation,
+      plaza: params.plaza,
     });
-  }, [generation.features, tile.id, seed, noiseEnabled, noise, tessParams, plaza]);
+  }, [generation.features, tile.id, seed, noiseEnabled, tileParams, params.tessellation, params.plaza]);
 
   // ============================================
   // 🧱 ПОРЯДОК ОТРИСОВКИ
@@ -453,10 +466,10 @@ const SandboxTileView = memo(({
         seed,
         features: generation.features,
         result,
-        tessellation: tessParams,
+        tessellation: params.tessellation,
         warnings: generation.warnings,
       }),
-    [tile.id, tile.artId, seed, generation.features, generation.warnings, result, tessParams]
+    [tile.id, tile.artId, seed, generation.features, generation.warnings, result, params.tessellation]
   );
 
   // Число вершин после тесселяции и шума
@@ -643,7 +656,7 @@ const SandboxTileView = memo(({
         {/* 🎮 3D ВИД */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ marginBottom: 8, color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>3D</div>
-          <Tile3DView result={result} size={size} features={generation.features} meshParams={meshParams} />
+          <Tile3DView result={result} size={size} features={generation.features} meshParams={params.mesh} />
         </div>
       </div>
 
@@ -728,80 +741,95 @@ export const GeometrySandbox = () => {
   // 🧬 ГЕНЕРАТИВНАЯ ГЕОМЕТРИЯ
   // ============================================
   const [enableGenerative, setEnableGenerative] = useState(true);
-  const [overwrite, setOverwrite] = useState(false);
-  const [roadWidth, setRoadWidth] = useState<number>(ROAD_PARAMS.width);
+  /** Временный seed для примерки: действует на все тайлы, пока не закреплён за тайлом */
   const [seedOverride, setSeedOverride] = useState('');
 
   // ============================================
-  // 🌊 ПАРАМЕТРЫ ШУМА ПЕРЛИНА И 📐 ТЕССЕЛЯЦИИ
+  // 🎛 ПАРАМЕТРЫ ГЕОМЕТРИИ (geometryParams.json)
   // ============================================
   const [noiseEnabled, setNoiseEnabled] = useState(true);
-  const [noiseParams, setNoiseParams] = useState<NoiseSettings>({ ...NOISE_PARAMS });
-  const [tessParams, setTessParams] = useState<TessellationParams>({ ...DEFAULT_TESSELLATION_PARAMS });
-  const [plazaParams, setPlazaParams] = useState<PlazaParams>({ ...DEFAULT_PLAZA_PARAMS });
-  const [meshParams, setMeshParams] = useState<MeshParams>(() => resolveMeshParams());
+  const [params, setParams] = useState<GeometryParams>(() => cloneGeometryParams(GEOMETRY_PARAMS));
+  /** Что лежит в файле сейчас: обновляется после «Сохранить» и «Загрузить» */
+  const [savedParams, setSavedParams] = useState<GeometryParams>(() => cloneGeometryParams(GEOMETRY_PARAMS));
 
   // Пока ползунок тянут, тяжёлый пайплайн (булевы операции + 3D) догоняет с задержкой
-  const deferredNoise = useDeferredValue(noiseParams);
-  const deferredTess = useDeferredValue(tessParams);
-  const deferredPlaza = useDeferredValue(plazaParams);
+  const deferredParams = useDeferredValue(params);
+  const isPending = params !== deferredParams;
+
+  const dirty = useMemo(
+    () => hashGeometryParams(params) !== hashGeometryParams(savedParams),
+    [params, savedParams]
+  );
+
+  // Короткие псевдонимы для панелей
+  const noiseParams = params.noise;
+  const tessParams = params.tessellation;
+  const plazaParams = params.plaza;
+  const meshParams = params.mesh;
+  const overwrite = params.generation.overwrite;
+  const roadWidth = params.generation.roadWidth;
+
+  const patchGeneration = useCallback(
+    (patch: Partial<GeometryParams['generation']>) =>
+      setParams((prev) => ({ ...prev, generation: { ...prev.generation, ...patch } })),
+    []
+  );
+  const setOverwrite = useCallback((value: boolean) => patchGeneration({ overwrite: value }), [patchGeneration]);
+  const setRoadWidth = useCallback((value: number) => patchGeneration({ roadWidth: value }), [patchGeneration]);
 
   const patchNoise = useCallback(
-    (patch: Partial<NoiseSettings>) => setNoiseParams((prev) => ({ ...prev, ...patch })),
+    (patch: Partial<NoiseSettings>) => setParams((prev) => ({ ...prev, noise: { ...prev.noise, ...patch } })),
     []
   );
   const patchTess = useCallback(
-    (patch: Partial<TessellationParams>) => setTessParams((prev) => ({ ...prev, ...patch })),
+    (patch: Partial<TessellationParams>) =>
+      setParams((prev) => ({ ...prev, tessellation: { ...prev.tessellation, ...patch } })),
     []
   );
-  // Галерея и доска швов считаются теми же настройками, что и одиночный тайл
-  const pipeline = useMemo<AuditPipelineOptions>(
-    () => ({
-      enableGenerative,
-      overwrite,
-      roadWidth,
-      noiseEnabled,
-      seedOverride,
-      noise: deferredNoise,
-      tessellation: deferredTess,
-      plaza: deferredPlaza,
-    }),
-    [enableGenerative, overwrite, roadWidth, noiseEnabled, seedOverride, deferredNoise, deferredTess, deferredPlaza]
-  );
-  const isPending =
-    noiseParams !== deferredNoise || tessParams !== deferredTess || plazaParams !== deferredPlaza;
-
-  const resetNoise = useCallback(() => setNoiseParams({ ...NOISE_PARAMS }), []);
   const patchPlaza = useCallback(
-    (patch: Partial<PlazaParams>) => setPlazaParams((prev) => ({ ...prev, ...patch })),
+    (patch: Partial<PlazaParams>) => setParams((prev) => ({ ...prev, plaza: { ...prev.plaza, ...patch } })),
     []
   );
   const patchMesh = useCallback(
     (patch: MeshParamsInput) =>
-      setMeshParams((prev) =>
-        resolveMeshParams({
-          ...prev,
+      setParams((prev) => ({
+        ...prev,
+        mesh: resolveMeshParams({
+          ...prev.mesh,
           ...patch,
-          heights: { ...prev.heights, ...patch.heights },
-          colors: { ...prev.colors, ...patch.colors },
-        })
-      ),
+          heights: { ...prev.mesh.heights, ...patch.heights },
+          colors: { ...prev.mesh.colors, ...patch.colors },
+        }),
+      })),
     []
   );
-  const resetMesh = useCallback(() => setMeshParams(resolveMeshParams()), []);
-  const resetTess = useCallback(() => setTessParams({ ...DEFAULT_TESSELLATION_PARAMS }), []);
-  const resetPlaza = useCallback(() => setPlazaParams({ ...DEFAULT_PLAZA_PARAMS }), []);
+  const setNoiseByType = useCallback(
+    (next: NoiseByType) => setParams((prev) => resolveGeometryParams({ ...prev, noiseByType: next })),
+    []
+  );
 
-  /** Копирует текущие параметры в буфер — чтобы перенести удачные значения в код */
-  const handleCopyParams = useCallback(() => {
-    const json = JSON.stringify(
-      { tessellation: tessParams, plaza: plazaParams, mesh: meshParams, noise: noiseParams },
-      null,
-      2
-    );
-    console.log('📋 [Sandbox] Параметры:\n' + json);
-    void navigator.clipboard?.writeText(json);
-  }, [tessParams, plazaParams, meshParams, noiseParams]);
+  const resetNoise = useCallback(() => setParams((prev) => ({ ...prev, noise: { ...NOISE_PARAMS } })), []);
+  const resetTess = useCallback(
+    () => setParams((prev) => ({ ...prev, tessellation: { ...DEFAULT_TESSELLATION_PARAMS } })),
+    []
+  );
+  const resetPlaza = useCallback(
+    () => setParams((prev) => ({ ...prev, plaza: { ...DEFAULT_PLAZA_PARAMS } })),
+    []
+  );
+  const resetMesh = useCallback(() => setParams((prev) => ({ ...prev, mesh: resolveMeshParams() })), []);
+
+  // Файл параметров: сохранение, загрузка, откат
+  const handleSaved = useCallback((saved: GeometryParams) => setSavedParams(cloneGeometryParams(saved)), []);
+  const handleLoaded = useCallback((loaded: GeometryParams) => setParams(loaded), []);
+  const handleRevert = useCallback(() => setParams(cloneGeometryParams(savedParams)), [savedParams]);
+  const handleResetDefaults = useCallback(() => setParams(cloneGeometryParams(DEFAULT_GEOMETRY_PARAMS)), []);
+
+  // Галерея и доска швов считаются теми же настройками, что и одиночный тайл
+  const pipeline = useMemo<AuditPipelineOptions>(
+    () => ({ geometryParams: deferredParams, enableGenerative, noiseEnabled, seedOverride }),
+    [deferredParams, enableGenerative, noiseEnabled, seedOverride]
+  );
 
   // ============================================
   // 🔄 ВЕРСИЯ ДЛЯ HOT-RELOAD
@@ -812,6 +840,42 @@ export const GeometrySandbox = () => {
     () => tiles.find((t) => t.id === selectedTileId) ?? null,
     [selectedTileId, tiles]
   );
+
+  // ============================================
+  // 📌 НАСТРОЙКИ ВЫБРАННОГО ТАЙЛА
+  // ============================================
+  const selectedArtId = selectedTile ? (selectedTile.artId ?? selectedTile.id) : null;
+
+  const handleRandomSeed = useCallback(() => {
+    setSeedOverride(`s${Math.random().toString(36).slice(2, 8)}`);
+  }, []);
+
+  /** Закрепляет примеряемый seed за artId выбранного тайла */
+  const handlePinSeed = useCallback(() => {
+    const seed = seedOverride.trim();
+    if (!selectedArtId || !seed) return;
+    setParams((prev) =>
+      resolveGeometryParams({
+        ...prev,
+        tiles: { ...prev.tiles, [selectedArtId]: { ...prev.tiles[selectedArtId], seed } },
+      })
+    );
+    setSeedOverride('');
+    console.log(`📌 [Sandbox] Seed "${seed}" закреплён за ${selectedArtId}`);
+  }, [seedOverride, selectedArtId]);
+
+  /** Снимает закрепление seed, сохраняя остальные настройки тайла */
+  const handleClearPin = useCallback(() => {
+    if (!selectedArtId) return;
+    setParams((prev) => {
+      const current = prev.tiles[selectedArtId];
+      if (!current) return prev;
+      const tiles = { ...prev.tiles };
+      if (current.noise) tiles[selectedArtId] = { noise: current.noise };
+      else delete tiles[selectedArtId];
+      return resolveGeometryParams({ ...prev, tiles });
+    });
+  }, [selectedArtId]);
 
   // ============================================
   // 📊 СТАТИСТИКА
@@ -910,6 +974,17 @@ export const GeometrySandbox = () => {
         <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
           {/* 🎛 ЛЕВАЯ ПАНЕЛЬ */}
           <div style={{ width: 330, flexShrink: 0, overflowY: 'auto', paddingRight: 8, borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+            {/* 💾 Файл параметров */}
+            <SandboxParamsBar
+              params={params}
+              dirty={dirty}
+              fileWarnings={GEOMETRY_PARAMS_WARNINGS}
+              onSaved={handleSaved}
+              onLoad={handleLoaded}
+              onRevert={handleRevert}
+              onResetDefaults={handleResetDefaults}
+            />
+
             <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 10, letterSpacing: 0.5 }}>
               🎛 Управление
             </div>
@@ -1030,15 +1105,24 @@ export const GeometrySandbox = () => {
                 disabled={!noiseEnabled}
               />
 
-              <div>
-                <button
-                  type="button"
-                  onClick={handleCopyParams}
-                  style={{ background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}
-                >
-                  📋 Копировать все параметры (JSON)
-                </button>
-              </div>
+              <NoiseByTypeControls
+                byType={params.noiseByType}
+                base={params.noise}
+                onChange={setNoiseByType}
+                disabled={!noiseEnabled}
+              />
+
+              {selectedArtId && (
+                <TileOverrideControls
+                  artId={selectedArtId}
+                  override={params.tiles[selectedArtId]}
+                  previewSeed={seedOverride}
+                  overriddenCount={Object.keys(params.tiles).length}
+                  onRandomize={handleRandomSeed}
+                  onPin={handlePinSeed}
+                  onClear={handleClearPin}
+                />
+              )}
             </div>
 
             {/* 📊 СТАТИСТИКА */}
@@ -1085,7 +1169,7 @@ export const GeometrySandbox = () => {
                 tiles={tiles}
                 pipeline={pipeline}
                 isPending={isPending}
-                meshParams={meshParams}
+                meshParams={deferredParams.mesh}
                 onOpenTile={handleOpenFromGallery}
               />
             ) : selectedTile ? (
@@ -1100,14 +1184,9 @@ export const GeometrySandbox = () => {
                     showPorts={showPorts}
                     showGeometry={showGeometry}
                     enableGenerative={enableGenerative}
-                    overwrite={overwrite}
-                    roadWidth={roadWidth}
                     seedOverride={seedOverride}
                     noiseEnabled={noiseEnabled}
-                    noise={deferredNoise}
-                    tessParams={deferredTess}
-                    plaza={deferredPlaza}
-                    meshParams={meshParams}
+                    params={deferredParams}
                     showVertices={showVertices}
                   />
                 </div>

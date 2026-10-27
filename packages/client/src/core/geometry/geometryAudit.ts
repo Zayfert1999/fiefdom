@@ -32,7 +32,8 @@ import { processTileGeometry } from './geometryProcessor';
 import { generateFeatureGeometries } from './generators';
 import type { PlazaParams } from './generators/plaza';
 import { HALF } from './generators/sides';
-import { measureOutOfTile, type NoiseSettings } from './geometryPostProcessor';
+import { measureOutOfTile, type NoiseByType, type NoiseSettings } from './geometryPostProcessor';
+import { resolveTileParams, type GeometryParams } from './geometryParams';
 import { pointInRing, multiPolygonContainsPoint } from './geometryPointInPolygon';
 import {
     tessellateArea,
@@ -573,8 +574,15 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
 // 🏭 АУДИТ ТАЙЛА «С НУЛЯ» (генерация + процессор + метрики)
 // ============================================
 
-/** Те же настройки, что и в песочнице */
+/**
+ * Те же настройки, что и в песочнице.
+ *
+ * Приоритет значений: явные поля ниже → `geometryParams` (в нём ещё и настройки
+ * конкретного тайла по artId) → значения по умолчанию в коде.
+ */
 export interface AuditPipelineOptions {
+    /** Полный набор параметров из geometryParams.json (или из песочницы) */
+    readonly geometryParams?: GeometryParams;
     /** Генерировать геометрию из портов (по умолчанию true) */
     readonly enableGenerative?: boolean;
     /** Перегенерировать поверх ручной геометрии (по умолчанию false) */
@@ -585,6 +593,8 @@ export interface AuditPipelineOptions {
     /** Общий seed вместо artId (для сравнения seed на всех тайлах) */
     readonly seedOverride?: string;
     readonly noise?: Partial<NoiseSettings>;
+    /** Настройки шума по типу фичи (город / монастырь / дорога) */
+    readonly noiseByType?: NoiseByType;
     readonly tessellation?: Partial<TessellationParams>;
     /** Параметры площадей на перекрёстках */
     readonly plaza?: Partial<PlazaParams>;
@@ -596,15 +606,25 @@ export interface AuditPipelineOptions {
 export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): TileAudit {
     const run = (): TileAudit => {
         const started = performance.now();
-        const seed = options.seedOverride?.trim() || tile.artId || tile.id;
+        const artKey = tile.artId ?? tile.id;
+
+        // Параметры тайла: общие + его собственные (seed, шум) из geometryParams
+        const params = options.geometryParams;
+        const forTile = params ? resolveTileParams(params, artKey) : undefined;
+
+        const seed = options.seedOverride?.trim() || forTile?.seed || artKey;
+        const noise = { ...forTile?.noise, ...options.noise };
+        const noiseByType = options.noiseByType ?? forTile?.noiseByType;
+        const tessellation = { ...params?.tessellation, ...options.tessellation };
+        const plaza = { ...params?.plaza, ...options.plaza };
 
         let features: readonly TileFeature[] = tile.features;
         const warnings: string[] = [];
 
         if (options.enableGenerative ?? true) {
             const generated = generateFeatureGeometries(tile.features, {
-                overwrite: options.overwrite ?? false,
-                roadWidth: options.roadWidth,
+                overwrite: options.overwrite ?? params?.generation.overwrite ?? false,
+                roadWidth: options.roadWidth ?? params?.generation.roadWidth,
             });
             warnings.push(...generated.warnings);
             features = tile.features.map((feature) => {
@@ -615,9 +635,9 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
 
         const result = processTileGeometry(features, {
             noiseSeed: (options.noiseEnabled ?? true) ? seed : undefined,
-            noise: options.noise,
-            tessellation: options.tessellation,
-            plaza: options.plaza,
+            noise: { ...noise, byType: noiseByType },
+            tessellation,
+            plaza,
         });
 
         return auditGeometry({
@@ -626,7 +646,7 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
             seed,
             features,
             result,
-            tessellation: options.tessellation,
+            tessellation,
             warnings,
             thresholds: options.thresholds,
             elapsedMs: performance.now() - started,

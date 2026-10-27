@@ -35,6 +35,8 @@ import { HALF } from './generators/sides';
 /** Форма нарастания смещения от края тайла к центру */
 export type EdgeFadeCurve = 'linear' | 'smoothstep' | 'smootherstep';
 
+export const EDGE_FADE_CURVES: readonly EdgeFadeCurve[] = ['linear', 'smoothstep', 'smootherstep'];
+
 export interface NoiseSettings {
     // --- Амплитуда (юниты) ---
     /** Амплитуда смещения контуров городов/монастырей */
@@ -120,11 +122,24 @@ export const NOISE_PARAMS: Readonly<NoiseSettings> = {
     widthVariation: 0,
 };
 
+/** Тип фичи, для которой можно задать свои настройки шума */
+export type NoiseFeatureType = 'city' | 'monastery' | 'road';
+
+/** Переопределения настроек шума по типу фичи (поверх общих) */
+export type NoiseByType = Partial<Record<NoiseFeatureType, Partial<NoiseSettings>>>;
+
 export interface NoiseOptions extends Partial<NoiseSettings> {
     readonly seed: string;
     readonly enabled?: boolean;
     /** Общая частота: используется, если areaFrequency/lineFrequency не заданы */
     readonly frequency?: number;
+    /**
+     * Свои настройки для города / монастыря / дороги.
+     * Например, у монастыря 40×40 разумна меньшая амплитуда, чем у города.
+     */
+    readonly byType?: NoiseByType;
+    /** featureId → тип фичи (нужен, чтобы отличить монастырь от города) */
+    readonly featureTypes?: ReadonlyMap<string, string>;
 }
 
 const num = (v: number | undefined, d: number, min: number, max: number): number => {
@@ -154,7 +169,9 @@ export function resolveNoiseSettings(
         minPointDistance: num(o.minPointDistance, d.minPointDistance, 0, 20),
         boundaryEpsilon: num(o.boundaryEpsilon, d.boundaryEpsilon, 0, 20),
         edgeFadeDistance: num(o.edgeFadeDistance, d.edgeFadeDistance, 0, HALF * 2),
-        edgeFadeCurve: o.edgeFadeCurve ?? d.edgeFadeCurve,
+        edgeFadeCurve: EDGE_FADE_CURVES.includes(o.edgeFadeCurve as EdgeFadeCurve)
+            ? (o.edgeFadeCurve as EdgeFadeCurve)
+            : d.edgeFadeCurve,
         alignNormals: o.alignNormals ?? d.alignNormals,
         clampToTile: o.clampToTile ?? d.clampToTile,
         clampMargin: num(o.clampMargin, d.clampMargin, 0, HALF),
@@ -555,29 +572,52 @@ export function applyGeometryNoise(
     const settings = resolveNoiseSettings(options);
     const sampler = createSampler(options.seed, settings);
 
+    // Настройки по типам фич считаем лениво и один раз на тип
+    const variants = new Map<NoiseFeatureType, { settings: NoiseSettings; sampler: NoiseSampler }>();
+    const variantFor = (type: NoiseFeatureType): { settings: NoiseSettings; sampler: NoiseSampler } => {
+        const override = options.byType?.[type];
+        if (!override) return { settings, sampler };
+
+        let variant = variants.get(type);
+        if (!variant) {
+            const merged = resolveNoiseSettings({ ...settings, ...override });
+            variant = { settings: merged, sampler: createSampler(options.seed, merged) };
+            variants.set(type, variant);
+        }
+        return variant;
+    };
+
     console.log(
         `🌊 [NoisePostProcessor] seed="${options.seed}", ` +
         `area=${settings.areaAmplitude}@${settings.areaFrequency}, ` +
         `line=${settings.lineAmplitude}@${settings.lineFrequency}, ` +
         `octaves=${settings.octaves}, fade=${settings.edgeFadeDistance}/${settings.edgeFadeCurve}, ` +
-        `align=${settings.alignNormals}, smooth=${settings.smoothIterations}`
+        `align=${settings.alignNormals}, smooth=${settings.smoothIterations}` +
+        (options.byType ? `, byType=[${Object.keys(options.byType).join(',')}]` : '')
     );
 
     // Шумим области
     const noisedAreas = new Map<string, MultiPolygon>();
     for (const [featureId, multiPolygon] of tessellation.areas) {
+        const type: NoiseFeatureType =
+            options.featureTypes?.get(featureId) === 'monastery' ? 'monastery' : 'city';
+        const variant = variantFor(type);
         noisedAreas.set(
             featureId,
             multiPolygon.map(polygon =>
-                polygon.map(ring => applyNoiseToRing(ring, sampler.area, settings))
+                polygon.map(ring => applyNoiseToRing(ring, variant.sampler.area, variant.settings))
             )
         );
     }
 
     // Шумим дороги
     const noisedLines = new Map<string, TessellatedLine>();
+    const roadVariant = variantFor('road');
     for (const [featureId, tessLine] of tessellation.lines) {
-        noisedLines.set(featureId, applyNoiseToTessellatedLine(tessLine, sampler, settings));
+        noisedLines.set(
+            featureId,
+            applyNoiseToTessellatedLine(tessLine, roadVariant.sampler, roadVariant.settings)
+        );
     }
 
     return { areas: noisedAreas, lines: noisedLines };

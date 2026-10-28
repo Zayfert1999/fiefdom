@@ -2,9 +2,14 @@
 // 🌟 Представление игрока на сервере: игровой профиль + сетевое соединение
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import type { Socket } from 'socket.io';
+import type { GameSocket, ServerEventName, ServerEventArgs } from '../types';
 import type { Player } from '@fiefdom/shared/core/types';
 import type { LobbyPlayer } from '@fiefdom/shared/protocol/events';
+
+/** Нетипизированный emit — только для внутренней реализации PlayerConnection.emit */
+interface RawEmitter {
+  emit(event: string, ...args: unknown[]): boolean;
+}
 
 export class PlayerConnection {
   /** Игровой профиль (id, name, color, score, meeples) */
@@ -17,7 +22,7 @@ export class PlayerConnection {
    */
   public readonly sessionToken: string = randomBytes(32).toString('base64url');
   /** Текущий socket (может меняться при reconnect) */
-  public socket: Socket | null;
+  public socket: GameSocket | null;
   /** Готовность в лобби */
   public isReady: boolean = false;
   /** Флаг отключения (для ожидания reconnect) */
@@ -25,7 +30,7 @@ export class PlayerConnection {
   /** Отметка о последнем disconnect (для cleanup) */
   public disconnectedAt: number | null = null;
 
-  constructor(player: Player, socket: Socket) {
+  constructor(player: Player, socket: GameSocket) {
     this.player = player;
     this.socket = socket;
   }
@@ -46,11 +51,15 @@ export class PlayerConnection {
     return this.player.name;
   }
 
-  /** Отправить событие лично этому игроку */
-  emit(event: string, data?: unknown): void {
-    if (this.socket) {
-      this.socket.emit(event, data);
-    }
+  /**
+   * Отправить событие лично этому игроку.
+   * Имя события и payload проверяются по контракту ServerToClientEvents.
+   */
+  emit<E extends ServerEventName>(event: E, ...args: ServerEventArgs<E>): void {
+    if (!this.socket) return;
+    // Внутри — нетипизированный emit: дженерик-вариант socket.io не умеет
+    // сопоставлять E с его аргументами, а снаружи контракт уже проверен.
+    (this.socket as unknown as RawEmitter).emit(event, ...args);
   }
 
   /** Представление для лобби */
@@ -71,7 +80,7 @@ export class PlayerConnection {
     this.socket = null;
   }
 
-  markReconnected(socket: Socket): void {
+  markReconnected(socket: GameSocket): void {
     this.isDisconnected = false;
     this.disconnectedAt = null;
     this.socket = socket;

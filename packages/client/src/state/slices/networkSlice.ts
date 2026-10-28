@@ -10,6 +10,7 @@ import type {
 } from '@fiefdom/shared/protocol/events';
 import { getSocket, destroySocket, type GameSocket } from '@/network/socket';
 import { toast } from '@/state/useToastStore';
+import { getErrorMessage } from '@fiefdom/shared/protocol/errors';
 import type { GameStore } from '../useGameStore';
 import { registerStateSync, unregisterStateSync } from '@/network/stateSync';
 import {
@@ -18,8 +19,12 @@ import {
   savePlayerName,
   loadPlayerName,
 } from '@/network/persistence';
+import { netLog } from '@/network/netLog';
 
 
+
+/** Сколько ждём подтверждения хода от сервера */
+const COMMIT_ACK_TIMEOUT_MS = 8000;
 
 /**
  * 🌟 Проверка связи перед отправкой.
@@ -72,6 +77,8 @@ export interface NetworkSlice {
   setReady: (ready: boolean) => void;
   kickPlayer: (playerId: string) => void;
   startNetworkGame: () => void;
+  /** «Я на месте»: фоновый сигнал активности в свой ход (см. useActivityReporter) */
+  sendActivity: () => void;
 
   // === Действия: браузер комнат ===
   startRoomBrowsing: () => void;
@@ -96,7 +103,7 @@ export interface NetworkSlice {
   _saveConnectionInfo: (playerId: string, roomId: string, sessionToken: string) => void;
 }
 
-export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set) => ({
+export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> = (set, get) => ({
   // === Начальное состояние ===
   lobbyScreen: 'modeSelect',
   isConnected: false,
@@ -113,7 +120,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   isBrowsingRooms: false,
 
   setLobbyScreen: (screen) => {
-    console.log(`🎮 [Network] Экран лобби: ${screen}`);
+    netLog(`🎮 [Network] Экран лобби: ${screen}`);
     set({ lobbyScreen: screen });
   },
 
@@ -122,7 +129,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   // ============================================
 
   connectToServer: () => {
-    console.log(`🔌 [Network] Подключение к серверу...`);
+    netLog(`🔌 [Network] Подключение к серверу...`);
     const socket = getSocket();
 
     // 🌟 КЛЮЧЕВОЕ: регистрируем обработчики ПЕРЕД socket.connect()
@@ -135,7 +142,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   },
 
   disconnectFromServer: () => {
-    console.log(`🔌 [Network] Отключение от сервера`);
+    netLog(`🔌 [Network] Отключение от сервера`);
     destroySocket();
     unregisterStateSync();
     set({
@@ -160,7 +167,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   createRoom: (playerName, settings, preferredColor) => {
     const socket = getSocket();
     if (!ensureConnected(socket)) return;
-    console.log(`🏠 [Network] Создание комнаты: ${playerName} (цвет: ${preferredColor})`, settings);
+    netLog(`🏠 [Network] Создание комнаты: ${playerName} (цвет: ${preferredColor})`, settings);
     savePlayerName(playerName);
     socket.emit('lobby:create-room', { playerName, settings, preferredColor });
   },
@@ -168,14 +175,14 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   joinRoom: (roomId, playerName, preferredColor) => {
     const socket = getSocket();
     if (!ensureConnected(socket)) return;
-    console.log(`🚪 [Network] Присоединение к комнате ${roomId}: ${playerName} (цвет: ${preferredColor})`);
+    netLog(`🚪 [Network] Присоединение к комнате ${roomId}: ${playerName} (цвет: ${preferredColor})`);
     savePlayerName(playerName);
     socket.emit('lobby:join-room', { roomId, playerName, preferredColor });
   },
 
   leaveRoom: () => {
     const socket = getSocket();
-    console.log(`👋 [Network] Выход из комнаты`);
+    netLog(`👋 [Network] Выход из комнаты`);
     // Без связи выход всё равно выполняем локально (сервер сам пометит отключение)
     if (socket.connected) socket.emit('lobby:leave-room');
     // Очищаем данные комнаты при выходе
@@ -196,22 +203,28 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   setReady: (ready) => {
     const socket = getSocket();
     if (!ensureConnected(socket)) return;
-    console.log(`✅ [Network] Готовность: ${ready}`);
+    netLog(`✅ [Network] Готовность: ${ready}`);
     socket.emit('lobby:set-ready', ready);
   },
 
   kickPlayer: (playerId) => {
     const socket = getSocket();
     if (!ensureConnected(socket)) return;
-    console.log(`👢 [Network] Кик игрока: ${playerId}`);
+    netLog(`👢 [Network] Кик игрока: ${playerId}`);
     socket.emit('lobby:kick-player', { playerId });
   },
 
   startNetworkGame: () => {
     const socket = getSocket();
     if (!ensureConnected(socket)) return;
-    console.log(`🚀 [Network] Запрос старта игры`);
+    netLog(`🚀 [Network] Запрос старта игры`);
     socket.emit('lobby:start-game');
+  },
+
+  // Фоновый сигнал: без связи или без комнаты молча ничего не делаем (никаких toast-ов)
+  sendActivity: () => {
+    const socket = getSocket();
+    if (socket.connected && get().roomId !== null) socket.emit('game:activity');
   },
 
   // ============================================
@@ -250,8 +263,32 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
     // 🌟 Не буферизуем ход: после реконнекта сервер пришлёт снапшот,
     // и клиент вернётся в фазу размещения тайла (сервер этот ход так и не получил)
     if (!ensureConnected(socket)) return;
-    console.log(`📤 [Network] commit-move → тайл (${tile.x}, ${tile.y}), мипл: ${meeple ? 'да' : 'нет'}`);
-    socket.emit('game:commit-move', { tile, meeple });
+    netLog(`📤 [Network] commit-move → тайл (${tile.x}, ${tile.y}), мипл: ${meeple ? 'да' : 'нет'}`);
+
+    // 🌟 Ход подтверждается ack-ом сервера. Раньше клиент ставил фазу endTurn
+    // и просто ждал state-update: при отказе или потере ответа он «зависал».
+    socket.timeout(COMMIT_ACK_TIMEOUT_MS).emit('game:commit-move', { tile, meeple }, (err, result) => {
+      if (err) {
+        // Ответа нет: ход мог дойти, а мог нет — просим сервер прислать актуальное состояние
+        console.warn('⚠️ [Network] Нет ack на commit-move — запрашиваем синхронизацию');
+        toast.error('Сервер не ответил на ход. Синхронизируем состояние…', { dedupeKey: 'commit-timeout' });
+        socket.emit('game:request-sync');
+        return;
+      }
+
+      if (!result.ok) {
+        console.warn(`🚫 [Network] Ход отклонён: [${result.code}] ${result.message}`);
+        toast.error(result.message || getErrorMessage(result.code), { dedupeKey: `error:${result.code}` });
+
+        // Обычные отказы сервер сопровождает ресинком сам. Но при лимите запросов или
+        // внутренней ошибке он состояние не присылает — запрашиваем сами, чтобы не зависнуть.
+        if (result.code === 'RATE_LIMITED' || result.code === 'INTERNAL_ERROR') {
+          window.setTimeout(() => {
+            if (socket.connected) socket.emit('game:request-sync');
+          }, 1500);
+        }
+      }
+    });
   },
 
   // ============================================
@@ -262,7 +299,7 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
   _setReconnecting: (reconnecting) => set({ isReconnecting: reconnecting }),
   _setConnectionError: (error) => set({ connectionError: error }),
   _setRoomInfo: (roomId, playerId) => {
-    console.log(`📥 [Network] _setRoomInfo: room=${roomId}, player=${playerId}`);
+    netLog(`📥 [Network] _setRoomInfo: room=${roomId}, player=${playerId}`);
     // В localStorage пишет _saveConnectionInfo — после получения снапшота с токеном
     set({ roomId, playerId });
   },

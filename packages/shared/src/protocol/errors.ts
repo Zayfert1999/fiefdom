@@ -7,6 +7,7 @@ export const ERROR_MESSAGES = {
   // --- Общие ---
   INVALID_DATA: 'Неверные данные запроса',
   INTERNAL_ERROR: 'Внутренняя ошибка сервера',
+  RATE_LIMITED: 'Слишком много запросов. Подождите немного',
   NOT_IN_ROOM: 'Вы не находитесь в комнате',
   INVALID_ACTION: 'Недопустимое действие',
 

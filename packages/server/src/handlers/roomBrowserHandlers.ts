@@ -8,14 +8,14 @@
 //    всем подписчикам; рассылки склеиваются debounce-ом в RoomManager;
 //  - lobby:unsubscribe-rooms / disconnect снимают подписку (disconnect — автоматически).
 
-import type { Server, Socket } from 'socket.io';
+import type { GameServer, GameSocket } from '../types';
 import type { RoomManager } from '../rooms/RoomManager';
 import { onSafe } from '../utils/socketUtils';
 
 /** Имя канала подписчиков. Не пересекается с кодами комнат (6 символов A-Z2-9). */
 export const ROOM_BROWSER_CHANNEL = 'room-browser';
 
-export function registerRoomBrowserHandlers(io: Server, socket: Socket, roomManager: RoomManager): void {
+export function registerRoomBrowserHandlers(io: GameServer, socket: GameSocket, roomManager: RoomManager): void {
   const sendList = (): void => {
     socket.emit('lobby:room-list', roomManager.listPublicRooms());
   };
@@ -40,7 +40,7 @@ export function registerRoomBrowserHandlers(io: Server, socket: Socket, roomMana
  * Вызывается один раз при старте сервера.
  * @returns функция отписки
  */
-export function bindRoomBrowserBroadcast(io: Server, roomManager: RoomManager): () => void {
+export function bindRoomBrowserBroadcast(io: GameServer, roomManager: RoomManager): () => void {
   return roomManager.onRoomsChanged(() => {
     // Никто не слушает — не тратим время на сборку списка
     const subscribers = io.sockets.adapter.rooms.get(ROOM_BROWSER_CHANNEL)?.size ?? 0;

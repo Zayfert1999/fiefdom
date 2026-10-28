@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import type { RoomInfo } from '@fiefdom/shared/protocol/events';
+import { formatTimeControl } from '@fiefdom/shared/core/fischerClock';
 
 import lobbyStyles from '@/components/styles/lobby.module.css';
 import styles from '@/components/styles/roomBrowser.module.css';
@@ -33,8 +34,6 @@ const STATUS_LABEL: Record<RoomStatus, string> = {
   playing: 'Идёт игра',
 };
 
-const formatTimer = (seconds: number): string =>
-  seconds > 0 ? `${seconds} с на ход` : 'без таймера';
 
 export const RoomBrowser = ({ onBack }: RoomBrowserProps) => {
   const roomList = useGameStore(s => s.roomList);
@@ -122,7 +121,7 @@ export const RoomBrowser = ({ onBack }: RoomBrowserProps) => {
                       <span className={`${styles.badge} ${styles[`badge_${status}`]}`}>
                         {STATUS_LABEL[status]}
                       </span>
-                      <span>⏱️ {formatTimer(room.turnTimerSeconds)}</span>
+                      <span>⏱️ {formatTimeControl(room.timeControl)}</span>
                       <span className={styles.code}>#{room.id}</span>
                     </div>
                   </div>

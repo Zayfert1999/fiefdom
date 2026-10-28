@@ -4,12 +4,14 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '@fiefdom/shared/protocol';
+import type { ClientToServerEvents, ServerToClientEvents } from '@fiefdom/shared/protocol/events';
+import type { InterServerEvents, SocketData } from './types';
 import cors from 'cors';
 import { RoomManager } from './rooms/RoomManager';
 import { registerLobbyHandlers } from './handlers/lobbyHandlers';
 import { registerGameHandlers } from './handlers/gameHandlers';
 import { registerRoomBrowserHandlers, bindRoomBrowserBroadcast } from './handlers/roomBrowserHandlers';
+import { registerSystemHandlers } from './handlers/systemHandlers';
 import { logger } from './utils/logger';
 
 // 🌟 Разрешённые источники. Для продакшена: CORS_ORIGINS="https://game.example.com,https://example.github.io"
@@ -23,7 +25,7 @@ const app = express();
 app.use(cors({ origin: ALLOWED_ORIGINS }));
 
 const httpServer = createServer(app);
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
   cors: {
     origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
@@ -49,9 +51,10 @@ app.get('/api/rooms', (_req, res) => {
 io.on('connection', (socket) => {
   logger.info('[Server]', `🔌 Клиент подключился: ${socket.id}`);
 
-  registerLobbyHandlers(io, socket as any, roomManager);
-  registerGameHandlers(io, socket as any, roomManager);
-  registerRoomBrowserHandlers(io, socket as any, roomManager);
+  registerLobbyHandlers(io, socket, roomManager);
+  registerGameHandlers(io, socket, roomManager);
+  registerRoomBrowserHandlers(io, socket, roomManager);
+  registerSystemHandlers(io, socket);
 });
 
 const PORT = process.env.PORT || 3001;

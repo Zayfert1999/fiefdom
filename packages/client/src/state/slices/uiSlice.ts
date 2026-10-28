@@ -3,7 +3,8 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameStore } from '../useGameStore';
-import { loadPlayerName, loadPlayerColor, savePlayerName, savePlayerColor } from '@/network/persistence';
+import { loadPlayerName, loadPlayerColor, savePlayerName, savePlayerColor, loadLocalTimeControl, saveLocalTimeControl } from '@/network/persistence';
+import type { TimeControl } from '@fiefdom/shared/core/fischerClock';
 
 const MAX_NAME_LENGTH = 20;
 const DEFAULT_NAME = 'Игрок';
@@ -28,6 +29,19 @@ export interface ActiveGame {
   playerCount: number;
 }
 
+/**
+ * Снимок шахматных часов. Банки хранятся «как были на момент receivedAt»;
+ * у игрока с идущими часами интерфейс сам досчитывает остаток по времени клиента
+ * (не зависит от синхронности часов клиента и сервера и не требует обновлений store каждую секунду).
+ */
+export interface ClockSnapshot {
+  banksMs: Record<string, number>;
+  /** Чьи часы идут; null — остановлены */
+  activePlayerId: string | null;
+  /** Date.now() клиента в момент получения/создания снимка */
+  receivedAt: number;
+}
+
 export interface UISlice {
   // === Имя и цвет игрока ===
   playerName: string;
@@ -47,13 +61,15 @@ export interface UISlice {
   serverPing: number | null;
   setServerPing: (ping: number | null) => void;
 
-  // === Остаток таймера хода (для кольцевого индикатора) ===
-  turnTimerRemaining: number | null;
-  setTurnTimerRemaining: (remaining: number | null) => void;
+  // === 🕐 Шахматные часы (онлайн: от сервера, локальная игра: считает useLocalClock) ===
+  clockSnapshot: ClockSnapshot | null;
+  setClockSnapshot: (snapshot: ClockSnapshot | null) => void;
 
-  // === timestamp окончания хода ===
-  turnDeadline: number | null;
-  setTurnDeadline: (deadline: number | null) => void;
+  /** Настройка таймера для ЛОКАЛЬНЫХ игр (лобби): null — выключен. Запоминается между сеансами */
+  localTimeControl: TimeControl | null;
+  setLocalTimeControl: (timeControl: TimeControl | null) => void;
+  /** Контроль времени идущей локальной игры (фиксируется на старте), null — без таймера */
+  gameTimeControl: TimeControl | null;
 
   // === timestamp начала игры ===
   gameStartTime: number | null;
@@ -80,8 +96,9 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set, get
   activeGame: null,
   reconnectError: null,
   serverPing: null,
-  turnTimerRemaining: null,
-  turnDeadline: null,
+  clockSnapshot: null,
+  localTimeControl: loadLocalTimeControl(),
+  gameTimeControl: null,
   gameStartTime: null,
   gameEndTime: null,
 
@@ -113,12 +130,13 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set, get
     set({ serverPing: ping });
   },
 
-  setTurnTimerRemaining: (remaining) => {
-    set({ turnTimerRemaining: remaining });
+  setClockSnapshot: (snapshot) => {
+    set({ clockSnapshot: snapshot });
   },
 
-  setTurnDeadline: (deadline) => {
-    set({ turnDeadline: deadline });
+  setLocalTimeControl: (timeControl) => {
+    saveLocalTimeControl(timeControl);
+    set({ localTimeControl: timeControl });
   },
 
   setGameStartTime: (time) => {

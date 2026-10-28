@@ -6,6 +6,7 @@ import type { GameSocket } from '@/network/socket';
 import { useGameStore } from '@/state/useGameStore';
 import { loadConnectionInfo } from '@/network/persistence';
 import { toast } from '@/state/useToastStore';
+import { netLog } from '@/network/netLog';
 
 /** Ключ дедупликации для toast-ов статуса соединения (один toast, а не стопка) */
 const CONNECTION_TOAST = 'connection';
@@ -30,6 +31,33 @@ export function registerConnectionHandlers(socket: GameSocket): void {
   let hasConnectedBefore = false;
 
   // ============================================
+  // 📶 ПИНГ (индикатор задержки в главном меню)
+  // ============================================
+  let pingTimer: ReturnType<typeof setInterval> | null = null;
+
+  const measurePing = (): void => {
+    const startedAt = performance.now();
+    // timeout: нет ответа за 4 с → пинг неизвестен (null)
+    socket.timeout(4000).emit('net:ping', (err: Error | null) => {
+      useGameStore.getState().setServerPing(err ? null : Math.round(performance.now() - startedAt));
+    });
+  };
+
+  const startPing = (): void => {
+    stopPing();
+    measurePing();
+    pingTimer = setInterval(measurePing, 5000);
+  };
+
+  const stopPing = (): void => {
+    if (pingTimer !== null) {
+      clearInterval(pingTimer);
+      pingTimer = null;
+    }
+    useGameStore.getState().setServerPing(null);
+  };
+
+  // ============================================
   // 🔌 БАЗОВЫЕ СОБЫТИЯ ПОДКЛЮЧЕНИЯ
   // ============================================
   socket.on('connect', () => {
@@ -46,7 +74,7 @@ export function registerConnectionHandlers(socket: GameSocket): void {
     if (store.roomId && store.playerId && store.sessionToken) {
       // 🌟 Мы были в комнате → просим сервер вернуть нас на место.
       // Ответ: lobby:reconnect-success (снапшот) или lobby:reconnect-failed.
-      console.log(`🔄 [StateSync] Связь восстановлена — возвращаемся в комнату ${store.roomId}`);
+      netLog(`🔄 [StateSync] Связь восстановлена — возвращаемся в комнату ${store.roomId}`);
       socket.emit('lobby:reconnect', {
         playerId: store.playerId,
         roomId: store.roomId,
@@ -67,10 +95,13 @@ export function registerConnectionHandlers(socket: GameSocket): void {
     if (store.isBrowsingRooms) {
       socket.emit('lobby:subscribe-rooms');
     }
+
+    startPing();
   });
 
   socket.on('disconnect', (reason) => {
     useGameStore.getState()._setConnected(false);
+    stopPing();
 
     // Намеренное отключение (destroySocket) — не повод для тревоги
     if (reason === 'io client disconnect') return;
@@ -119,7 +150,7 @@ export function registerConnectionHandlers(socket: GameSocket): void {
   // 🔍 ПРОВЕРКА АКТИВНЫХ ИГР (кнопка "Продолжить")
   // ============================================
   socket.on('session:active-games', ({ game }) => {
-    console.log(`🔍 [StateSync] Активная игра: ${game ? game.roomId : 'нет'}`);
+    netLog(`🔍 [StateSync] Активная игра: ${game ? game.roomId : 'нет'}`);
     useGameStore.getState().setActiveGame(game);
   });
 }

@@ -1,0 +1,80 @@
+/* ============================================
+   🕐 НАСТРОЙКА ВРЕМЕНИ (слайдеры + пресеты)
+   Каркас панели (settingsPanel/sectionTitle/settingRow) — из lobby.module.css.
+   ============================================ */
+
+.summary {
+  margin: 4px 0 10px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.sliderRow {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.sliderLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.sliderLabel b {
+  color: #fff;
+}
+
+.slider {
+  width: 100%;
+  accent-color: #4a90e2;
+  cursor: pointer;
+}
+
+.slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.presets {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.preset {
+  flex: 1;
+  padding: 7px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.preset:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.preset:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.presetActive {
+  background: rgba(74, 144, 226, 0.25);
+  border-color: #4a90e2;
+  color: #fff;
+}
+
+.hint {
+  margin: 0;
+  color: #888;
+  font-size: 12px;
+  line-height: 1.4;
+}

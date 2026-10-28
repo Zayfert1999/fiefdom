@@ -4,6 +4,7 @@
 
 import type { PlayerConnection } from '../state/PlayerConnection';
 import type { ServerGameState } from '../state/ServerGameState';
+import type { ServerEventName, ServerEventArgs } from '../types';
 
 /**
  * 🌟 Инкапсулирует логику рассылки событий игрокам.
@@ -23,10 +24,10 @@ export class RoomBroadcaster {
      * Отправить событие ВСЕМ подключённым игрокам.
      * Отключённые игроки пропускаются.
      */
-    broadcast(event: string, data: unknown): void {
+    broadcast<E extends ServerEventName>(event: E, ...args: ServerEventArgs<E>): void {
         for (const conn of this.players.values()) {
             if (!conn.isDisconnected) {
-                conn.emit(event, data);
+                conn.emit(event, ...args);
             }
         }
     }
@@ -35,10 +36,10 @@ export class RoomBroadcaster {
      * Отправить событие всем подключённым игрокам, КРОМЕ одного
      * (например, «игрок вернулся» не нужно слать самому вернувшемуся).
      */
-    broadcastExcept(excludePlayerId: string, event: string, data: unknown): void {
+    broadcastExcept<E extends ServerEventName>(excludePlayerId: string, event: E, ...args: ServerEventArgs<E>): void {
         for (const conn of this.players.values()) {
             if (conn.id !== excludePlayerId && !conn.isDisconnected) {
-                conn.emit(event, data);
+                conn.emit(event, ...args);
             }
         }
     }

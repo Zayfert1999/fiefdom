@@ -2,7 +2,7 @@
 // 🌟 Комната: фасад для лобби и игры.
 // Делегирует работу специализированным модулям.
 
-import type { Socket } from 'socket.io';
+import type { GameSocket, ServerEventName, ServerEventArgs } from '../types';
 import type { RoomSettings, RoomInfo, LobbyPlayer } from '@fiefdom/shared/protocol/events';
 import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
 import type { PlayerConnection } from '../state/PlayerConnection';
@@ -13,6 +13,12 @@ import { RoomGameLoop } from './RoomGameLoop';
 import type { RoomSnapshot, SnapshotPlayer } from '@fiefdom/shared/protocol/events';
 import type { ErrorCode } from '@fiefdom/shared/protocol/errors';
 import { logger } from '../utils/logger';
+
+/**
+ * Сколько ждём игрока, потерявшего соединение в ЛОББИ (хоста и остальных одинаково).
+ * Не вернулся — исключается из комнаты; если это был хост, роль переходит другому.
+ */
+const LOBBY_DISCONNECT_GRACE_MS = 15_000;
 
 /**
  * 🌟 Комната — фасад для управления лобби и игрой.
@@ -32,6 +38,14 @@ export class Room {
   private broadcaster: RoomBroadcaster;
   private playerManager: RoomPlayerManager;
   private gameLoop: RoomGameLoop;
+  /** Таймеры исключения из лобби: playerId → таймер (идёт, пока игрок офлайн) */
+  private lobbyEvictionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * Вызывается после исключения игрока по таймауту (комната могла опустеть,
+   * список комнат — измениться). Подключает RoomManager.
+   */
+  public onLobbyEviction: (() => void) | null = null;
 
   constructor(id: string, settings: RoomSettings, host: PlayerConnection, preferredColor?: string) {
     this.id = id;
@@ -63,8 +77,8 @@ export class Room {
   // ============================================
 
   /** Отправить событие ВСЕМ подключённым игрокам */
-  broadcast(event: string, data: unknown): void {
-    this.broadcaster.broadcast(event, data);
+  broadcast<E extends ServerEventName>(event: E, ...args: ServerEventArgs<E>): void {
+    this.broadcaster.broadcast(event, ...args);
   }
 
   /** Разослать состояние игры */
@@ -83,12 +97,85 @@ export class Room {
 
   /** Удалить игрока из комнаты */
   removePlayer(playerId: string): void {
+    this.clearLobbyEviction(playerId);
     this.hostId = this.playerManager.removePlayer(playerId, this.hostId);
   }
 
   /** Пометить игрока как отключённого */
   markPlayerDisconnected(playerId: string): void {
     this.playerManager.markPlayerDisconnected(playerId);
+    // В игре — запускаем отсчёт до автопропуска хода (если ходит этот игрок)
+    this.gameLoop.onConnectionChanged();
+    // В лобби — даём LOBBY_DISCONNECT_GRACE_MS на возвращение, затем исключаем
+    this.scheduleLobbyEviction(playerId);
+  }
+
+  /**
+   * 🚪 Игрок явно вышел из ИДУЩЕЙ игры: помечаем отключённым и выбывшим.
+   * Если сейчас его ход — он пропускается сразу, без таймера.
+   */
+  handlePlayerLeftGame(playerId: string): void {
+    this.markPlayerDisconnected(playerId);
+    this.gameLoop.onPlayerLeft(playerId);
+  }
+
+  /** Игрок подал признак жизни в свой ход (сбрасывает отсчёт бездействия) */
+  handleActivity(playerId: string): void {
+    this.gameLoop.noteActivity(playerId);
+  }
+
+  /** Выбыл ли игрок из партии (вышел или пропустил слишком много ходов) */
+  isPlayerAbandoned(playerId: string): boolean {
+    return this.gameLoop.isPlayerAbandoned(playerId);
+  }
+
+  // ============================================
+  // ⏳ ИСКЛЮЧЕНИЕ ОТКЛЮЧИВШИХСЯ ИЗ ЛОББИ
+  // ============================================
+
+  /**
+   * Игрок потерял соединение в лобби: через LOBBY_DISCONNECT_GRACE_MS исключаем его
+   * (с передачей хоста, если он был хостом). Короткий обрыв или перезагрузка
+   * страницы ничего не отнимают. Только для лобби: в игре действует другая политика.
+   */
+  private scheduleLobbyEviction(playerId: string): void {
+    if (this.gameState.isGameStarted) return;
+    if (this.lobbyEvictionTimers.has(playerId)) return;
+
+    const conn = this.players.get(playerId);
+    if (!conn || !conn.isDisconnected) return;
+
+    logger.info('[Room]', `⏳ ${conn.name} отключился в лобби ${this.id}: ждём ${LOBBY_DISCONNECT_GRACE_MS / 1000}с`);
+    const timer = setTimeout(() => this.evictFromLobby(playerId), LOBBY_DISCONNECT_GRACE_MS);
+    this.lobbyEvictionTimers.set(playerId, timer);
+  }
+
+  private clearLobbyEviction(playerId: string): void {
+    const timer = this.lobbyEvictionTimers.get(playerId);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    this.lobbyEvictionTimers.delete(playerId);
+  }
+
+  private evictFromLobby(playerId: string): void {
+    this.lobbyEvictionTimers.delete(playerId);
+
+    // Состояние могло измениться за время ожидания
+    if (this.gameState.isGameStarted) return;
+    const conn = this.players.get(playerId);
+    if (!conn || !conn.isDisconnected) return;
+
+    logger.warn('[Room]', `🚪 ${conn.name} не вернулся за ${LOBBY_DISCONNECT_GRACE_MS / 1000}с → исключён из лобби ${this.id}`);
+
+    // removePlayer сам выберет нового хоста (предпочитая игрока онлайн), если уходит хост
+    this.removePlayer(playerId);
+    this.broadcast('lobby:player-left', {
+      playerId,
+      newHostId: this.hostId,
+      reason: 'timeout',
+    });
+
+    this.onLobbyEviction?.();
   }
 
   /**
@@ -110,18 +197,33 @@ export class Room {
   }
 
   /** Восстановить игрока в комнате */
-  reconnectPlayer(oldPlayerId: string, newSocket: Socket, sessionToken: string): {
+  reconnectPlayer(oldPlayerId: string, newSocket: GameSocket, sessionToken: string): {
     success: boolean;
     reason?: string;
     snapshot?: RoomSnapshot;
   } {
-    return this.playerManager.reconnectPlayer(
+    // 🚪 Выбывший из партии игрок (вышел / пропустил 3 хода подряд) вернуться не может
+    if (this.gameState.isGameStarted && this.isPlayerAbandoned(oldPlayerId)) {
+      return {
+        success: false,
+        reason: 'Вы выбыли из этой игры (выход или 3 пропущенных хода подряд)',
+      };
+    }
+
+    const result = this.playerManager.reconnectPlayer(
       oldPlayerId,
       newSocket,
       sessionToken,
       this.hostId,
       (viewerId) => this.getSnapshot(viewerId)
     );
+
+    if (result.success) {
+      // Вернулся ходивший игрок — отменяем автопропуск; вернулся из лобби — отменяем исключение
+      this.gameLoop.onConnectionChanged();
+      this.clearLobbyEviction(oldPlayerId);
+    }
+    return result;
   }
 
   // ============================================
@@ -130,6 +232,11 @@ export class Room {
 
   /** Инициализация игры БЕЗ начала хода */
   initializeGame(): void {
+    // Игра стартует — ожидание возвращения игроков лобби больше не нужно
+    for (const timer of this.lobbyEvictionTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.lobbyEvictionTimers.clear();
     this.gameLoop.initializeGame();
   }
 
@@ -164,7 +271,7 @@ export class Room {
       hostName: host?.name ?? 'Unknown',
       playerCount: this.players.size,
       maxPlayers: this.settings.maxPlayers,
-      turnTimerSeconds: this.settings.turnTimerSeconds,
+      timeControl: this.settings.timeControl,
       isPrivate: this.settings.isPrivate,
       isPlaying: this.gameState.isGameStarted,
     };
@@ -232,6 +339,10 @@ export class Room {
 
   /** Освободить ресурсы */
   dispose(): void {
+    for (const timer of this.lobbyEvictionTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.lobbyEvictionTimers.clear();
     this.gameLoop.dispose();
   }
 

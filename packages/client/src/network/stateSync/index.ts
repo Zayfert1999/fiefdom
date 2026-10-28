@@ -7,6 +7,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { registerConnectionHandlers } from './connectionHandlers';
 import { registerLobbyHandlers } from './lobbyHandlers';
 import { registerGameHandlers } from './gameHandlers';
+import { netLog } from '@/network/netLog';
 
 // Реэкспортируем applyServerState для внешнего использования (если нужно)
 export { applyServerState } from './applyServerState';
@@ -31,7 +32,7 @@ export function registerStateSync(socket: GameSocket): void {
   // 🛡️ ЗАЩИТА: если уже зарегистрированы — пропускаем
   // ============================================
   if (handlersRegistered) {
-    console.log(`🔄 [StateSync] Обработчики уже зарегистрированы — пропускаем`);
+    netLog(`🔄 [StateSync] Обработчики уже зарегистрированы — пропускаем`);
 
     // Всё равно проверяем текущее состояние подключения
     if (socket.connected) {
@@ -42,7 +43,7 @@ export function registerStateSync(socket: GameSocket): void {
   }
   handlersRegistered = true;
 
-  console.log(`🔄 [StateSync] Регистрация обработчиков серверных событий`);
+  netLog(`🔄 [StateSync] Регистрация обработчиков серверных событий`);
 
   // ============================================
   // 🔌 RACE CONDITION FIX
@@ -50,7 +51,7 @@ export function registerStateSync(socket: GameSocket): void {
   // синхронизируем состояние сразу
   // ============================================
   if (socket.connected) {
-    console.log(`🔌 [StateSync] Сокет уже подключён — синхронизируем состояние`);
+    netLog(`🔌 [StateSync] Сокет уже подключён — синхронизируем состояние`);
     useGameStore.getState()._setConnected(true);
     useGameStore.getState()._setConnectionError(null);
     useGameStore.getState()._setReconnecting(false);
@@ -63,7 +64,7 @@ export function registerStateSync(socket: GameSocket): void {
   registerLobbyHandlers(socket);
   registerGameHandlers(socket);
 
-  console.log(`✅ [StateSync] Все обработчики зарегистрированы`);
+  netLog(`✅ [StateSync] Все обработчики зарегистрированы`);
 }
 
 /**
@@ -72,5 +73,5 @@ export function registerStateSync(socket: GameSocket): void {
  */
 export function unregisterStateSync(): void {
   handlersRegistered = false;
-  console.log(`🔄 [StateSync] Флаг регистрации сброшен`);
+  netLog(`🔄 [StateSync] Флаг регистрации сброшен`);
 }

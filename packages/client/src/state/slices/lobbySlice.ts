@@ -110,7 +110,13 @@ export const createLobbySlice: StateCreator<GameStore, [], [], LobbySlice> = (se
 
         // Инициализируем игру с игроками из лобби
         get().initGame(state.lobbyPlayers);
-        set({ phase: 'startTurn', gameStartTime: Date.now() });
+        // 🕐 Контроль времени фиксируется на старте партии (null — играем без таймера)
+        set({
+            phase: 'startTurn',
+            gameStartTime: Date.now(),
+            gameTimeControl: state.localTimeControl,
+            clockSnapshot: null,
+        });
         console.log(`🎮 [Store] Игра начата с ${state.lobbyPlayers.length} игроками`);
     },
 
@@ -144,6 +150,8 @@ export const createLobbySlice: StateCreator<GameStore, [], [], LobbySlice> = (se
             lastPlacedTiles: new Map(),
             gameStartTime: null,
             gameEndTime: null,
+            clockSnapshot: null,
+            gameTimeControl: null,
         });
         // Возвращаемся в главное меню
         get().setLobbyScreen('modeSelect');

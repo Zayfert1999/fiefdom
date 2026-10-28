@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { SessionSettings } from '@/components/lobby/SessionSettings';
 import { RoomBrowser } from '@/components/lobby/RoomBrowser';
+import { TimeControlSettings } from '@/components/lobby/TimeControlSettings';
+import { DEFAULT_TIME_CONTROL, formatTimeControl, normalizeTimeControl, type TimeControl } from '@fiefdom/shared/core/fischerClock';
 
 // 🌟 Единый CSS-модуль для всех лобби
 import styles from '@/components/styles/lobby.module.css';
@@ -18,7 +20,8 @@ export const NetworkLobby = () => {
 
   const [roomId, setRoomId] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [turnTimer, setTurnTimer] = useState(60);
+  // 🕐 Часы Фишера: в онлайн-игре таймер обязателен (null здесь невозможен)
+  const [timeControl, setTimeControl] = useState<TimeControl>(DEFAULT_TIME_CONTROL);
   const [showRegions, setShowRegions] = useState(true);
   const [showDeadCells, setShowDeadCells] = useState(true);
   const [enabledDeckView, setEnabledDeckView] = useState(true);
@@ -54,8 +57,8 @@ export const NetworkLobby = () => {
     if (!profileName.trim()) return;
     createRoom(profileName.trim(), {
       isPrivate,
-      // 🌟 Значение из поля может быть пустым/дробным/вне диапазона — сервер такое отклонит
-      turnTimerSeconds: Math.min(300, Math.max(0, Math.floor(turnTimer) || 0)),
+      // Слайдеры уже ограничивают диапазон; normalize — страховка (сервер всё равно перепроверит)
+      timeControl: normalizeTimeControl(timeControl),
       maxPlayers: 5,
       // 🌟 Передаём настройки сессии по умолчанию
       showRegions,
@@ -174,17 +177,11 @@ export const NetworkLobby = () => {
             <span className={styles.settingLabel}>🔒 Приватная комната (скрыта из списка, вход по коду)</span>
           </label>
 
-          <label className={styles.labelColumn}>
-            <span>⏱️ Таймер на ход (секунды)</span>
-            <input
-              type="number"
-              min={0}
-              max={300}
-              value={turnTimer}
-              onChange={(e) => setTurnTimer(Number(e.target.value))}
-              className={styles.input}
-            />
-          </label>
+          {/* 🕐 Время на партию: слайдеры + пресеты (отключить таймер нельзя) */}
+          <TimeControlSettings
+            value={timeControl}
+            onChange={(value) => setTimeControl(value ?? DEFAULT_TIME_CONTROL)}
+          />
 
           {/*  Настройки сессии */}
           <SessionSettings
@@ -330,7 +327,7 @@ export const NetworkLobby = () => {
           {/* Информация о комнате */}
           {roomSettings && (
             <p className={styles.roomInfo}>
-              ⏱️ Таймер: {roomSettings.turnTimerSeconds} сек |{' '}
+              ⏱️ Время: {formatTimeControl(roomSettings.timeControl)} |{' '}
               {roomSettings.isPrivate ? '🔒 Приватная' : '🌐 Публичная'}
             </p>
           )}

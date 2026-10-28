@@ -239,6 +239,22 @@
   color: #aaa;
 }
 
+/* === Часы игрока (банк времени) === */
+.playerClock {
+  color: #999;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.playerClockRunning {
+  color: #fff;
+  font-weight: 600;
+}
+
+.playerClockLow {
+  color: #ff6b6b;
+}
+
 /* === Бейдж отключения === */
 .disconnectBadge {
   position: absolute;

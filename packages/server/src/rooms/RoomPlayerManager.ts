@@ -2,7 +2,7 @@
 // 🌟 Управление игроками в комнате.
 // Отделён от Room для чёткого разделения ответственности.
 
-import type { Socket } from 'socket.io';
+import type { GameSocket } from '../types';
 import type { Player } from '@fiefdom/shared/core/types';
 import type { RoomSettings, LobbyPlayer } from '@fiefdom/shared/protocol/events';
 import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
@@ -82,7 +82,9 @@ export class RoomPlayerManager {
 
     // Передача хоста, если ушёл хост
     if (currentHostId === playerId && this.players.size > 0) {
-      const newHost = Array.from(this.players.values())[0];
+      // Предпочитаем игрока онлайн: хост-призрак не сможет начать игру
+      const remaining = Array.from(this.players.values());
+      const newHost = remaining.find(p => !p.isDisconnected) ?? remaining[0];
       logger.info('[PlayerManager]', `Новый хост: ${newHost.name}`);
       return newHost.id;
     }
@@ -122,7 +124,7 @@ export class RoomPlayerManager {
    */
   reconnectPlayer(
     oldPlayerId: string,
-    newSocket: Socket,
+    newSocket: GameSocket,
     sessionToken: string,
     hostId: string,
     getSnapshot: (viewerId: string) => RoomSnapshot

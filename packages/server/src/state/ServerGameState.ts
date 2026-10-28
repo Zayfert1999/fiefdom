@@ -32,6 +32,13 @@ export class ServerGameState {
   public deck: Tile[] = [];
   public totalTiles: number = 0;
   public currentTurn = 0;
+
+  /**
+   * 🚪 Игроки, выбывшие из партии (вышли сами или пропустили слишком много ходов
+   * офлайн). В очереди ходов они пропускаются автоматически и без таймера,
+   * но их очки и миплы на доске остаются и учитываются в финальном подсчёте.
+   */
+  private leftPlayerIds = new Set<string>();
   public drawnTile: Tile | null = null;
   public phase: ServerPhase = 'lobby';
   public seed: string = '';
@@ -60,6 +67,7 @@ export class ServerGameState {
     this.currentTurn = 0;
     this.phase = 'playing';
     this.lastPlacedTiles = {};
+    this.leftPlayerIds.clear();
 
     // 🌟 Стартовый тайл в центре (0,0)
     const startingTile = this.deck.pop();
@@ -207,14 +215,38 @@ export class ServerGameState {
     return {};
   }
 
-  /** Пропуск хода (таймаут или автопропуск). Возвращает тайл в колоду */
+  /**
+   * Пропуск хода (таймаут или автопропуск).
+   * 🗑️ Тайл из руки ВЫБРАСЫВАЕТСЯ (в колоду не возвращается): иначе при игроках,
+   * которые не ходят, один и тот же тайл вечно ходил бы по кругу, а партия не заканчивалась.
+   */
   skipTurn(): void {
     if (this.drawnTile) {
-      this.deck.push(this.drawnTile);
+      logger.info('[GameState]', `Тайл ${this.drawnTile.id} выброшен из-за пропуска хода`);
       this.drawnTile = null;
-      logger.info('[GameState]', `Тайл возвращён в колоду из-за пропуска хода`);
     }
     this.nextTurn();
+  }
+
+  // ============================================
+  // 🚪 ВЫБЫВШИЕ ИГРОКИ
+  // ============================================
+
+  /** Пометить игрока выбывшим. @returns false, если он уже был выбывшим / не найден */
+  markPlayerLeft(playerId: string): boolean {
+    if (this.leftPlayerIds.has(playerId)) return false;
+    if (!this.players.some(p => p.id === playerId)) return false;
+    this.leftPlayerIds.add(playerId);
+    return true;
+  }
+
+  isPlayerLeft(playerId: string): boolean {
+    return this.leftPlayerIds.has(playerId);
+  }
+
+  /** Сколько игроков ещё участвуют в партии */
+  get activePlayerCount(): number {
+    return this.players.length - this.leftPlayerIds.size;
   }
 
   /** Проверка завершённых регионов после установки тайла */
@@ -279,7 +311,11 @@ export class ServerGameState {
 
   /** Переход к следующему игроку */
   nextTurn(): void {
-    this.currentTurn = (this.currentTurn + 1) % this.players.length;
+    // Выбывшие игроки пропускаются автоматически (без таймера и без выдачи тайла)
+    for (let i = 0; i < this.players.length; i++) {
+      this.currentTurn = (this.currentTurn + 1) % this.players.length;
+      if (!this.leftPlayerIds.has(this.currentPlayer.id)) break;
+    }
     logger.info('[GameState]', `Ход передан: ${this.currentPlayer.name}`);
   }
 

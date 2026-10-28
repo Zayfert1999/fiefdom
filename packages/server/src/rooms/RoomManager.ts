@@ -51,6 +51,19 @@ export class RoomManager {
 
   addRoom(room: Room): void {
     this.rooms.set(room.id, room);
+
+    // 🌟 Игрок исключён из лобби по таймауту (потерял соединение > 15 с):
+    // пустую комнату удаляем, иначе просто обновляем список комнат
+    room.onLobbyEviction = () => {
+      if (room.players.size === 0) {
+        room.dispose();
+        this.removeRoom(room.id);
+        logger.info('[RoomManager]', `🗑️ Комната ${room.id} удалена (все игроки исключены по таймауту)`);
+      } else {
+        this.notifyRoomsChanged();
+      }
+    };
+
     logger.info('[RoomManager]', `Комната ${room.id} создана (всего: ${this.rooms.size})`);
     this.notifyRoomsChanged();
   }
@@ -196,6 +209,8 @@ export class RoomManager {
       const conn = room.players.get(playerId);
       // 🔐 Чужие игры не раскрываем: нужен и playerId, и токен сессии
       if (!conn || !conn.verifySessionToken(sessionToken)) continue;
+      // 🚪 Из этой партии игрок выбыл — «Продолжить» предлагать нечего
+      if (room.isGameStarted && room.isPlayerAbandoned(playerId)) continue;
 
       const disconnectedAt = conn.disconnectedAt ?? 0;
 

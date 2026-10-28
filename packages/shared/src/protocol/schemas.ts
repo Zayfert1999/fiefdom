@@ -3,6 +3,7 @@
 // Сервер использует их для проверки клиентских запросов
 
 import { z } from 'zod';
+import { TIME_CONTROL_LIMITS } from '../core/fischerClock';
 
 // ============================================
 // 🏠 Лобби
@@ -12,7 +13,12 @@ export const CreateRoomSchema = z.object({
   playerName: z.string().min(1).max(20),
   settings: z.object({
     isPrivate: z.boolean(),
-    turnTimerSeconds: z.number().min(0).max(300),
+    // 🕐 Часы Фишера. Таймер обязателен (отключить нельзя) — границы совпадают
+    // с TIME_CONTROL_LIMITS, по которым настроены слайдеры в интерфейсе
+    timeControl: z.object({
+      baseSeconds: z.number().int().min(TIME_CONTROL_LIMITS.baseSeconds.min).max(TIME_CONTROL_LIMITS.baseSeconds.max),
+      incrementSeconds: z.number().int().min(TIME_CONTROL_LIMITS.incrementSeconds.min).max(TIME_CONTROL_LIMITS.incrementSeconds.max),
+    }),
     maxPlayers: z.number().min(2).max(5),
     showRegions: z.boolean().default(true),
     showDeadCells: z.boolean().default(true),
@@ -53,8 +59,6 @@ export const ReconnectSchema = z.object({
   playerId: z.string().min(1).max(64),
   sessionToken: z.string().min(1).max(128),
 });
-
-export const ChatMessageSchema = z.string().min(1).max(500);
 
 // ============================================
 // 👢 Кик игрока

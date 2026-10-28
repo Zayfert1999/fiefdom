@@ -10,6 +10,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import styles from '@/components/styles/game.module.css';
 import type { Player } from '@fiefdom/shared/core/types';
 import { darkenColor } from '@/utils/color';
+import { formatClock } from '@fiefdom/shared/core/fischerClock';
 
 // Ленивые импорты модалок
 const HotkeysModal = lazy(() => import('@/components/hotKeysModal').then(m => ({ default: m.HotkeysModal })));
@@ -31,9 +32,11 @@ export const GameHUD: React.FC = () => {
     const isConnected = useGameStore(s => s.isConnected);
     const isReconnecting = useGameStore(s => s.isReconnecting);
     const enabledDeckView = useGameStore(s => s.enabledDeckView);
-    const turnTimerRemaining = useGameStore(s => s.turnTimerRemaining);
-    const turnDeadline = useGameStore(s => s.turnDeadline);
-    const turnTimerTotal = useGameStore(s => s.roomSettings?.turnTimerSeconds ?? 0);
+    // 🕐 Шахматные часы: онлайн — настройка комнаты, локально — настройка партии (null = без таймера)
+    const clockSnapshot = useGameStore(s => s.clockSnapshot);
+    const timeControl = useGameStore(s =>
+        s.roomId !== null ? (s.roomSettings?.timeControl ?? null) : s.gameTimeControl
+    );
     const exitToLobby = useGameStore(s => s.exitToLobby);
 
     // ============================================
@@ -162,9 +165,10 @@ export const GameHUD: React.FC = () => {
                                         isActive={isActive}
                                         isSelf={isSelf}
                                         isDisconnected={isDisconnected}
-                                        timerRemaining={isActive ? turnTimerRemaining : null}
-                                        timerTotal={turnTimerTotal}
-                                        turnDeadline={isActive ? turnDeadline : null}
+                                        baseSeconds={timeControl?.baseSeconds ?? 0}
+                                        clockBankMs={timeControl && clockSnapshot ? (clockSnapshot.banksMs[player.id] ?? null) : null}
+                                        clockReceivedAt={clockSnapshot?.receivedAt ?? 0}
+                                        clockRunning={clockSnapshot?.activePlayerId === player.id}
                                     />
                                 );
                             })}
@@ -200,19 +204,30 @@ interface PlayerCardProps {
     isActive: boolean;
     isSelf: boolean;
     isDisconnected: boolean;
-    timerRemaining: number | null;
-    timerTotal: number;
-    turnDeadline: number | null;
+    /** Основное время партии, сек (0 — таймера нет) */
+    baseSeconds: number;
+    /** Банк игрока на момент clockReceivedAt, мс (null — часов нет) */
+    clockBankMs: number | null;
+    clockReceivedAt: number;
+    /** Часы этого игрока идут сейчас */
+    clockRunning: boolean;
 }
 
-const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, timerTotal, turnDeadline }: PlayerCardProps) => {
+/** Остаток времени игрока на момент now (у игрока с идущими часами — с учётом тикающего времени) */
+const bankAt = (bankMs: number, receivedAt: number, running: boolean, now: number): number =>
+    Math.max(0, running ? bankMs - (now - receivedAt) : bankMs);
 
-    // Упрощённая логика: таймер активен если есть deadline и timerTotal > 0
-    const hasTimer = turnDeadline !== null && timerTotal > 0;
+const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, baseSeconds, clockBankMs, clockReceivedAt, clockRunning }: PlayerCardProps) => {
+
+    // Часы показываем у всех игроков, если в партии есть таймер
+    const hasTimer = clockBankMs !== null && baseSeconds > 0;
+    const timerTotal = baseSeconds;
 
     // ============================================
     // 🎨 Цвет базовой рамки
     // ============================================
+    // С таймером базовая рамка тёмная — на её фоне виден «банк времени»; активного игрока
+    // выделяет полная яркость кольца (часы идут) и класс playerCardActive
     const borderColor = (isActive && !hasTimer)
         ? player.color
         : darkenColor(player.color, 0.5);
@@ -245,42 +260,45 @@ const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, timerTotal,
     }, [hasTimer]);
 
     // ============================================
-    // 🌟 ПЛАВНЫЙ ТАЙМЕР ОТ DEADLINE
+    // 🌟 ПЛАВНЫЕ ЧАСЫ
+    // Показываем остаток банка (мс). У игрока с идущими часами остаток досчитывается
+    // от момента получения снимка (rAF); у остальных — статичное значение банка.
     // ============================================
-    const [displayProgress, setDisplayProgress] = useState<number>(0);
+    const [displayMs, setDisplayMs] = useState<number>(clockBankMs ?? 0);
     const rafRef = useRef<number | null>(null);
 
     useEffect(() => {
-        // Сброс при отсутствии таймера или deadline
-        if (!hasTimer || turnDeadline === null) {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            setDisplayProgress(0);
+        if (!hasTimer || clockBankMs === null) {
+            setDisplayMs(0);
             return;
         }
 
-        // 🌟 rAF цикл: вычисляем прогресс от реального времени до deadline
+        // Часы стоят: просто показываем банк
+        if (!clockRunning) {
+            setDisplayMs(clockBankMs);
+            return;
+        }
+
         const animate = () => {
-            const now = Date.now();
-            const remainingMs = Math.max(0, turnDeadline - now);
-            const remainingSeconds = remainingMs / 1000;
-            const progress = Math.max(0, (remainingSeconds / timerTotal) * 100);
-
-            setDisplayProgress(progress);
-
-            if (remainingSeconds > 0) {
+            const remaining = bankAt(clockBankMs, clockReceivedAt, true, Date.now());
+            setDisplayMs(remaining);
+            if (remaining > 0) {
                 rafRef.current = requestAnimationFrame(animate);
             }
         };
-
         rafRef.current = requestAnimationFrame(animate);
 
         return () => {
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
         };
-    }, [hasTimer, turnDeadline, timerTotal]);
+    }, [hasTimer, clockBankMs, clockReceivedAt, clockRunning]);
 
-    // 🌟 Пульсация от отображаемого прогресса (точнее, чем от timerRemaining)
-    const isPulsing = hasTimer && displayProgress <= (5 / timerTotal) * 100;
+    // Рамка показывает долю от основного времени (банк может превышать его за счёт инкремента)
+    const displayProgress = hasTimer ? Math.min(100, (displayMs / (timerTotal * 1000)) * 100) : 0;
+
+    // 🌟 Пульсация, когда осталось ≤ 10 секунд и часы идут
+    const isLowTime = hasTimer && displayMs <= 10_000;
+    const isPulsing = isLowTime && clockRunning;
 
     // ============================================
     // 🌟 Параметры SVG-таймера
@@ -316,6 +334,8 @@ const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, timerTotal,
                         strokeDasharray={strokeDasharray}
                         strokeDashoffset={strokeDashoffset}
                         stroke={player.color}
+                        // Часы стоят — кольцо приглушено; идут — на полную яркость
+                        style={{ opacity: clockRunning ? 1 : 0.4 }}
                     />
                 </svg>
             )}
@@ -340,6 +360,14 @@ const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, timerTotal,
             <div className={styles.playerStats}>
                 <span className={styles.playerScore}>🏆 {player.score}</span>
                 <span className={styles.playerMeeples}>🔶 {player.meepleCount}</span>
+                {hasTimer && (
+                    <span
+                        className={`${styles.playerClock} ${clockRunning ? styles.playerClockRunning : ''} ${isLowTime ? styles.playerClockLow : ''}`}
+                        title="Остаток времени на партию"
+                    >
+                        ⏱ {formatClock(displayMs)}
+                    </span>
+                )}
             </div>
         </div>
     );

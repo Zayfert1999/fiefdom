@@ -2,6 +2,7 @@
 // 🌟 Обёртка над socket.io-client.
 // Единственная точка создания socket-соединения.
 
+import { netLog } from '@/network/netLog';
 import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
@@ -36,7 +37,7 @@ export function getSocket(): GameSocket {
 
     // 🌟 Базовые логи для отладки
     socket.on('connect', () => {
-      console.log(`🔌 [Socket] Подключено: ${socket?.id}`);
+      netLog(`🔌 [Socket] Подключено: ${socket?.id}`);
     });
 
     socket.on('disconnect', (reason) => {
@@ -49,11 +50,11 @@ export function getSocket(): GameSocket {
 
     // 🌟 ИСПРАВЛЕНО: правильные имена событий (без "ion")
     socket.io.on('reconnect_attempt', (attempt: number) => {
-      console.log(`🔄 [Socket] Попытка переподключения #${attempt}`);
+      netLog(`🔄 [Socket] Попытка переподключения #${attempt}`);
     });
 
     socket.io.on('reconnect', () => {
-      console.log(`✅ [Socket] Переподключение успешно`);
+      netLog(`✅ [Socket] Переподключение успешно`);
     });
 
     socket.io.on('reconnect_failed', () => {
@@ -71,6 +72,6 @@ export function destroySocket(): void {
     socket.disconnect();
     socket.removeAllListeners();
     socket = null;
-    console.log(`🔌 [Socket] Соединение закрыто`);
+    netLog(`🔌 [Socket] Соединение закрыто`);
   }
 }

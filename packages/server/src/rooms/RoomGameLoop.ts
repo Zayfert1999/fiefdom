@@ -5,13 +5,59 @@
 import type { RoomSettings } from '@fiefdom/shared/protocol/events';
 import type { PlayerConnection } from '../state/PlayerConnection';
 import type { ServerGameState } from '../state/ServerGameState';
-import { TurnTimer } from '../services/TurnTimer';
+import { FischerClock, normalizeTimeControl } from '@fiefdom/shared/core/fischerClock';
 import type { RoomBroadcaster } from './RoomBroadcaster';
 import { generateGameSeed } from '@fiefdom/shared/prng/seedRandom';
 import { logger } from '../utils/logger';
 
 // 🌟 Время, в течение которого все видят мипла перед проверкой регионов
 const MEEPLE_VISIBLE_DELAY = 1000; // 1 секунда
+
+// ============================================
+// 🕳️ ПОЛИТИКА ДЛЯ ОТСУТСТВУЮЩИХ ИГРОКОВ
+// ============================================
+
+/**
+ * Сколько ждём отключённого игрока, чей сейчас ход (перезагрузка страницы,
+ * кратковременный обрыв). Не вернулся — ход пропускается, а тайл из его руки
+ * выбрасывается. Действует и при выключенном таймере хода, иначе игра
+ * зависала бы навсегда.
+ */
+const ABSENT_GRACE_MS = 20_000;
+
+/**
+ * Сколько ходов ПОДРЯД игрок может пропустить (офлайн, по бездействию или по времени).
+ * Достиг лимита — считается покинувшим игру: в очереди ходов он автоматически
+ * пропускается (без ожидания и без таймера), вернуться в партию уже нельзя.
+ * Удачный ход обнуляет счётчик.
+ */
+export const MAX_MISSED_TURNS = 3;
+
+// ============================================
+// 💤 AFK: ИГРОК НА СВЯЗИ, НО НЕ ХОДИТ
+// ============================================
+// Банк времени по Фишеру (например, 10 минут) — это время на ВСЮ партию. Если ждать,
+// пока AFK-игрок сожжёт банк целиком, остальные простоят до 10 минут. Поэтому на ход
+// действует ещё и лимит бездействия: клиент шлёт `game:activity` при любом действии
+// игрока (мышь, клавиши, касания); нет активности — ход пропускается задолго до
+// конца банка. Тратить банк на размышления это не мешает: пока игрок что-то
+// делает, лимит не срабатывает, ограничивают только часы.
+
+/** Сколько можно ничего не делать в свой ход */
+const IDLE_LIMIT_MS = 60_000;
+/** То же для игрока, который уже пропустил ход (подозрение на AFK — ждём меньше) */
+const IDLE_LIMIT_AFTER_MISS_MS = 25_000;
+/** За сколько до пропуска предупреждаем игрока (game:afk-warning) */
+const IDLE_WARNING_MS = 15_000;
+/** Период публикации часов и проверок */
+const TICK_MS = 1000;
+
+/**
+ * Если ходы пропускаются столько кругов подряд (по каждому игроку), игра
+ * считается брошенной и завершается подсчётом очков. Иначе при уходе всех
+ * игроков тайл возвращался бы в колоду бесконечно.
+ */
+const MAX_SKIP_ROUNDS = 2;
 
 /**
  * 🌟 Управляет игровым циклом:
@@ -22,13 +68,27 @@ const MEEPLE_VISIBLE_DELAY = 1000; // 1 секунда
  * - Конец игры
  */
 export class RoomGameLoop {
-    private turnTimer = new TurnTimer();
+    /** Часы Фишера (создаются в initializeGame) */
+    private clock: FischerClock | null = null;
+    private ticker: ReturnType<typeof setInterval> | null = null;
+    /** Когда игрок, чей сейчас ход, в последний раз подавал признаки жизни */
+    private lastActivityAt = 0;
+    private afkWarned = false;
 
     // 🌟 Отложенные шаги (пауза на мипла, анимации регионов, финал).
     // Хранятся, чтобы dispose() мог их отменить: иначе после удаления комнаты
     // они продолжили бы двигать игру «в пустоту» и запускать таймеры.
     private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
     private disposed = false;
+
+    // 🕳️ Отсутствующие игроки
+    private absentTimer: ReturnType<typeof setTimeout> | null = null;
+    /** Пропущенные ходы подряд среди ВСЕХ игроков (сбрасывается любым удачным ходом) */
+    private consecutiveSkips = 0;
+    /** Подряд пропущенные ходы каждого игрока (3 → выбывает; сбрасывается удачным ходом) */
+    private missedTurns = new Map<string, number>();
+    /** Игра уже завершена (защита от повторного endGame) */
+    private ended = false;
 
     constructor(
         private players: Map<string, PlayerConnection>,
@@ -38,13 +98,159 @@ export class RoomGameLoop {
     ) { }
 
     /** setTimeout с учётом dispose(): после освобождения комнаты колбэк не вызывается */
-    private schedule(fn: () => void, delayMs: number): void {
+    private schedule(fn: () => void, delayMs: number): ReturnType<typeof setTimeout> {
         const id = setTimeout(() => {
             this.pendingTimeouts.delete(id);
             if (this.disposed) return;
             fn();
         }, delayMs);
         this.pendingTimeouts.add(id);
+        return id;
+    }
+
+    private cancel(id: ReturnType<typeof setTimeout>): void {
+        clearTimeout(id);
+        this.pendingTimeouts.delete(id);
+    }
+
+    // ============================================
+    // 🕳️ ОТСУТСТВУЮЩИЕ ИГРОКИ
+    // ============================================
+
+    private hasConnectedPlayers(): boolean {
+        for (const conn of this.players.values()) {
+            if (!conn.isDisconnected) return true;
+        }
+        return false;
+    }
+
+    private clearAbsentTimer(): void {
+        if (this.absentTimer !== null) {
+            this.cancel(this.absentTimer);
+            this.absentTimer = null;
+        }
+    }
+
+    /**
+     * Пересмотреть «сторожа»: нужно ли пропускать ход отключённого игрока.
+     * Идемпотентен — повторный вызов не сдвигает уже идущий отсчёт.
+     * Сторож работает только в окне хода (тайл выдан, ход ещё не сыгран),
+     * и только если в комнате остался кто-то онлайн: пустую комнату
+     * убирает RoomManager (cleanup), а игру ставить на «автопилот» некому.
+     */
+    private armAbsentWatch(): void {
+        const gs = this.gameState;
+        if (this.disposed || gs.phase !== 'playing' || !gs.drawnTile) {
+            this.clearAbsentTimer();
+            return;
+        }
+
+        const current = this.players.get(gs.currentPlayer.id);
+        const shouldWatch = !!current && current.isDisconnected && this.hasConnectedPlayers();
+        if (!shouldWatch) {
+            this.clearAbsentTimer();
+            return;
+        }
+        if (this.absentTimer !== null) return;
+
+        logger.info('[GameLoop]', `⏳ Ход игрока ${current?.name} (отключён): ждём ${ABSENT_GRACE_MS / 1000}с до пропуска`);
+        this.absentTimer = this.schedule(() => {
+            this.absentTimer = null;
+            this.skipCurrentTurn('absent');
+        }, ABSENT_GRACE_MS);
+    }
+
+    /** Room сообщает, что кто-то отключился или вернулся */
+    onConnectionChanged(): void {
+        this.armAbsentWatch();
+    }
+
+    // ============================================
+    // 🕐 ЧАСЫ И AFK-КОНТРОЛЬ
+    // ============================================
+
+    private broadcastClocks(now = Date.now()): void {
+        if (!this.clock) return;
+        this.broadcaster.broadcast('game:timer-update', {
+            banksMs: this.clock.snapshot(now),
+            activePlayerId: this.clock.activePlayerId,
+        });
+    }
+
+    private startTicker(): void {
+        this.stopTicker();
+        this.ticker = setInterval(() => this.tick(), TICK_MS);
+    }
+
+    private stopTicker(): void {
+        if (this.ticker !== null) {
+            clearInterval(this.ticker);
+            this.ticker = null;
+        }
+    }
+
+    /** Окно хода открыто: тайл выдан, ход ещё не сыгран */
+    private isTurnInProgress(): boolean {
+        const gs = this.gameState;
+        return !this.disposed && !this.ended && gs.phase === 'playing' && !!gs.drawnTile;
+    }
+
+    /** Раз в секунду: публикуем часы, проверяем «упал флажок» и бездействие */
+    private tick(): void {
+        if (!this.isTurnInProgress() || !this.clock) {
+            this.stopTicker();
+            return;
+        }
+
+        // В комнате никого нет онлайн — часы стоят (иначе вернувшийся игрок застал бы пустой банк)
+        if (!this.hasConnectedPlayers()) {
+            this.clock.stop(Date.now());
+            return;
+        }
+        // Кто-то вернулся после паузы — продолжаем с того же места
+        if (this.clock.activePlayerId === null) {
+            this.clock.start(this.gameState.currentPlayer.id, Date.now());
+            this.lastActivityAt = Date.now();
+        }
+
+        const now = Date.now();
+        const playerId = this.gameState.currentPlayer.id;
+        this.broadcastClocks(now);
+
+        // 1) Время на часах закончилось
+        if (this.clock.isFlagged(playerId, now)) {
+            this.skipCurrentTurn('timeout');
+            return;
+        }
+
+        // 2) Бездействие (только для игроков на связи: отключённых обрабатывает сторож absent)
+        const conn = this.players.get(playerId);
+        if (!conn || conn.isDisconnected) return;
+
+        const idleLimit = (this.missedTurns.get(playerId) ?? 0) > 0
+            ? IDLE_LIMIT_AFTER_MISS_MS
+            : IDLE_LIMIT_MS;
+        const idleMs = now - this.lastActivityAt;
+
+        if (idleMs >= idleLimit) {
+            this.skipCurrentTurn('afk');
+            return;
+        }
+        const leftMs = idleLimit - idleMs;
+        if (leftMs <= IDLE_WARNING_MS && !this.afkWarned) {
+            this.afkWarned = true;
+            conn.emit('game:afk-warning', { secondsLeft: Math.ceil(leftMs / 1000) });
+        }
+    }
+
+    /**
+     * Игрок подал признак жизни (game:activity, ход, запрос синхронизации).
+     * Учитывается только для игрока, чей сейчас ход.
+     */
+    noteActivity(playerId: string): void {
+        if (!this.isTurnInProgress() || this.gameState.currentPlayer.id !== playerId) return;
+        this.lastActivityAt = Date.now();
+        this.afkWarned = false;
     }
 
     // ============================================
@@ -62,6 +268,14 @@ export class RoomGameLoop {
 
         this.gameState.initialize(playerProfiles, seed);
         this.gameState.gameStartTime = Date.now();
+
+        // 🕐 У каждого игрока — свой банк времени на всю партию (+ инкремент после каждого хода)
+        this.clock = new FischerClock(
+            playerProfiles.map(p => p.id),
+            normalizeTimeControl(this.settings.timeControl)
+        );
+        this.missedTurns.clear();
+        this.consecutiveSkips = 0;
 
         logger.info('[GameLoop]', `🎮 Игра инициализирована, seed=${seed}`);
     }
@@ -90,7 +304,7 @@ export class RoomGameLoop {
      * Начало хода текущего игрока: выдача тайла + таймер.
      */
     private beginTurn(): void {
-        if (this.disposed) return;
+        if (this.disposed || this.ended) return;
         const gs = this.gameState;
         logger.info('[GameLoop]', `🔄 beginTurn: игрок ${gs.currentPlayer.name}`);
 
@@ -107,29 +321,75 @@ export class RoomGameLoop {
             currentConn.emit('game:your-turn', { drawnTile: gs.drawnTile });
         }
 
-        this.turnTimer.start(
-            this.settings.turnTimerSeconds,
-            (remaining, deadline) => this.broadcaster.broadcast('game:timer-update', { remainingSeconds: remaining, deadline }),
-            () => this.handleTimeout()
-        );
+        // 🕐 Часы игрока пошли; бездействие считаем с начала хода
+        const now = Date.now();
+        this.clock?.start(gs.currentPlayer.id, now);
+        this.lastActivityAt = now;
+        this.afkWarned = false;
+        this.broadcastClocks(now);
+        this.startTicker();
+
+        // Если ходит отключённый игрок — запускаем отсчёт до автопропуска
+        this.armAbsentWatch();
     }
 
     /**
-     * ⏰ Таймаут: авто-пропуск хода.
+     * ⏭️ Пропуск хода сервером. Тайл из руки выбрасывается.
+     *  - timeout — на часах Фишера закончилось время;
+     *  - afk     — игрок на связи, но бездействует (см. IDLE_LIMIT_MS);
+     *  - absent  — игрок отключён и не вернулся за ABSENT_GRACE_MS;
+     *  - left    — игрок вышел из игры прямо в свой ход (без ожидания и без таймера).
+     *
+     * Любой пропуск, кроме `left`, засчитывается игроку как «пропущенный ход»;
+     * MAX_MISSED_TURNS таких ходов подряд — и игрок выбывает из партии.
+     * Инкремент за пропущенный ход НЕ начисляется.
      */
-    private handleTimeout(): void {
-        const skippedPlayer = this.gameState.currentPlayer;
-        logger.warn('[GameLoop]', `Игрок ${skippedPlayer.name} не успел → пропуск хода`);
+    private skipCurrentTurn(reason: 'timeout' | 'afk' | 'absent' | 'left'): void {
+        const gs = this.gameState;
+        // Защита от гонок: ход уже сыгран (идёт пауза после commit) или игра окончена
+        if (this.disposed || this.ended || gs.phase !== 'playing' || !gs.drawnTile) return;
 
-        // 🌟 Сообщаем всем, чей ход пропущен (клиенты покажут toast)
-        this.broadcaster.broadcast('game:turn-skipped', { playerId: skippedPlayer.id });
+        const skipped = gs.currentPlayer;
+        logger.warn('[GameLoop]', `Игрок ${skipped.name} → пропуск хода (${reason})`);
 
-        // Возвращаем тайл в колоду и передаём ход
-        this.gameState.skipTurn();
+        // Один из механизмов (часы/AFK/сторож) сработал — остальные больше не нужны
+        this.stopTicker();
+        this.clearAbsentTimer();
+        this.clock?.stop(Date.now()); // без инкремента
 
-        // Проверяем конец игры
-        if (this.gameState.deck.length === 0) {
-            this.endGame();
+        let missedTurns = 0;
+        if (reason !== 'left') {
+            missedTurns = (this.missedTurns.get(skipped.id) ?? 0) + 1;
+            this.missedTurns.set(skipped.id, missedTurns);
+        }
+
+        if (reason !== 'left') {
+            this.consecutiveSkips += 1;
+            // 🌟 Сообщаем всем, чей ход пропущен (клиенты покажут toast)
+            this.broadcaster.broadcast('game:turn-skipped', {
+                playerId: skipped.id,
+                reason,
+                missedTurns,
+                maxMissedTurns: MAX_MISSED_TURNS,
+            });
+        }
+
+        // Выбрасываем тайл и передаём ход (выбывшие игроки в очереди пропускаются)
+        gs.skipTurn();
+
+        // Выбытие игрока: сам вышел или исчерпал лимит пропусков
+        let ended = false;
+        if (reason === 'left') {
+            ended = this.abandonPlayer(skipped.id, 'left');
+        } else if (missedTurns >= MAX_MISSED_TURNS) {
+            ended = this.abandonPlayer(skipped.id, 'missed-turns');
+        }
+        if (ended) return;
+
+        // Все оставшиеся игроки пропускают ход несколько кругов подряд → игра брошена
+        if (this.consecutiveSkips >= Math.max(gs.activePlayerCount * MAX_SKIP_ROUNDS, 4)) {
+            logger.warn('[GameLoop]', `🏳️ ${this.consecutiveSkips} пропусков подряд → игра завершена досрочно`);
+            this.endGame('abandoned');
             return;
         }
 
@@ -138,12 +398,60 @@ export class RoomGameLoop {
         this.beginTurn();
     }
 
+    // ============================================
+    // 🚪 ВЫБЫТИЕ ИГРОКОВ
+    // ============================================
+
+    /**
+     * Игрок выбывает из партии.
+     * @returns true, если из-за этого игра завершилась (остался один игрок)
+     */
+    private abandonPlayer(playerId: string, reason: 'left' | 'missed-turns'): boolean {
+        const gs = this.gameState;
+        if (!gs.markPlayerLeft(playerId)) return false;
+
+        logger.warn('[GameLoop]', `🚪 Игрок ${playerId} выбыл из игры (${reason})`);
+        this.missedTurns.delete(playerId);
+        this.broadcaster.broadcast('game:player-abandoned', { playerId, reason });
+
+        // Остался один (или никого) — играть не с кем: подводим итоги
+        if (gs.activePlayerCount < 2 && gs.phase === 'playing') {
+            logger.warn('[GameLoop]', `🏳️ В игре остался ${gs.activePlayerCount} игрок → досрочное завершение`);
+            this.endGame('forfeit');
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Игрок явно вышел из игры (кнопка «Выйти»).
+     * Если сейчас его ход — пропускаем его сразу, без ожидания и без таймера;
+     * иначе просто помечаем выбывшим: очередь сама его пропустит.
+     */
+    onPlayerLeft(playerId: string): void {
+        const gs = this.gameState;
+        if (this.disposed || this.ended || gs.phase !== 'playing') return;
+
+        if (gs.currentPlayer.id === playerId && gs.drawnTile) {
+            this.skipCurrentTurn('left');
+            return;
+        }
+        this.abandonPlayer(playerId, 'left');
+    }
+
+    /** Выбыл ли игрок из партии */
+    isPlayerAbandoned(playerId: string): boolean {
+        return this.gameState.isPlayerLeft(playerId);
+    }
+
     /**
      * Переход к следующему ходу.
      * Вызывается после обработки хода или таймаута.
      */
     private proceedToNextTurn(): void {
         const gs = this.gameState;
+        // Игра могла закончиться за время паузы (например, все остальные вышли)
+        if (this.disposed || this.ended || gs.phase !== 'playing') return;
 
         // Проверяем конец игры
         if (gs.deck.length === 0) {
@@ -187,7 +495,16 @@ export class RoomGameLoop {
         }
 
         logger.info('[GameLoop]', `✅ commitMove принят (фаза 1: тайл + мипл)`);
-        this.turnTimer.stop();
+        this.stopTicker();
+        this.clearAbsentTimer();
+
+        // 🕐 Ход сделан: часы останавливаются, к банку добавляется инкремент
+        this.clock?.commit(Date.now());
+        this.broadcastClocks();
+
+        // Игрок жив и играет — сбрасываем счётчики пропусков
+        this.missedTurns.delete(playerId);
+        this.consecutiveSkips = 0;
 
         // Рассылаем move-committed
         this.broadcaster.broadcast('game:move-committed', {
@@ -263,8 +580,12 @@ export class RoomGameLoop {
     /**
      * Финальный подсчёт очков и завершение игры.
      */
-    private endGame(): void {
-        this.turnTimer.stop();
+    private endGame(reason: 'completed' | 'abandoned' | 'forfeit' = 'completed'): void {
+        if (this.ended) return;
+        this.ended = true;
+        this.stopTicker();
+        this.clock?.stop(Date.now());
+        this.clearAbsentTimer();
 
         // Финальный подсчёт
         const finalRegions = this.gameState.finalizeGame();
@@ -280,7 +601,7 @@ export class RoomGameLoop {
         // Ждём анимации перед финальным state
         const animationDelay = finalRegions.length * 3000;
         this.schedule(() => {
-            this.broadcaster.broadcast('game:over', { finalScores: this.gameState.players });
+            this.broadcaster.broadcast('game:over', { finalScores: this.gameState.players, reason });
             this.broadcaster.broadcastState();
         }, animationDelay);
     }
@@ -294,7 +615,8 @@ export class RoomGameLoop {
      */
     dispose(): void {
         this.disposed = true;
-        this.turnTimer.stop();
+        this.stopTicker();
+        this.absentTimer = null;
         for (const id of this.pendingTimeouts) {
             clearTimeout(id);
         }

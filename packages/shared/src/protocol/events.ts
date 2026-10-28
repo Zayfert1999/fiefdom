@@ -5,6 +5,7 @@
 import type { Player, Tile } from '../core/types';
 import type { SerializedGameState } from '../core/serialization';
 import type { CompletedRegion } from '../core/scoring'
+import type { TimeControl } from '../core/fischerClock';
 
 // ============================================
 // 📦 ТИПЫ ДАННЫХ
@@ -13,7 +14,8 @@ import type { CompletedRegion } from '../core/scoring'
 /** Настройки комнаты (задаются при создании) */
 export interface RoomSettings {
   isPrivate: boolean;       // Приватная (по коду) или публичная
-  turnTimerSeconds: number; // Таймер на ход (0 = без таймера)
+  /** Часы Фишера: основное время + инкремент за ход. Отключить нельзя (онлайн-игра). */
+  timeControl: TimeControl;
   maxPlayers: number;       // Максимум игроков (2-5)
   showRegions: boolean;
   showDeadCells: boolean;
@@ -36,7 +38,7 @@ export interface RoomInfo {
   hostName: string;
   playerCount: number;
   maxPlayers: number;
-  turnTimerSeconds: number;  // 0 = без таймера
+  timeControl: TimeControl;
   isPrivate: boolean;
   isPlaying: boolean;
 }
@@ -98,6 +100,19 @@ export interface RoomSnapshot {
 }
 
 // ============================================
+// ✅ ACK ХОДА
+// ============================================
+
+/**
+ * Ответ сервера на game:commit-move (socket.io acknowledgement).
+ * ok: true — ход принят (новое состояние придёт отдельным game:state-update);
+ * ok: false — ход отклонён, состояние игры не изменилось.
+ */
+export type MoveAck =
+  | { ok: true }
+  | { ok: false; code: string; message: string };
+
+// ============================================
 // 📤 CLIENT → SERVER (исходящие события)
 // ============================================
 
@@ -147,10 +162,21 @@ export interface ClientToServerEvents {
       x: number;
       y: number;
     } | null;  // null = пропуск мипла
-  }) => void;
+  }, ack?: (result: MoveAck) => void) => void;
 
-  // --- Чат (последняя очередь) ---
-  'chat:message': (text: string) => void;
+  /** Запросить актуальное состояние игры (если клиент подозревает рассинхрон) */
+  'game:request-sync': () => void;
+
+  /**
+   * «Я на месте»: клиент шлёт при любом действии игрока (движение мыши, клавиши, касания)
+   * во время своего хода, не чаще раза в пару секунд. Без активности ход пропускается (AFK).
+   */
+  'game:activity': () => void;
+
+  // --- Служебное ---
+  /** Замер задержки: сервер сразу вызывает ack */
+  'net:ping': (ack: () => void) => void;
+
 
   'session:check-active': (data: {
     playerId: string;
@@ -185,9 +211,12 @@ export interface ServerToClientEvents {
   }) => void;
 
   'lobby:player-joined': (player: LobbyPlayer) => void;
-  'lobby:player-left': (data: { playerId: string; newHostId?: string }) => void;
+  /**
+   * Игрок покинул лобби. newHostId — если вместе с ним сменился хост.
+   * reason: timeout — игрок потерял соединение и не вернулся за 15 секунд.
+   */
+  'lobby:player-left': (data: { playerId: string; newHostId?: string; reason?: 'timeout' }) => void;
   'lobby:player-ready': (data: { playerId: string; isReady: boolean }) => void;
-  'lobby:settings-changed': (settings: RoomSettings) => void;
   'lobby:room-list': (rooms: RoomInfo[]) => void;
   'lobby:player-disconnected': (data: { playerId: string }) => void;
   'lobby:player-reconnected': (data: { playerId: string }) => void;
@@ -225,27 +254,57 @@ export interface ServerToClientEvents {
     }>;
   }) => void;
 
-  'game:next-turn': (data: {
-    nextPlayerId: string;
-    turnIndex: number;
-  }) => void;
-
   'game:final-scoring': (data: {
     regions: CompletedRegion[];
   }) => void;
 
   'game:over': (data: {
     finalScores: Player[];
+    /**
+     * completed — колода закончилась; abandoned — игроки перестали отвечать;
+     * forfeit — остальные игроки покинули игру (остался один).
+     */
+    reason?: 'completed' | 'abandoned' | 'forfeit';
   }) => void;
 
-  /** Игрок не уложился в таймер — ход пропущен сервером */
+  /**
+   * Ход пропущен сервером (тайл из руки выбрасывается).
+   * timeout — закончилось время на часах, absent — игрок отключён,
+   * afk — игрок на связи, но бездействует.
+   * missedTurns / maxMissedTurns — сколько ходов подряд пропущено игроком
+   * (по достижении максимума он считается покинувшим игру).
+   */
   'game:turn-skipped': (data: {
     playerId: string;
+    reason: 'timeout' | 'absent' | 'afk';
+    missedTurns: number;
+    maxMissedTurns: number;
   }) => void;
 
+  /**
+   * Игрок выбыл из игры: left — вышел сам, missed-turns — пропустил слишком много ходов
+   * подряд (офлайн, по бездействию или по времени). Его ходы больше не ждут.
+   */
+  'game:player-abandoned': (data: {
+    playerId: string;
+    reason: 'left' | 'missed-turns';
+  }) => void;
+
+  /**
+   * Состояние шахматных часов (шлётся раз в секунду во время хода, а также в начале
+   * и в конце хода). banksMs — остаток банка каждого игрока в миллисекундах НА МОМЕНТ
+   * отправки; у активного игрока банк продолжает тикать — клиент досчитывает сам
+   * от момента получения (не полагаясь на синхронность часов клиента и сервера).
+   */
   'game:timer-update': (data: {
-    remainingSeconds: number;
-    deadline?: number;
+    banksMs: Record<string, number>;
+    /** Чьи часы идут сейчас; null — часы остановлены (пауза между ходами) */
+    activePlayerId: string | null;
+  }) => void;
+
+  /** Предупреждение лично игроку: бездействует, ход скоро будет пропущен */
+  'game:afk-warning': (data: {
+    secondsLeft: number;
   }) => void;
 
   // --- Ошибки ---
@@ -253,14 +312,6 @@ export interface ServerToClientEvents {
   'error': (data: {
     code: string;
     message: string;
-  }) => void;
-
-  // --- Чат (последняя очередь) ---
-  'chat:message': (data: {
-    playerId: string;
-    playerName: string;
-    text: string;
-    timestamp: number;
   }) => void;
 
   'session:active-games': (data: {

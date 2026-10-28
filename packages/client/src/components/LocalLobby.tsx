@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { SessionSettings } from '@/components/lobby/SessionSettings';
+import { TimeControlSettings } from '@/components/lobby/TimeControlSettings';
 
 import styles from '@/components/styles/lobby.module.css'
 
@@ -18,6 +19,8 @@ export const Lobby = () => {
   const toggleDeadCells = useGameStore(s => s.toggleDeadCells);
   const toggleDeckView = useGameStore(s => s.toggleDeckView);
   const setLobbyScreen = useGameStore(s => s.setLobbyScreen);
+  const localTimeControl = useGameStore(s => s.localTimeControl);
+  const setLocalTimeControl = useGameStore(s => s.setLocalTimeControl);
 
   // 🌟 Состояние inline-редактирования
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -134,6 +137,13 @@ export const Lobby = () => {
           onToggleRegions={toggleRegions}
           onToggleDeadCells={toggleDeadCells}
           onToggleDeckView={toggleDeckView}
+        />
+
+        {/* 🕐 Таймер: в локальной игре его можно полностью отключить */}
+        <TimeControlSettings
+          value={localTimeControl}
+          onChange={setLocalTimeControl}
+          allowDisable
         />
 
         {/* Кнопка начала игры */}

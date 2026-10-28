@@ -13,6 +13,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MainMenu } from '@/components/MainMenu';
 import { ReconnectingOverlay } from '@/components/ReconnectingOverlay';
 import { ToastContainer } from '@/components/ToastContainer';
+import { useLocalClock } from '@/hooks/useLocalClock';
+import { useActivityReporter } from '@/hooks/useActivityReporter';
 
 // Ленивый импорт
 const LocalLobby = lazy(() => import('@/components/LocalLobby').then(m => ({ default: m.Lobby })));
@@ -39,6 +41,10 @@ export default function App() {
 }
 
 function AppScreens() {
+  // 🕐 Часы локальной игры и сигнал «я на месте» для онлайн-игры (каждый сам решает, нужен ли он)
+  useLocalClock();
+  useActivityReporter();
+
   // 🎯 ЗНАЧЕНИЯ — рендеримся только когда меняются
   const drawnTile = useGameStore(s => s.drawnTile);
   const phase = useGameStore(s => s.phase);

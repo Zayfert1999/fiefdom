@@ -9,6 +9,7 @@ import { toast } from '@/state/useToastStore';
 import { applyServerState } from './applyServerState';
 import { getPlayerName, isMe } from './helpers';
 import type { RoomSnapshot, LobbyPlayer } from '@fiefdom/shared/protocol/events';
+import { netLog } from '@/network/netLog';
 
 /**
  * 🌟 Применяет RoomSnapshot к клиентскому store.
@@ -51,7 +52,7 @@ function applySnapshot(snapshot: RoomSnapshot): void {
 
   // 6. Игровое состояние (если игра началась)
   if (snapshot.gameState) {
-    console.log(`🎮 [StateSync] Игра уже началась — восстанавливаем состояние`);
+    netLog(`🎮 [StateSync] Игра уже началась — восстанавливаем состояние`);
     applyServerState(snapshot.gameState);
 
     // 🌟 Сейчас мой ход и тайл выдан → сразу переводим в фазу размещения.
@@ -74,7 +75,7 @@ function applySnapshot(snapshot: RoomSnapshot): void {
  * - room-created / room-joined — создание и присоединение
  * - room-list — список публичных комнат (браузер комнат)
  * - player-joined / player-left — изменения списка игроков
- * - player-ready / settings-changed — готовность и настройки
+ * - player-ready — готовность
  * - player-kicked / kicked — кик игроков
  * - player-disconnected / player-reconnected — статус подключения
  * - reconnect-success / reconnect-failed — восстановление после перезагрузки/обрыва
@@ -86,13 +87,13 @@ export function registerLobbyHandlers(socket: GameSocket): void {
   // 🏠 СОЗДАНИЕ И ПРИСОЕДИНЕНИЕ К КОМНАТЕ
   // ============================================
   socket.on('lobby:room-created', ({ roomId, playerId }) => {
-    console.log(`🏠 [StateSync] Комната создана: ${roomId}`);
+    netLog(`🏠 [StateSync] Комната создана: ${roomId}`);
     useGameStore.getState()._setRoomInfo(roomId, playerId);
     useGameStore.getState()._setHost(true);
   });
 
   socket.on('lobby:room-joined', ({ snapshot }) => {
-    console.log(`🚪 [StateSync] Присоединились к комнате ${snapshot.roomId}`);
+    netLog(`🚪 [StateSync] Присоединились к комнате ${snapshot.roomId}`);
     applySnapshot(snapshot);
   });
 
@@ -107,7 +108,7 @@ export function registerLobbyHandlers(socket: GameSocket): void {
   // 👥 ИЗМЕНЕНИЯ СПИСКА ИГРОКОВ
   // ============================================
   socket.on('lobby:player-joined', (player) => {
-    console.log(`➕ [StateSync] Игрок присоединился: ${player.name}`);
+    netLog(`➕ [StateSync] Игрок присоединился: ${player.name}`);
     const store = useGameStore.getState();
 
     // Защита от дублей (например, повторная доставка события)
@@ -117,8 +118,8 @@ export function registerLobbyHandlers(socket: GameSocket): void {
     toast.info(`👋 ${player.name} присоединился`);
   });
 
-  socket.on('lobby:player-left', ({ playerId, newHostId }) => {
-    console.log(`➖ [StateSync] Игрок вышел: ${playerId}`);
+  socket.on('lobby:player-left', ({ playerId, newHostId, reason }) => {
+    netLog(`➖ [StateSync] Игрок вышел: ${playerId}`);
     const store = useGameStore.getState();
 
     // Имя нужно взять ДО удаления игрока из списка
@@ -127,19 +128,31 @@ export function registerLobbyHandlers(socket: GameSocket): void {
     store._setLobbyPlayers(
       store.networkLobbyPlayers.filter(p => p.id !== playerId)
     );
-    toast.info(`🚪 ${name} вышел из комнаты`);
+    // timeout — игрок потерял соединение и не вернулся за 15 секунд
+    toast.info(
+      reason === 'timeout'
+        ? `📴 ${name} потерял соединение и исключён из комнаты`
+        : `🚪 ${name} вышел из комнаты`
+    );
 
     if (newHostId) {
+      // Хост мог смениться (ушёл прежний): обновляем флаги в списке игроков
+      useGameStore.getState()._setLobbyPlayers(
+        useGameStore.getState().networkLobbyPlayers.map(p => ({ ...p, isHost: p.id === newHostId }))
+      );
       const iAmHost = store.playerId === newHostId;
       store._setHost(iAmHost);
       if (iAmHost) {
         toast.info('👑 Вы стали хостом комнаты');
+      } else if (!isMe(playerId)) {
+        const hostChanged = store.networkLobbyPlayers.find(p => p.id === playerId)?.isHost;
+        if (hostChanged) toast.info(`👑 ${getPlayerName(newHostId)} — новый хост`);
       }
     }
   });
 
   // ============================================
-  // ✅ ГОТОВНОСТЬ И НАСТРОЙКИ
+  // ✅ ГОТОВНОСТЬ И ХОСТ
   // ============================================
   socket.on('lobby:player-ready', ({ playerId, isReady }) => {
     const store = useGameStore.getState();
@@ -150,15 +163,11 @@ export function registerLobbyHandlers(socket: GameSocket): void {
     );
   });
 
-  socket.on('lobby:settings-changed', (settings) => {
-    useGameStore.getState()._setRoomSettings(settings);
-  });
-
   // ============================================
   // 👢 КИК ИГРОКОВ
   // ============================================
   socket.on('lobby:player-kicked', ({ playerId }) => {
-    console.log(`👢 [StateSync] Игрок кикнут: ${playerId}`);
+    netLog(`👢 [StateSync] Игрок кикнут: ${playerId}`);
     const store = useGameStore.getState();
     const name = getPlayerName(playerId);
 
@@ -169,7 +178,7 @@ export function registerLobbyHandlers(socket: GameSocket): void {
   });
 
   socket.on('lobby:kicked', () => {
-    console.log(`👢 [StateSync] Вас кикнули из комнаты`);
+    netLog(`👢 [StateSync] Вас кикнули из комнаты`);
     const store = useGameStore.getState();
     store.leaveRoom();
     useGameStore.setState({ isReconnectingToRoom: false });
@@ -180,7 +189,7 @@ export function registerLobbyHandlers(socket: GameSocket): void {
   // 🔌 ОТКЛЮЧЕНИЕ ДРУГИХ ИГРОКОВ (лобби + игра)
   // ============================================
   socket.on('lobby:player-disconnected', ({ playerId }) => {
-    console.log(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
+    netLog(`⚠️ [StateSync] Игрок отключился: ${playerId}`);
     const store = useGameStore.getState();
 
     // Обновляем список лобби (для экрана ожидания и карточек игроков в HUD)
@@ -191,12 +200,18 @@ export function registerLobbyHandlers(socket: GameSocket): void {
     );
 
     if (!isMe(playerId)) {
-      toast.warning(`⚠️ ${getPlayerName(playerId)} отключился`);
+      // В лобби у отключившегося есть 15 секунд, чтобы вернуться, — потом его исключат
+      const inLobby = useGameStore.getState().phase === 'lobby';
+      toast.warning(
+        inLobby
+          ? `⚠️ ${getPlayerName(playerId)} отключился — исключим через 15 с, если не вернётся`
+          : `⚠️ ${getPlayerName(playerId)} отключился`
+      );
     }
   });
 
   socket.on('lobby:player-reconnected', ({ playerId }) => {
-    console.log(`✅ [StateSync] Игрок переподключился: ${playerId}`);
+    netLog(`✅ [StateSync] Игрок переподключился: ${playerId}`);
     const store = useGameStore.getState();
 
     // Обновляем список лобби
@@ -215,7 +230,7 @@ export function registerLobbyHandlers(socket: GameSocket): void {
   // 🔄 ВОССТАНОВЛЕНИЕ ПОСЛЕ ПЕРЕЗАГРУЗКИ / ОБРЫВА СВЯЗИ
   // ============================================
   socket.on('lobby:reconnect-success', ({ snapshot }) => {
-    console.log(`✅ [StateSync] Успешное восстановление в комнате ${snapshot.roomId}`);
+    netLog(`✅ [StateSync] Успешное восстановление в комнате ${snapshot.roomId}`);
     applySnapshot(snapshot);
     toast.success('Вы снова в комнате', { dedupeKey: 'session' });
   });

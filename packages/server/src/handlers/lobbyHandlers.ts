@@ -1,7 +1,7 @@
 // packages/server/src/handlers/lobbyHandlers.ts
 // 🌟 Обработчики событий лобби (create/join/leave/ready/kick/start/reconnect/session-check)
 
-import type { Server, Socket } from 'socket.io';
+import type { GameServer, GameSocket } from '../types';
 import type { RoomManager } from '../rooms/RoomManager';
 import { Room } from '../rooms/Room';
 import { PlayerConnection } from '../state/PlayerConnection';
@@ -58,7 +58,7 @@ function createPlayerProfile(name: string): Player {
 // 🌟 РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
 // ============================================
 
-export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: RoomManager): void {
+export function registerLobbyHandlers(io: GameServer, socket: GameSocket, roomManager: RoomManager): void {
 
   // ============================================
   // 🚪 ВЫХОД ИЗ ТЕКУЩЕЙ КОМНАТЫ (общая логика)
@@ -80,9 +80,10 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
 
     // 🌟 В идущей игре игрок остаётся в gameState (очередь ходов, очки, миплы),
     // поэтому удалять его из room.players нельзя — иначе состояние игры и комнаты
-    // разойдутся. Помечаем как отключённого: остальные увидят «отключился».
+    // разойдутся. Игрок помечается отключённым И выбывшим: в очереди ходов его
+    // больше не ждут (если сейчас его ход — он пропускается сразу, без таймера).
     if (room.isGameStarted) {
-      room.markPlayerDisconnected(playerId);
+      room.handlePlayerLeftGame(playerId);
       socket.leave(roomId);
       roomManager.notifyRoomsChanged();
       return;
@@ -273,7 +274,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket, roomManager: R
     }
 
     conn.isReady = parsed.data;
-    room.broadcast('lobby:player-ready', { playerId, isReady: parsed.data });
+    room.broadcast('lobby:player-ready', { playerId: conn.id, isReady: parsed.data });
     logger.info('[Lobby]', `${conn.name} ready=${parsed.data}`);
   });
 

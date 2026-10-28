@@ -14,6 +14,7 @@ import { RegionManager } from '@fiefdom/shared/core/regionManager';
 import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@fiefdom/shared/core/scoring';
 import { COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@fiefdom/shared/core/constants'
 import { createDeck, drawPlayableTile } from '@fiefdom/shared/core/deck';
+import { toast } from '@/state/useToastStore';
 
 
 export interface GameSlice {
@@ -44,6 +45,8 @@ export interface GameSlice {
     // Вспомогательные функции
     processEndTurn: () => void;
     finishEndTurn: () => void;
+    /** 🕐 Локальная игра: время на часах вышло — ход пропускается, тайл выбрасывается */
+    expireLocalTurn: () => void;
     processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
     processEndGameInStore: (nextTurn: number) => void;
     animateRegionCompletion: (
@@ -354,6 +357,44 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     // ============================================
     // 🌟 НОВОЕ: Завершение хода
     // ============================================
+    // ============================================
+    // 🕐 ВРЕМЯ НА ЧАСАХ ВЫШЛО (только локальная игра; онлайн это делает сервер)
+    // ============================================
+    expireLocalTurn: () => {
+        const state = get();
+        if (state.roomId !== null) return;
+
+        const player = state.players[state.currentTurn];
+
+        // Тайл уже поставлен, остался выбор мипла: фиксируем ход как есть
+        // (временный мипл, если выбран, подтверждается, иначе — ход без мипла)
+        if (state.phase === 'placeMeeple') {
+            toast.warning(`⏰ ${player?.name ?? 'Игрок'}: время вышло — ход завершён автоматически`);
+            get().confirmMeeple();
+            return;
+        }
+        if (state.phase !== 'placeTile') return;
+
+        // Тайл ещё не поставлен: выбрасываем его (в колоду не возвращается),
+        // незавершённое превью отменяем, ход переходит дальше
+        console.log(`⏰ [Store] Время вышло у ${player?.name}: тайл выброшен, ход пропущен`);
+        toast.warning(`⏰ ${player?.name ?? 'Игрок'}: время вышло — тайл выброшен, ход пропущен`);
+
+        const nextTurn = (state.currentTurn + 1) % state.players.length;
+        set({
+            previewTile: null,
+            previewRegionManager: null,
+            moveSnapshot: null,
+            drawnTile: null,
+        });
+
+        if (state.deck.length === 0) {
+            get().processEndGameInStore(nextTurn);
+            return;
+        }
+        set({ currentTurn: nextTurn, phase: 'startTurn' });
+    },
+
     finishEndTurn: () => {
         const state = get();
         const nextTurn = (state.currentTurn + 1) % state.players.length;
@@ -668,6 +709,10 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             enabledDeckView: data.enabledDeckView,
             gameStartTime: data.gameStartTime ?? null,
             lobbyPlayers: data.lobbyPlayers || [],
+            // 🕐 Часы в сохранение не пишутся: после загрузки партия идёт с НОВЫМИ банками
+            // по текущей настройке таймера локальной игры
+            gameTimeControl: get().localTimeControl,
+            clockSnapshot: null,
             previewTile: null,
             previewRegionManager: null,
             moveSnapshot: null,

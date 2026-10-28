@@ -2,6 +2,8 @@
 // 🌟 Отдельный модуль для работы с localStorage.
 // Используется и в networkSlice, и в stateSync.
 
+import { DEFAULT_TIME_CONTROL, normalizeTimeControl, type TimeControl } from '@fiefdom/shared/core/fischerClock';
+
 const STORAGE_KEYS = {
   PLAYER_ID: 'Fiefdom_player_id',
   SESSION_TOKEN: 'Fiefdom_session_token',
@@ -90,5 +92,33 @@ export function loadPlayerColor(): string {
     return localStorage.getItem(STORAGE_KEYS.PLAYER_COLOR) || '#ff5555';
   } catch {
     return '#ff5555';
+  }
+}
+
+// ============================================
+// 🕐 Настройка таймера ЛОКАЛЬНОЙ игры
+// ============================================
+const LOCAL_TIME_CONTROL_KEY = 'Fiefdom_local_time_control';
+
+/** null — таймер выключен. Без сохранённого значения — стандартные 10 мин + 5 с. */
+export function loadLocalTimeControl(): TimeControl | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_TIME_CONTROL_KEY);
+    if (raw === null) return DEFAULT_TIME_CONTROL;
+    if (raw === 'off') return null;
+    return normalizeTimeControl(JSON.parse(raw) as Partial<TimeControl>);
+  } catch {
+    return DEFAULT_TIME_CONTROL;
+  }
+}
+
+export function saveLocalTimeControl(timeControl: TimeControl | null): void {
+  try {
+    localStorage.setItem(
+      LOCAL_TIME_CONTROL_KEY,
+      timeControl === null ? 'off' : JSON.stringify(timeControl)
+    );
+  } catch {
+    // localStorage недоступен (приватный режим и т.п.) — настройка просто не сохранится
   }
 }

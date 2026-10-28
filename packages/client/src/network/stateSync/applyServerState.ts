@@ -6,6 +6,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { RegionManager } from '@fiefdom/shared/core/regionManager';
 import type { PlacedTile, PlacedMeeple } from '@fiefdom/shared/core/types';
 import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
+import { netLog } from '@/network/netLog';
 
 /**
  * 🌟 Применяет состояние сервера к клиентскому store.
@@ -24,7 +25,7 @@ export function applyServerState(
 ): void {
   const animate = options?.animate ?? false;
 
-  console.log(`📥 [StateSync] Применение состояния сервера к store`);
+  netLog(`📥 [StateSync] Применение состояния сервера к store`);
 
   // ============================================
   // 🗺️ ДЕСЕРИАЛИЗАЦИЯ ДОСКИ
@@ -69,11 +70,11 @@ export function applyServerState(
             // Тайл НОВЫЙ — анимировать тайл (и мипла если есть)
             animatedTile = newTile;
             animatedMeeple = newTile.meeple ?? null;
-            console.log(`🎬 [StateSync] Новый тайл найден: (${newLast.x}, ${newLast.y})`);
+            netLog(`🎬 [StateSync] Новый тайл найден: (${newLast.x}, ${newLast.y})`);
           } else if (!oldTile.meeple && newTile.meeple) {
             // Тайл уже есть, но мипл новый (я поставил тайл, сервер подтвердил мипла)
             animatedMeeple = newTile.meeple;
-            console.log(`🎬 [StateSync] Новый мипл найден на тайле (${newLast.x}, ${newLast.y})`);
+            netLog(`🎬 [StateSync] Новый мипл найден на тайле (${newLast.x}, ${newLast.y})`);
           }
         }
         break;  // За один ход только один игрок делает ход
@@ -86,7 +87,7 @@ export function applyServerState(
         meeple: animatedMeeple,
         startTime: Date.now(),
       });
-      console.log(`🎬 [StateSync] Анимация установки запущена`);
+      netLog(`🎬 [StateSync] Анимация установки запущена`);
     }
   }
 
@@ -98,7 +99,7 @@ export function applyServerState(
   const hasActiveAnimations = currentState.completionAnimations.length > 0;
 
   if (hasActiveAnimations) {
-    console.log(`📥 [StateSync] Есть активные анимации — сохраняем isCompleting миплы`);
+    netLog(`📥 [StateSync] Есть активные анимации — сохраняем isCompleting миплы`);
     for (const [key, currentTile] of currentState.board) {
       if (currentTile.meeple?.isCompleting) {
         const serverTile = board.get(key);
@@ -134,7 +135,7 @@ export function applyServerState(
   // ============================================
   // 📋 ЛОГ ИТОГА
   // ============================================
-  console.log(
+  netLog(
     `📥 [StateSync] Состояние применено: ` +
     `board=${board.size} тайлов, ` +
     `players=${gameState.players.length}, ` +

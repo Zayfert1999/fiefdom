@@ -45,7 +45,7 @@ export interface GameSlice {
     // Вспомогательные функции
     processEndTurn: () => void;
     finishEndTurn: () => void;
-    /** 🕐 Локальная игра: время на часах вышло — ход пропускается, тайл выбрасывается */
+    /** 🕐 Локальная игра: банк времени игрока исчерпан — он больше не ходит (зритель) */
     expireLocalTurn: () => void;
     processCompletedRegionsInStore: (regions: CompletedRegion[]) => void;
     processEndGameInStore: (nextTurn: number) => void;
@@ -67,6 +67,18 @@ export interface GameSlice {
     // === Дебаг-сохранение (ручное) ===
     saveDebugGame: () => void;
     loadDebugGame: () => void;
+}
+
+/**
+ * Индекс следующего игрока в очереди. Проигравшие по времени пропускаются.
+ * Если активных игроков не осталось — возвращает следующий индекс как есть.
+ */
+function nextActiveTurn(players: Player[], current: number, timedOutIds: string[]): number {
+    for (let step = 1; step <= players.length; step++) {
+        const index = (current + step) % players.length;
+        if (!timedOutIds.includes(players[index].id)) return index;
+    }
+    return (current + 1) % players.length;
 }
 
 export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set, get) => ({
@@ -363,24 +375,21 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
     expireLocalTurn: () => {
         const state = get();
         if (state.roomId !== null) return;
+        if (state.phase !== 'placeTile' && state.phase !== 'placeMeeple') return;
 
-        const player = state.players[state.currentTurn];
+        const loser = state.players[state.currentTurn];
+        if (!loser || state.timedOutPlayerIds.includes(loser.id)) return;
 
-        // Тайл уже поставлен, остался выбор мипла: фиксируем ход как есть
-        // (временный мипл, если выбран, подтверждается, иначе — ход без мипла)
-        if (state.phase === 'placeMeeple') {
-            toast.warning(`⏰ ${player?.name ?? 'Игрок'}: время вышло — ход завершён автоматически`);
-            get().confirmMeeple();
-            return;
+        // Незавершённый ход игрока без времени отменяем: если тайл уже подтверждён, но мипл ещё
+        // не выбран, откатываем доску к состоянию до хода (тайл возвращается в «руку»)
+        if (state.phase === 'placeMeeple' && state.moveSnapshot) {
+            get().rollbackMove();
         }
-        if (state.phase !== 'placeTile') return;
 
-        // Тайл ещё не поставлен: выбрасываем его (в колоду не возвращается),
-        // незавершённое превью отменяем, ход переходит дальше
-        console.log(`⏰ [Store] Время вышло у ${player?.name}: тайл выброшен, ход пропущен`);
-        toast.warning(`⏰ ${player?.name ?? 'Игрок'}: время вышло — тайл выброшен, ход пропущен`);
+        console.log(`⏰ [Store] У ${loser.name} закончилось время — дальше он только наблюдает`);
+        toast.warning(`⏰ У ${loser.name} вышло время — дальше он наблюдает за игрой`, { duration: 8000 });
 
-        const nextTurn = (state.currentTurn + 1) % state.players.length;
+        // Тайл из руки выбрасывается (в колоду не возвращается), превью отменяется
         set({
             previewTile: null,
             previewRegionManager: null,
@@ -388,7 +397,15 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             drawnTile: null,
         });
 
-        if (state.deck.length === 0) {
+        // Игрок становится зрителем: очередь его пропускает, очки и миплы на доске остаются
+        const timedOutPlayerIds = [...state.timedOutPlayerIds, loser.id];
+        set({ timedOutPlayerIds });
+
+        const nextTurn = nextActiveTurn(state.players, state.currentTurn, timedOutPlayerIds);
+        const activeCount = state.players.length - timedOutPlayerIds.length;
+
+        // Остался один игрок (или колода пуста) — подводим итоги
+        if (activeCount < 2 || get().deck.length === 0) {
             get().processEndGameInStore(nextTurn);
             return;
         }
@@ -397,7 +414,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
 
     finishEndTurn: () => {
         const state = get();
-        const nextTurn = (state.currentTurn + 1) % state.players.length;
+        const nextTurn = nextActiveTurn(state.players, state.currentTurn, state.timedOutPlayerIds);
         const currentPlayer = state.players[state.currentTurn];
         let lastTile: PlacedTile | undefined;
         for (const tile of state.board.values()) lastTile = tile;
@@ -713,6 +730,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             // по текущей настройке таймера локальной игры
             gameTimeControl: get().localTimeControl,
             clockSnapshot: null,
+            timedOutPlayerIds: [],
             previewTile: null,
             previewRegionManager: null,
             moveSnapshot: null,

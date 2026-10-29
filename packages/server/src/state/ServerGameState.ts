@@ -39,6 +39,9 @@ export class ServerGameState {
    * но их очки и миплы на доске остаются и учитываются в финальном подсчёте.
    */
   private leftPlayerIds = new Set<string>();
+
+  /** ⏰ Игроки, у которых закончилось время: зрители (подмножество leftPlayerIds) */
+  private timedOutPlayerIds = new Set<string>();
   public drawnTile: Tile | null = null;
   public phase: ServerPhase = 'lobby';
   public seed: string = '';
@@ -68,6 +71,7 @@ export class ServerGameState {
     this.phase = 'playing';
     this.lastPlacedTiles = {};
     this.leftPlayerIds.clear();
+    this.timedOutPlayerIds.clear();
 
     // 🌟 Стартовый тайл в центре (0,0)
     const startingTile = this.deck.pop();
@@ -238,6 +242,21 @@ export class ServerGameState {
     if (!this.players.some(p => p.id === playerId)) return false;
     this.leftPlayerIds.add(playerId);
     return true;
+  }
+
+  /**
+   * У игрока закончилось время: играть дальше он не может — становится зрителем
+   * (пропускается в очереди). Очки и миплы на доске сохраняются, место в итогах обычное.
+   */
+  markPlayerTimedOut(playerId: string): boolean {
+    if (!this.markPlayerLeft(playerId)) return false;
+    this.timedOutPlayerIds.add(playerId);
+    return true;
+  }
+
+  /** Игрок стал зрителем из-за времени (в отличие от вышедшего: может вернуться и наблюдать) */
+  isPlayerTimedOut(playerId: string): boolean {
+    return this.timedOutPlayerIds.has(playerId);
   }
 
   isPlayerLeft(playerId: string): boolean {

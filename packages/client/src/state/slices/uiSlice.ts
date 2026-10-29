@@ -71,6 +71,10 @@ export interface UISlice {
   /** Контроль времени идущей локальной игры (фиксируется на старте), null — без таймера */
   gameTimeControl: TimeControl | null;
 
+  /** ⏰ Игроки, у которых закончилось время: зрители, в очереди ходов пропускаются */
+  timedOutPlayerIds: string[];
+  markPlayerTimedOut: (playerId: string) => void;
+
   // === timestamp начала игры ===
   gameStartTime: number | null;
   setGameStartTime: (time: number | null) => void;
@@ -99,6 +103,7 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set, get
   clockSnapshot: null,
   localTimeControl: loadLocalTimeControl(),
   gameTimeControl: null,
+  timedOutPlayerIds: [],
   gameStartTime: null,
   gameEndTime: null,
 
@@ -132,6 +137,14 @@ export const createUISlice: StateCreator<GameStore, [], [], UISlice> = (set, get
 
   setClockSnapshot: (snapshot) => {
     set({ clockSnapshot: snapshot });
+  },
+
+  markPlayerTimedOut: (playerId) => {
+    set((state) =>
+      state.timedOutPlayerIds.includes(playerId)
+        ? state
+        : { timedOutPlayerIds: [...state.timedOutPlayerIds, playerId] }
+    );
   },
 
   setLocalTimeControl: (timeControl) => {

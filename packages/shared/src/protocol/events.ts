@@ -269,25 +269,27 @@ export interface ServerToClientEvents {
 
   /**
    * Ход пропущен сервером (тайл из руки выбрасывается).
-   * timeout — закончилось время на часах, absent — игрок отключён,
-   * afk — игрок на связи, но бездействует.
+   * absent — игрок отключён, afk — игрок на связи, но бездействует.
+   * (Закончившееся время на часах — не пропуск хода: игрок становится зрителем, см. game:player-abandoned.)
    * missedTurns / maxMissedTurns — сколько ходов подряд пропущено игроком
    * (по достижении максимума он считается покинувшим игру).
    */
   'game:turn-skipped': (data: {
     playerId: string;
-    reason: 'timeout' | 'absent' | 'afk';
+    reason: 'absent' | 'afk';
     missedTurns: number;
     maxMissedTurns: number;
   }) => void;
 
   /**
    * Игрок выбыл из игры: left — вышел сам, missed-turns — пропустил слишком много ходов
-   * подряд (офлайн, по бездействию или по времени). Его ходы больше не ждут.
+   * подряд (офлайн или по бездействию), timeout — у него закончилось время на часах:
+   * играть дальше он не может и остаётся зрителем (может вернуться и наблюдать).
+   * Его ходы больше не ждут, он пропускается в очереди; очки и миплы на доске сохраняются.
    */
   'game:player-abandoned': (data: {
     playerId: string;
-    reason: 'left' | 'missed-turns';
+    reason: 'left' | 'missed-turns' | 'timeout';
   }) => void;
 
   /**

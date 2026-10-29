@@ -185,12 +185,6 @@ export function registerGameHandlers(socket: GameSocket): void {
         me ? `💤 Вы бездействовали — ход пропущен ${counter}` : `💤 ${name} бездействует — ход пропущен ${counter}`,
         { dedupeKey: me ? 'turn-timer' : undefined }
       );
-    } else {
-      // timeout — закончилось время на часах
-      toast.warning(
-        me ? `⏰ Время на часах вышло — ход пропущен ${counter}` : `⏰ У ${name} вышло время — ход пропущен ${counter}`,
-        { dedupeKey: me ? 'turn-timer' : undefined }
-      );
     }
   });
 
@@ -208,6 +202,20 @@ export function registerGameHandlers(socket: GameSocket): void {
   // ============================================
   socket.on('game:player-abandoned', ({ playerId, reason }) => {
     if (!inRoom()) return;
+
+    // ⏰ У игрока закончился банк на часах: ходить он больше не может, но наблюдает за партией
+    if (reason === 'timeout') {
+      useGameStore.getState().markPlayerTimedOut(playerId);
+      if (isMe(playerId)) {
+        toast.warning('⏰ Время на часах вышло — дальше вы наблюдаете за игрой', {
+          dedupeKey: 'abandoned-self',
+          duration: 10000,
+        });
+      } else {
+        toast.warning(`⏰ У ${getDisplayName(playerId)} вышло время — он наблюдает за игрой`, { duration: 7000 });
+      }
+      return;
+    }
 
     if (isMe(playerId)) {
       // Выбыли, оставаясь на связи (например, 3 пропуска по бездействию): партию можно досматривать

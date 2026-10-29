@@ -335,14 +335,13 @@ export class RoomGameLoop {
 
     /**
      * ⏭️ Пропуск хода сервером. Тайл из руки выбрасывается.
-     *  - timeout — на часах Фишера закончилось время;
+     *  - timeout — на часах Фишера закончилось время: игрок становится зрителем;
      *  - afk     — игрок на связи, но бездействует (см. IDLE_LIMIT_MS);
      *  - absent  — игрок отключён и не вернулся за ABSENT_GRACE_MS;
      *  - left    — игрок вышел из игры прямо в свой ход (без ожидания и без таймера).
      *
-     * Любой пропуск, кроме `left`, засчитывается игроку как «пропущенный ход»;
-     * MAX_MISSED_TURNS таких ходов подряд — и игрок выбывает из партии.
-     * Инкремент за пропущенный ход НЕ начисляется.
+     * Пропуски `afk` и `absent` засчитываются как «пропущенный ход»: MAX_MISSED_TURNS таких
+     * ходов подряд — и игрок выбывает из партии. Инкремент за пропущенный ход НЕ начисляется.
      */
     private skipCurrentTurn(reason: 'timeout' | 'afk' | 'absent' | 'left'): void {
         const gs = this.gameState;
@@ -358,12 +357,10 @@ export class RoomGameLoop {
         this.clock?.stop(Date.now()); // без инкремента
 
         let missedTurns = 0;
-        if (reason !== 'left') {
+        if (reason === 'afk' || reason === 'absent') {
             missedTurns = (this.missedTurns.get(skipped.id) ?? 0) + 1;
             this.missedTurns.set(skipped.id, missedTurns);
-        }
 
-        if (reason !== 'left') {
             this.consecutiveSkips += 1;
             // 🌟 Сообщаем всем, чей ход пропущен (клиенты покажут toast)
             this.broadcaster.broadcast('game:turn-skipped', {
@@ -381,6 +378,9 @@ export class RoomGameLoop {
         let ended = false;
         if (reason === 'left') {
             ended = this.abandonPlayer(skipped.id, 'left');
+        } else if (reason === 'timeout') {
+            // ⏰ Время на часах вышло — играть дальше нельзя, игрок становится зрителем
+            ended = this.abandonPlayer(skipped.id, 'timeout');
         } else if (missedTurns >= MAX_MISSED_TURNS) {
             ended = this.abandonPlayer(skipped.id, 'missed-turns');
         }
@@ -406,9 +406,10 @@ export class RoomGameLoop {
      * Игрок выбывает из партии.
      * @returns true, если из-за этого игра завершилась (остался один игрок)
      */
-    private abandonPlayer(playerId: string, reason: 'left' | 'missed-turns'): boolean {
+    private abandonPlayer(playerId: string, reason: 'left' | 'missed-turns' | 'timeout'): boolean {
         const gs = this.gameState;
-        if (!gs.markPlayerLeft(playerId)) return false;
+        const marked = reason === 'timeout' ? gs.markPlayerTimedOut(playerId) : gs.markPlayerLeft(playerId);
+        if (!marked) return false;
 
         logger.warn('[GameLoop]', `🚪 Игрок ${playerId} выбыл из игры (${reason})`);
         this.missedTurns.delete(playerId);
@@ -439,9 +440,10 @@ export class RoomGameLoop {
         this.abandonPlayer(playerId, 'left');
     }
 
-    /** Выбыл ли игрок из партии */
+    /** Покинул ли игрок партию (вышел / пропустил 3 хода). Зрители из-за времени — нет */
     isPlayerAbandoned(playerId: string): boolean {
-        return this.gameState.isPlayerLeft(playerId);
+        // Зритель из-за времени «покинувшим» не считается: он может вернуться и наблюдать
+        return this.gameState.isPlayerLeft(playerId) && !this.gameState.isPlayerTimedOut(playerId);
     }
 
     /**

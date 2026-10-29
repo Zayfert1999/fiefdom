@@ -116,6 +116,7 @@ export const createLobbySlice: StateCreator<GameStore, [], [], LobbySlice> = (se
             gameStartTime: Date.now(),
             gameTimeControl: state.localTimeControl,
             clockSnapshot: null,
+            timedOutPlayerIds: [],
         });
         console.log(`🎮 [Store] Игра начата с ${state.lobbyPlayers.length} игроками`);
     },
@@ -152,6 +153,7 @@ export const createLobbySlice: StateCreator<GameStore, [], [], LobbySlice> = (se
             gameEndTime: null,
             clockSnapshot: null,
             gameTimeControl: null,
+            timedOutPlayerIds: [],
         });
         // Возвращаемся в главное меню
         get().setLobbyScreen('modeSelect');

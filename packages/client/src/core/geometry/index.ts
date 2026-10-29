@@ -41,6 +41,18 @@ export type {
     NoiseOptions, NoiseSettings, EdgeFadeCurve, NoiseByType, NoiseFeatureType,
 } from './geometryPostProcessor';
 
+// 📍 Споты мипла и щита (вычисляются из геометрии)
+export {
+    DEFAULT_SPOT_PARAMS,
+    resolveSpotParams,
+    computeTileSpots,
+    poleOfInaccessibility,
+    bestPole,
+    maximizeDistance,
+    signedDistanceToPolygon,
+} from './spots';
+export type { SpotParams, FeatureSpot, SpotMethod, PoleResult } from './spots';
+
 // 🎛 Единый набор параметров (geometryParams.json)
 export {
     GEOMETRY_PARAMS_VERSION,

@@ -19,14 +19,23 @@ export const GEOMETRY_COLORS = {
 } as const;
 
 interface TileGeometryLayersProps {
-  audit: Pick<TileAudit, 'features' | 'geometry'>;
+  audit: Pick<TileAudit, 'features' | 'geometry'> & Partial<Pick<TileAudit, 'spots'>>;
   /** Рисовать вершины тесселяции */
   showVertices?: boolean;
+  /** Рисовать вычисленные споты мипла и щита (нужны audit.spots) */
+  showSpots?: boolean;
+  /** Радиус фигурки мипла для кружка спота */
+  spotRadius?: number;
 }
 
 const STROKE = 'rgba(255,255,255,0.22)';
 
-export const TileGeometryLayers = memo(({ audit, showVertices = false }: TileGeometryLayersProps) => {
+export const TileGeometryLayers = memo(({
+  audit,
+  showVertices = false,
+  showSpots = false,
+  spotRadius = 8,
+}: TileGeometryLayersProps) => {
   const { features, geometry } = audit;
   const { tessellation, clipping, fields, decorations } = geometry;
 
@@ -83,6 +92,27 @@ export const TileGeometryLayers = memo(({ audit, showVertices = false }: TileGeo
       {decorations.plazas.map((plaza, i) => (
         <path key={`plaza-${i}`} d={ringToPathD(plaza)} fill={GEOMETRY_COLORS.plaza} />
       ))}
+
+      {/* Споты мипла (голубой круг размером с фигурку) и щита (жёлтый квадрат) */}
+      {showSpots && audit.spots && (
+        <g>
+          {Array.from(audit.spots.entries()).map(([featureId, spot]) => (
+            <g key={`spot-${featureId}`}>
+              <circle
+                cx={spot.meeple[0]} cy={spot.meeple[1]} r={spotRadius}
+                fill="rgba(56,189,248,0.18)" stroke="#38bdf8" strokeWidth={0.5} strokeDasharray="1.5 1"
+              />
+              <circle cx={spot.meeple[0]} cy={spot.meeple[1]} r={1.4} fill="#38bdf8" stroke="#000" strokeWidth={0.3} />
+              {spot.shield && (
+                <rect
+                  x={spot.shield[0] - 2.5} y={spot.shield[1] - 2.5} width={5} height={5} rx={1}
+                  fill="#facc15" stroke="#fff" strokeWidth={0.4}
+                />
+              )}
+            </g>
+          ))}
+        </g>
+      )}
 
       {/* Вершины: жёлтые — контуры, голубые — ось дороги, розовые — края дороги */}
       {showVertices && (

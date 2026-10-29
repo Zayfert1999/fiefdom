@@ -45,6 +45,13 @@
     "cornerRoundness": 1,
     "clusterTolerance": 3
   },
+  "spots": {
+    "meepleRadius": 8,
+    "shieldMargin": 2,
+    "centerBias": 0.05,
+    "precision": 0.25,
+    "roadSampleStep": 1
+  },
   "mesh": {
     "baseHeight": 4,
     "heights": {

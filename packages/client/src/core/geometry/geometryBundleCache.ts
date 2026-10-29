@@ -36,7 +36,13 @@ export function getTileBundle(tile: AuditTile, params: GeometryParams): TileBund
     misses++;
     const audit = auditTile(tile, { geometryParams: params });
     const bundle = buildTileBundle(
-        { tileId: audit.tileId, artId: audit.artId, features: audit.features, geometry: audit.geometry },
+        {
+            tileId: audit.tileId,
+            artId: audit.artId,
+            features: audit.features,
+            geometry: audit.geometry,
+            spots: audit.spots,
+        },
         params.mesh
     );
 

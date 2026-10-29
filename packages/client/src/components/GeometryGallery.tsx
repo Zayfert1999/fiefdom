@@ -25,6 +25,7 @@ import {
   type TileAudit,
 } from '@/core/geometry/geometryAudit';
 import { buildTileBundle, type MeshParamsInput, type TileBundle } from '@/core/geometry/tileMesh';
+import { DEFAULT_SPOT_PARAMS } from '@/core/geometry/spots';
 import { Board3D, type Board3DHover, type BoardPlacement } from './Board3D';
 import { TileGeometryLayers } from './TileGeometryLayers';
 
@@ -83,7 +84,11 @@ export const GeometryGallery = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {isPending && <div style={{ color: '#9ca3af', fontSize: 12 }}>⏳ Пересчёт…</div>}
       {mode === 'gallery' ? (
-        <GalleryGrid audits={audits} onOpenTile={onOpenTile} />
+        <GalleryGrid
+          audits={audits}
+          spotRadius={pipeline.geometryParams?.spots.meepleRadius ?? DEFAULT_SPOT_PARAMS.meepleRadius}
+          onOpenTile={onOpenTile}
+        />
       ) : (
         <SeamBoard
           tiles={tiles}
@@ -102,13 +107,16 @@ export const GeometryGallery = ({
 // ============================================
 interface GalleryGridProps {
   audits: readonly TileAudit[];
+  /** Радиус фигурки мипла для кружков спотов */
+  spotRadius: number;
   onOpenTile: (tileId: string) => void;
 }
 
-const GalleryGrid = ({ audits, onOpenTile }: GalleryGridProps) => {
+const GalleryGrid = ({ audits, spotRadius, onOpenTile }: GalleryGridProps) => {
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [cellSize, setCellSize] = useState(190);
   const [showVertices, setShowVertices] = useState(false);
+  const [showSpots, setShowSpots] = useState(true);
 
   const summary = useMemo(() => summarizeAudits(audits), [audits]);
 
@@ -141,6 +149,10 @@ const GalleryGrid = ({ audits, onOpenTile }: GalleryGridProps) => {
           <input type="checkbox" checked={showVertices} onChange={(e) => setShowVertices(e.target.checked)} />
           Вершины
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showSpots} onChange={(e) => setShowSpots(e.target.checked)} />
+          Споты
+        </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           Размер
           <input
@@ -165,7 +177,14 @@ const GalleryGrid = ({ audits, onOpenTile }: GalleryGridProps) => {
         }}
       >
         {visible.map((audit) => (
-          <GalleryCell key={audit.tileId} audit={audit} showVertices={showVertices} onOpen={onOpenTile} />
+          <GalleryCell
+            key={audit.tileId}
+            audit={audit}
+            showVertices={showVertices}
+            showSpots={showSpots}
+            spotRadius={spotRadius}
+            onOpen={onOpenTile}
+          />
         ))}
       </div>
     </>
@@ -178,10 +197,12 @@ const GalleryGrid = ({ audits, onOpenTile }: GalleryGridProps) => {
 interface GalleryCellProps {
   audit: TileAudit;
   showVertices: boolean;
+  showSpots: boolean;
+  spotRadius: number;
   onOpen: (tileId: string) => void;
 }
 
-const GalleryCell = memo(({ audit, showVertices, onOpen }: GalleryCellProps) => {
+const GalleryCell = memo(({ audit, showVertices, showSpots, spotRadius, onOpen }: GalleryCellProps) => {
   const color = statusColor(audit);
   const tooltip = audit.issues.length
     ? audit.issues.map((i) => `${i.severity === 'error' ? '✖' : '⚠'} ${i.message}`).join('\n')
@@ -199,7 +220,7 @@ const GalleryCell = memo(({ audit, showVertices, onOpen }: GalleryCellProps) => 
       }}
     >
       <svg viewBox="-53 -53 106 106" width="100%" style={{ display: 'block', background: '#0b1020', borderRadius: 4 }}>
-        <TileGeometryLayers audit={audit} showVertices={showVertices} />
+        <TileGeometryLayers audit={audit} showVertices={showVertices} showSpots={showSpots} spotRadius={spotRadius} />
         <rect x={-50} y={-50} width={100} height={100} fill="none" stroke={COLOR_ERROR} strokeWidth={0.4} strokeDasharray="2 1.5" opacity={0.7} />
       </svg>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, fontSize: 11 }}>
@@ -257,7 +278,13 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardP
       audits.map((audit) => [
         audit.tileId,
         buildTileBundle(
-          { tileId: audit.tileId, artId: audit.artId, features: audit.features, geometry: audit.geometry },
+          {
+            tileId: audit.tileId,
+            artId: audit.artId,
+            features: audit.features,
+            geometry: audit.geometry,
+            spots: audit.spots,
+          },
           meshParams
         ),
       ])

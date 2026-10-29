@@ -60,6 +60,24 @@ export function cityArcSides(citySides: readonly Side[]): Side[] {
   return [];
 }
 
+/**
+ * Точка на границе тайла, где лежит середина «трети» стороны, занятой портом.
+ * Порты идут по часовой стрелке (ось Y вниз):
+ *   N: 0,1,2 слева направо   E: 3,4,5 сверху вниз
+ *   S: 6,7,8 справа налево   W: 9,10,11 снизу вверх
+ * Угловые порты лежат в ±HALF·2/3, центральный — в 0.
+ */
+export function getPortPoint(port: number): Point {
+  const side = getPortSide(port);
+  const t = ((port % PORTS_PER_SIDE) - 1) * ((HALF * 2) / PORTS_PER_SIDE);
+  switch (side) {
+    case 0: return [t + 0, -HALF];
+    case 1: return [HALF, t + 0];
+    case 2: return [-t + 0, HALF];
+    default: return [-HALF, -t + 0];
+  }
+}
+
 /** Контекст тайла: то, что фичи должны знать друг о друге */
 export interface TileContext {
   /** Половина стороны монастыря; null — монастыря на тайле нет */

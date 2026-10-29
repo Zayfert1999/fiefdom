@@ -16,6 +16,9 @@
 //   • missing-geometry  — у фичи не получилась геометрия
 //   • field-unassigned  — поле не получило полигон / остались лишние полигоны
 //   • road-clipped      — дорога полностью вырезана
+//   • spot-missing      — для фичи не получилось вычислить спот мипла
+//   • spot-tight        — фигурка мипла (или щит) не помещается: запас меньше радиуса
+//   • field-binding-fallback — поле нашло полигон только по meepleSpot, а не по портам
 //
 // Швы: строится случайная доска из тайлов с совпадающими портами,
 // затем вдоль каждого общего ребра берутся пары точек по обе стороны.
@@ -34,6 +37,7 @@ import type { PlazaParams } from './generators/plaza';
 import { HALF } from './generators/sides';
 import { measureOutOfTile, type NoiseByType, type NoiseSettings } from './geometryPostProcessor';
 import { resolveTileParams, type GeometryParams } from './geometryParams';
+import { computeTileSpots, resolveSpotParams, type FeatureSpot, type SpotParams } from './spots';
 import { pointInRing, multiPolygonContainsPoint } from './geometryPointInPolygon';
 import {
     tessellateArea,
@@ -68,12 +72,18 @@ export type AuditCode =
     | 'missing-geometry'
     | 'field-unassigned'
     | 'road-clipped'
+    | 'spot-missing'
+    | 'spot-tight'
+    | 'field-binding-fallback'
     | 'generation';
 
 /** Коды, которые зависят от булевых операций (clipper2-ts) */
 export const CLIPPER_DEPENDENT_CODES: ReadonlySet<AuditCode> = new Set<AuditCode>([
     'field-unassigned',
     'road-clipped',
+    'spot-missing',
+    'spot-tight',
+    'field-binding-fallback',
 ]);
 
 export interface AuditIssue {
@@ -117,6 +127,12 @@ export interface TileAudit {
     readonly roadEndGap: number;
     readonly selfIntersections: number;
     readonly minSpacing: number;
+    /** Вычисленные споты мипла и щита по featureId */
+    readonly spots: ReadonlyMap<string, FeatureSpot>;
+    /** Расстояние от вычисленного спота до прежнего ручного meepleSpot (юниты), если он задан */
+    readonly spotDeltas: Readonly<Record<string, number>>;
+    /** Наименьший запас вокруг спота среди всех фич (юниты) */
+    readonly minSpotClearance: number;
     /**
      * Площадь площадей, выступающая за дорожные полосы (юниты²).
      * Это «заливка» скруглённых углов: при cornerRadius = 0 и перекрёстке
@@ -330,6 +346,8 @@ export interface AuditGeometryInput {
     readonly result: TileGeometryResult;
     /** Параметры тесселяции — нужны, чтобы посчитать «чистую» форму без шума */
     readonly tessellation?: Partial<TessellationParams>;
+    /** Параметры расчёта спотов (радиус мипла, точность, притяжение к центру) */
+    readonly spots?: Partial<SpotParams>;
     readonly warnings?: readonly string[];
     readonly thresholds?: Partial<AuditThresholds>;
     readonly elapsedMs?: number;
@@ -532,6 +550,72 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
         }
     }
 
+    // --- Споты: считаются из итоговой геометрии ---
+    const spotParams = resolveSpotParams(input.spots);
+    const spots = computeTileSpots(features, result, spotParams);
+    const spotDeltas: Record<string, number> = {};
+    let minSpotClearance = Infinity;
+
+    for (const feature of features) {
+        if (feature.type !== 'city' && feature.type !== 'road' && feature.type !== 'monastery' && feature.type !== 'field') {
+            continue;
+        }
+        const spot = spots.get(feature.id);
+        const alreadyBroken = issues.some(
+            (i) => i.severity === 'error' && i.featureId === feature.id
+        );
+
+        if (!spot) {
+            if (!alreadyBroken) {
+                issues.push({
+                    severity: 'error',
+                    code: 'spot-missing',
+                    featureId: feature.id,
+                    message: `Не удалось вычислить спот мипла для "${feature.id}"`,
+                });
+            }
+            continue;
+        }
+
+        minSpotClearance = Math.min(minSpotClearance, spot.clearance);
+        if (spot.clearance < spotParams.meepleRadius) {
+            issues.push({
+                severity: 'warn',
+                code: 'spot-tight',
+                featureId: feature.id,
+                message:
+                    `Фигурка не помещается в "${feature.id}": запас ${spot.clearance.toFixed(1)} ` +
+                    `< радиуса мипла ${spotParams.meepleRadius}`,
+            });
+        }
+        if (spot.shieldClearance !== undefined && spot.shieldClearance < 0) {
+            issues.push({
+                severity: 'warn',
+                code: 'spot-tight',
+                featureId: feature.id,
+                message: `Щит в "${feature.id}" перекрывает мипла или выходит за город (запас ${spot.shieldClearance.toFixed(1)})`,
+            });
+        }
+
+        const rawManual = feature.meepleSpot as unknown;
+        const manual = (Array.isArray(rawManual) ? rawManual[0] : rawManual) as { x: number; y: number } | undefined;
+        if (manual && typeof manual.x === 'number' && typeof manual.y === 'number') {
+            spotDeltas[feature.id] = Math.hypot(spot.meeple[0] - manual.x, spot.meeple[1] - manual.y);
+        }
+    }
+
+    // Поля, привязанные только запасным способом (по meepleSpot): без ручных спотов они бы потерялись
+    for (const [fieldId, method] of assignments.fieldBinding ?? []) {
+        if (method === 'spot') {
+            issues.push({
+                severity: 'warn',
+                code: 'field-binding-fallback',
+                featureId: fieldId,
+                message: `Поле "${fieldId}" нашло полигон только по meepleSpot (порты не совпали с границей)`,
+            });
+        }
+    }
+
     const assignedCount = [...assignments.fieldGeometries.values()].reduce(
         (sum, multi) => sum + multi.length,
         0
@@ -559,6 +643,9 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
         roadEndGap: maxGap,
         selfIntersections,
         minSpacing: Number.isFinite(minSpacing) ? minSpacing : 0,
+        spots,
+        spotDeltas,
+        minSpotClearance: Number.isFinite(minSpotClearance) ? minSpotClearance : 0,
         plazaExcessArea,
         areaDrift,
         maxAreaDrift,
@@ -598,6 +685,8 @@ export interface AuditPipelineOptions {
     readonly tessellation?: Partial<TessellationParams>;
     /** Параметры площадей на перекрёстках */
     readonly plaza?: Partial<PlazaParams>;
+    /** Параметры расчёта спотов мипла и щита */
+    readonly spots?: Partial<SpotParams>;
     readonly thresholds?: Partial<AuditThresholds>;
     /** Заглушить консольные логи пайплайна (по умолчанию true) */
     readonly quiet?: boolean;
@@ -617,6 +706,7 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
         const noiseByType = options.noiseByType ?? forTile?.noiseByType;
         const tessellation = { ...params?.tessellation, ...options.tessellation };
         const plaza = { ...params?.plaza, ...options.plaza };
+        const spotParams = { ...params?.spots, ...options.spots };
 
         let features: readonly TileFeature[] = tile.features;
         const warnings: string[] = [];
@@ -647,6 +737,7 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
             features,
             result,
             tessellation,
+            spots: spotParams,
             warnings,
             thresholds: options.thresholds,
             elapsedMs: performance.now() - started,

@@ -36,6 +36,7 @@ const withChanges = (changes: Parameters<typeof resolveGeometryParams>[0] = {}):
         tessellation: { ...GEOMETRY_PARAMS.tessellation, ...changes.tessellation },
         noise: { ...GEOMETRY_PARAMS.noise, ...changes.noise },
         plaza: { ...GEOMETRY_PARAMS.plaza, ...changes.plaza },
+        spots: { ...GEOMETRY_PARAMS.spots, ...changes.spots },
         mesh: {
             ...GEOMETRY_PARAMS.mesh,
             ...changes.mesh,
@@ -109,6 +110,17 @@ describe('parseGeometryParams', () => {
         expect(params.mesh.colors.road).toBe(DEFAULT_GEOMETRY_PARAMS.mesh.colors.road);
     });
 
+    it('секция spots: значения вне диапазона обрезаются, лишние ключи игнорируются', () => {
+        const { params, warnings } = parseGeometryParams({
+            version: 1,
+            spots: { meepleRadius: -3, centerBias: 9, lolwut: 1 },
+        });
+        expect(params.spots.meepleRadius).toBeGreaterThan(0);
+        expect(params.spots.centerBias).toBeLessThan(0.51);
+        expect(warnings.some((w) => w.includes('spots.meepleRadius'))).toBe(true);
+        expect(warnings.some((w) => w.includes('spots.lolwut'))).toBe(true);
+    });
+
     it('другая версия формата даёт предупреждение', () => {
         expect(parseGeometryParams({ version: 2 }).warnings.some((w) => w.includes('version'))).toBe(true);
     });
@@ -142,6 +154,7 @@ describe('hashGeometryParams', () => {
         expect(hashGeometryParams(withChanges({ noise: { areaAmplitude: 3.1 } }))).not.toBe(base);
         expect(hashGeometryParams(withChanges({ plaza: { depth: 31 } }))).not.toBe(base);
         expect(hashGeometryParams(withChanges({ mesh: { baseHeight: 5 } }))).not.toBe(base);
+        expect(hashGeometryParams(withChanges({ spots: { meepleRadius: 9 } }))).not.toBe(base);
     });
 
     it('хэш тайла не зависит от настроек других тайлов', () => {
@@ -209,6 +222,19 @@ describe('параметры доходят до геометрии', () => {
         const params = withChanges({ noiseByType: { road: { lineAmplitude: 9 } } });
         expect(signature('tile_CRRC', params)).not.toBe(signature('tile_CRRC', GEOMETRY_PARAMS));
         expect(signature(CITY, params)).toBe(signature(CITY, GEOMETRY_PARAMS));
+    });
+
+    it('radius мипла из spots доходит до аудита: большой радиус даёт предупреждения о тесноте', () => {
+        const roomy = auditTile(tileById('tile_CRRC'), {
+            geometryParams: withChanges({ spots: { meepleRadius: 3 } }),
+            overwrite: true,
+        });
+        const cramped = auditTile(tileById('tile_CRRC'), {
+            geometryParams: withChanges({ spots: { meepleRadius: 14 } }),
+            overwrite: true,
+        });
+        expect(roomy.issues.some((i) => i.code === 'spot-tight')).toBe(false);
+        expect(cramped.issues.some((i) => i.code === 'spot-tight')).toBe(true);
     });
 
     it('ширина дороги из generation.roadWidth доходит до геометрии', () => {

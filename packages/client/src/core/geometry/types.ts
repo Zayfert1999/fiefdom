@@ -32,6 +32,8 @@ export interface FieldComputationResult {
 
 /** Результат привязки полей к фичам */
 export interface AssignmentResult {
+    /** Как каждое поле нашло полигон: по портам или запасным способом по meepleSpot */
+    readonly fieldBinding?: ReadonlyMap<string, 'ports' | 'spot'>;
     readonly fieldGeometries: ReadonlyMap<string, MultiPolygon>;
 }
 

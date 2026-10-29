@@ -31,6 +31,7 @@ import earcut from 'earcut';
 import type { Point, Polygon, Ring } from '@fiefdom/shared/core/geometry.types';
 import type { FeatureType, TileFeature } from '@fiefdom/shared/core/types';
 import { HALF } from './generators/sides';
+import type { FeatureSpot } from './spots';
 import type { TileGeometryResult } from './types';
 
 // ============================================
@@ -454,6 +455,8 @@ export interface TileBundle {
     readonly features: readonly MeshFeature[];
     readonly geometry: TileGeometryResult;
     readonly mesh: TileMeshData;
+    /** Споты мипла и щита по featureId (локальные координаты тайла без поворота) */
+    readonly spots: ReadonlyMap<string, FeatureSpot>;
 }
 
 export function buildTileBundle(
@@ -462,6 +465,7 @@ export function buildTileBundle(
         readonly artId: string;
         readonly features: readonly MeshFeature[];
         readonly geometry: TileGeometryResult;
+        readonly spots?: ReadonlyMap<string, FeatureSpot>;
     },
     params?: MeshParamsInput
 ): TileBundle {
@@ -471,5 +475,6 @@ export function buildTileBundle(
         features: source.features,
         geometry: source.geometry,
         mesh: buildTileMesh(source.geometry, source.features, params),
+        spots: source.spots ?? new Map(),
     };
 }

@@ -27,6 +27,11 @@
 //    • «Швы»     — случайная доска, подсветка несовпадений на стыках
 //    • «3D доска» — та же доска в 3D (инстансинг, тени, пикинг клеток)
 //
+// 📍 Споты мипла и щита вычисляются из геометрии (core/geometry/spots.ts).
+//    На схеме: голубой круг — вычисленный спот (размером с фигурку),
+//    оранжевая точка — прежний ручной spot из данных. В диагностике — таблица
+//    «авто против ручного» и запас вокруг каждого спота.
+//
 // 💾 Все параметры живут в одном объекте GeometryParams (geometryParams.json).
 //    Панель «Файл параметров» сохраняет его на диск (dev-сервер Vite),
 //    показывает несохранённые изменения и умеет загружать/откатывать.
@@ -44,6 +49,7 @@ import {
   NoiseByTypeControls,
   NoiseControls,
   PlazaControls,
+  SpotControls,
   TessellationControls,
   TileOverrideControls,
   ParamCheckbox,
@@ -59,8 +65,9 @@ import {
   NOISE_PARAMS,
   DEFAULT_TESSELLATION_PARAMS,
   DEFAULT_PLAZA_PARAMS,
+  DEFAULT_SPOT_PARAMS,
 } from '@/core/geometry';
-import type { NoiseByType, NoiseSettings, PlazaParams, TessellationParams } from '@/core/geometry';
+import type { NoiseByType, NoiseSettings, PlazaParams, SpotParams, TessellationParams } from '@/core/geometry';
 import { auditGeometry, type AuditPipelineOptions } from '@/core/geometry/geometryAudit';
 import { resolveMeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
 import {
@@ -352,6 +359,7 @@ interface SandboxTileViewProps {
   showGrid: boolean;
   showAxes: boolean;
   showSpots: boolean;
+  showAutoSpots: boolean;
   showPorts: boolean;
   showGeometry: boolean;
   // Генеративная геометрия
@@ -369,6 +377,7 @@ const SandboxTileView = memo(({
   showGrid,
   showAxes,
   showSpots,
+  showAutoSpots,
   showPorts,
   showGeometry,
   enableGenerative,
@@ -467,9 +476,10 @@ const SandboxTileView = memo(({
         features: generation.features,
         result,
         tessellation: params.tessellation,
+        spots: params.spots,
         warnings: generation.warnings,
       }),
-    [tile.id, tile.artId, seed, generation.features, generation.warnings, result, params.tessellation]
+    [tile.id, tile.artId, seed, generation.features, generation.warnings, result, params.tessellation, params.spots]
   );
 
   // Число вершин после тесселяции и шума
@@ -650,6 +660,32 @@ const SandboxTileView = memo(({
                 )}
               </g>
             ))}
+
+            {/* 📍 Вычисленные споты: круг размером с фигурку; тонкая линия тянется к прежнему ручному споту */}
+            {showAutoSpots && Array.from(audit.spots.entries()).map(([featureId, spot]) => {
+              const manual = tile.features.find((f) => f.id === featureId)?.meepleSpot;
+              return (
+                <g key={`auto-spot-${featureId}`} pointerEvents="none">
+                  {showSpots && manual && (
+                    <line
+                      x1={manual.x} y1={manual.y} x2={spot.meeple[0]} y2={spot.meeple[1]}
+                      stroke="#38bdf8" strokeWidth={0.3} strokeDasharray="1 1" opacity={0.7}
+                    />
+                  )}
+                  <circle
+                    cx={spot.meeple[0]} cy={spot.meeple[1]} r={params.spots.meepleRadius}
+                    fill="rgba(56,189,248,0.15)" stroke="#38bdf8" strokeWidth={0.5} strokeDasharray="1.5 1"
+                  />
+                  <circle cx={spot.meeple[0]} cy={spot.meeple[1]} r={1.5} fill="#38bdf8" stroke="#000" strokeWidth={0.3} />
+                  {spot.shield && (
+                    <rect
+                      x={spot.shield[0] - 2.5} y={spot.shield[1] - 2.5} width={5} height={5} rx={1}
+                      fill="#facc15" stroke="#fff" strokeWidth={0.5}
+                    />
+                  )}
+                </g>
+              );
+            })}
           </svg>
         </div>
 
@@ -673,6 +709,42 @@ const SandboxTileView = memo(({
           </span>
         ))}
       </div>
+
+      {/* 📍 СПОТЫ: вычисленные против прежних ручных */}
+      {audit.spots.size > 0 && (
+        <details style={{ fontSize: 12, color: '#ccc' }}>
+          <summary style={{ cursor: 'pointer', color: '#fff', fontWeight: 600 }}>
+            📍 Споты ({audit.spots.size}) · наименьший запас {audit.minSpotClearance.toFixed(1)} при радиусе мипла {params.spots.meepleRadius}
+          </summary>
+          <table style={{ borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: 11.5, marginTop: 4 }}>
+            <thead>
+              <tr style={{ color: '#9ca3af', textAlign: 'left' }}>
+                <th style={{ paddingRight: 12 }}>фича</th>
+                <th style={{ paddingRight: 12 }}>авто (x, y)</th>
+                <th style={{ paddingRight: 12 }}>запас</th>
+                <th style={{ paddingRight: 12 }}>Δ ручной</th>
+                <th>способ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from(audit.spots.entries()).map(([featureId, spot]) => {
+                const tight = spot.clearance < params.spots.meepleRadius;
+                return (
+                  <tr key={featureId} style={{ color: tight ? '#fcd34d' : '#ccc' }}>
+                    <td style={{ paddingRight: 12 }}>{featureId}</td>
+                    <td style={{ paddingRight: 12 }}>{spot.meeple[0].toFixed(1)}, {spot.meeple[1].toFixed(1)}</td>
+                    <td style={{ paddingRight: 12 }}>{spot.clearance.toFixed(1)}{tight ? ' ⚠' : ''}</td>
+                    <td style={{ paddingRight: 12 }}>
+                      {audit.spotDeltas[featureId] === undefined ? '—' : audit.spotDeltas[featureId].toFixed(1)}
+                    </td>
+                    <td>{spot.method === 'pole' ? 'полюс' : 'ось'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
+      )}
 
       {/* 🚦 ПРОБЛЕМЫ, НАЙДЕННЫЕ АУДИТОМ (ошибки генерации показываются ниже отдельно) */}
       {audit.issues.some((issue) => issue.code !== 'generation') && (
@@ -733,6 +805,7 @@ export const GeometrySandbox = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [showAxes, setShowAxes] = useState(true);
   const [showSpots, setShowSpots] = useState(true);
+  const [showAutoSpots, setShowAutoSpots] = useState(true);
   const [showPorts, setShowPorts] = useState(true);
   const [showGeometry, setShowGeometry] = useState(true);
   const [showVertices, setShowVertices] = useState(false);
@@ -790,6 +863,10 @@ export const GeometrySandbox = () => {
     (patch: Partial<PlazaParams>) => setParams((prev) => ({ ...prev, plaza: { ...prev.plaza, ...patch } })),
     []
   );
+  const patchSpots = useCallback(
+    (patch: Partial<SpotParams>) => setParams((prev) => ({ ...prev, spots: { ...prev.spots, ...patch } })),
+    []
+  );
   const patchMesh = useCallback(
     (patch: MeshParamsInput) =>
       setParams((prev) => ({
@@ -815,6 +892,10 @@ export const GeometrySandbox = () => {
   );
   const resetPlaza = useCallback(
     () => setParams((prev) => ({ ...prev, plaza: { ...DEFAULT_PLAZA_PARAMS } })),
+    []
+  );
+  const resetSpots = useCallback(
+    () => setParams((prev) => ({ ...prev, spots: { ...DEFAULT_SPOT_PARAMS } })),
     []
   );
   const resetMesh = useCallback(() => setParams((prev) => ({ ...prev, mesh: resolveMeshParams() })), []);
@@ -945,7 +1026,8 @@ export const GeometrySandbox = () => {
   const layerToggles = [
     { label: '🔲 Сетка', value: showGrid, set: setShowGrid },
     { label: '➕ Оси', value: showAxes, set: setShowAxes },
-    { label: '🔶 Споты', value: showSpots, set: setShowSpots },
+    { label: '🔶 Споты (ручные)', value: showSpots, set: setShowSpots },
+    { label: '📍 Споты (авто)', value: showAutoSpots, set: setShowAutoSpots },
     { label: '📍 Порты', value: showPorts, set: setShowPorts },
     { label: '🎨 Геометрия', value: showGeometry, set: setShowGeometry },
     { label: '🔹 Вершины тесселяции', value: showVertices, set: setShowVertices },
@@ -1066,6 +1148,16 @@ export const GeometrySandbox = () => {
             </div>
 
             {/* ======================================== */}
+            {/* 📍 СПОТЫ МИПЛА И ЩИТА */}
+            {/* ======================================== */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+                📍 Споты
+              </div>
+              <SpotControls params={params.spots} onChange={patchSpots} onReset={resetSpots} />
+            </div>
+
+            {/* ======================================== */}
             {/* 🧱 МЕШ (3D) */}
             {/* ======================================== */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1181,6 +1273,7 @@ export const GeometrySandbox = () => {
                     showGrid={showGrid}
                     showAxes={showAxes}
                     showSpots={showSpots}
+                    showAutoSpots={showAutoSpots}
                     showPorts={showPorts}
                     showGeometry={showGeometry}
                     enableGenerative={enableGenerative}

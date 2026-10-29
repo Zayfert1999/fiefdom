@@ -18,7 +18,7 @@ import {
 } from './tessellate';
 import { subtractPolygons } from './booleanOps';
 import { generatePlazas, type PlazaParams } from './generators/plaza';
-import { computeFieldPolygons, assignFieldFeatures } from './generators/field';
+import { computeFieldPolygons, assignFieldFeaturesDetailed } from './generators/field';
 import { applyGeometryNoise, type NoiseOptions } from './geometryPostProcessor';
 // 🌟 Типы из нового файла
 import type {
@@ -229,8 +229,8 @@ function assignFieldPolygons(
     features: readonly TileFeature[],
     fields: FieldComputationResult
 ): AssignmentResult {
-    const fieldGeometries = assignFieldFeatures(features, fields.fieldPolygons);
-    return { fieldGeometries };
+    const { fieldGeometries, methods } = assignFieldFeaturesDetailed(features, fields.fieldPolygons);
+    return { fieldGeometries, fieldBinding: methods };
 }
 
 // ============================================

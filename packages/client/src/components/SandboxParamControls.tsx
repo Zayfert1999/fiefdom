@@ -16,6 +16,7 @@ import type {
   NoiseFeatureType,
   NoiseSettings,
   PlazaParams,
+  SpotParams,
   TessellationParams,
 } from '@/core/geometry';
 import type { TileParamOverride } from '@/core/geometry/geometryParams';
@@ -259,6 +260,50 @@ export const TessellationControls = memo(({ params, onChange, onReset }: Tessell
   </div>
 ));
 TessellationControls.displayName = 'TessellationControls';
+
+// ============================================
+// 📍 СПОТЫ МИПЛА И ЩИТА
+// ============================================
+
+interface SpotControlsProps {
+  params: SpotParams;
+  onChange: (patch: Partial<SpotParams>) => void;
+  onReset: () => void;
+}
+
+export const SpotControls = memo(({ params, onChange, onReset }: SpotControlsProps) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ fontSize: 10.5, color: MUTED, lineHeight: 1.3 }}>
+      Споты считаются из итоговой геометрии: город, монастырь и поле — «полюс недоступности»,
+      дорога — середина видимого участка оси. Прежние ручные споты в данных не используются.
+    </div>
+    <ParamSlider
+      label="Радиус мипла" value={params.meepleRadius} min={1} max={30} step={0.5}
+      hint="Если запас вокруг спота меньше радиуса, аудит предупреждает: фигурка не помещается. У дорог запас ≈ половина ширины."
+      onChange={(v) => onChange({ meepleRadius: v })}
+    />
+    <ParamSlider
+      label="Притяжение к центру" value={params.centerBias} min={0} max={0.5} step={0.01}
+      hint="На широких фичах много равноценных точек. Небольшое притяжение к центроиду делает выбор симметричным. 0 — чистый polylabel."
+      onChange={(v) => onChange({ centerBias: v })}
+    />
+    <ParamSlider
+      label="Зазор щита от мипла" value={params.shieldMargin} min={0} max={20} step={0.5}
+      onChange={(v) => onChange({ shieldMargin: v })}
+    />
+    <ParamSlider
+      label="Точность поиска" value={params.precision} min={0.05} max={2} step={0.05}
+      hint="Меньше — точнее и медленнее."
+      onChange={(v) => onChange({ precision: v })}
+    />
+    <ParamSlider
+      label="Шаг выборки оси дороги" value={params.roadSampleStep} min={0.25} max={5} step={0.25}
+      onChange={(v) => onChange({ roadSampleStep: v })}
+    />
+    <div><ResetButton onClick={onReset} label="↺ Сбросить споты" /></div>
+  </div>
+));
+SpotControls.displayName = 'SpotControls';
 
 // ============================================
 // 🧱 МЕШ (3D)

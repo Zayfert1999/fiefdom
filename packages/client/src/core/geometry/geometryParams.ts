@@ -8,7 +8,7 @@
 //   {
 //     version, generation, tessellation, noise,
 //     noiseByType: { city?, monastery?, road? },   ← свои настройки шума для типа фичи
-//     plaza, mesh,
+//     plaza, spots, mesh,
 //     tiles: { "<artId>": { seed?, noise? } }      ← настройки конкретного тайла
 //   }
 //
@@ -25,6 +25,7 @@
 // ============================================
 import { ROAD_PARAMS } from './generators/road';
 import { DEFAULT_PLAZA_PARAMS, resolvePlazaParams, type PlazaParams } from './generators/plaza';
+import { DEFAULT_SPOT_PARAMS, resolveSpotParams, type SpotParams } from './spots';
 import {
     EDGE_FADE_CURVES,
     NOISE_PARAMS,
@@ -74,6 +75,7 @@ export interface GeometryParams {
     noise: NoiseSettings;
     noiseByType: NoiseByType;
     plaza: PlazaParams;
+    spots: SpotParams;
     mesh: MeshParams;
     tiles: Record<string, TileParamOverride>;
 }
@@ -86,6 +88,7 @@ export interface GeometryParamsInput {
     noise?: Partial<NoiseSettings>;
     noiseByType?: NoiseByType;
     plaza?: Partial<PlazaParams>;
+    spots?: Partial<SpotParams>;
     mesh?: MeshParamsInput;
     tiles?: Record<string, TileParamOverride>;
 }
@@ -156,6 +159,7 @@ export function resolveGeometryParams(input: GeometryParamsInput = {}): Geometry
         noise,
         noiseByType,
         plaza: resolvePlazaParams(input.plaza),
+        spots: resolveSpotParams(input.spots),
         mesh: resolveMeshParams(input.mesh),
         tiles,
     };
@@ -242,7 +246,9 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
         );
     }
 
-    const topLevel = new Set(['version', 'generation', 'tessellation', 'noise', 'noiseByType', 'plaza', 'mesh', 'tiles']);
+    const topLevel = new Set([
+        'version', 'generation', 'tessellation', 'noise', 'noiseByType', 'plaza', 'spots', 'mesh', 'tiles',
+    ]);
     for (const key of Object.keys(raw)) {
         if (!topLevel.has(key)) warnings.push(`${key}: неизвестная секция, проигнорирована`);
     }
@@ -254,6 +260,7 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
             GeometryParamsInput['tessellation'],
         noise: sanitizeSection('noise', raw.noise, NOISE_PARAMS, warnings) as GeometryParamsInput['noise'],
         plaza: sanitizeSection('plaza', raw.plaza, DEFAULT_PLAZA_PARAMS, warnings) as GeometryParamsInput['plaza'],
+        spots: sanitizeSection('spots', raw.spots, DEFAULT_SPOT_PARAMS, warnings) as GeometryParamsInput['spots'],
         mesh: sanitizeSection('mesh', raw.mesh, DEFAULT_MESH_PARAMS, warnings) as GeometryParamsInput['mesh'],
     };
 
@@ -322,6 +329,7 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     reportClamped('tessellation', input.tessellation, params.tessellation, warnings);
     reportClamped('noise', input.noise, params.noise, warnings);
     reportClamped('plaza', input.plaza, params.plaza, warnings);
+    reportClamped('spots', input.spots, params.spots, warnings);
     reportClamped('mesh', input.mesh, params.mesh, warnings);
     for (const type of NOISE_FEATURE_TYPES) {
         reportClamped(`noiseByType.${type}`, input.noiseByType?.[type], params.noiseByType[type], warnings);
@@ -371,6 +379,7 @@ function canonicalObject(params: GeometryParams, onlyTile?: string): unknown {
         noise: params.noise,
         noiseByType,
         plaza: params.plaza,
+        spots: params.spots,
         mesh: params.mesh,
         tiles,
     };

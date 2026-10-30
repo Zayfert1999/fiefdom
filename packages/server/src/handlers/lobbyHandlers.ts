@@ -16,6 +16,7 @@ import {
 } from '@fiefdom/shared/protocol/schemas';
 import { logger } from '../utils/logger';
 import { emitError, onSafe } from '../utils/socketUtils';
+import { ipGuard, SERVER_LIMITS } from '../utils/ipGuard';
 
 // ============================================
 // 🌟 ХЕЛПЕРЫ
@@ -122,6 +123,18 @@ export function registerLobbyHandlers(io: GameServer, socket: GameSocket, roomMa
 
     const { playerName, settings, preferredColor } = parsed.data;
     const validatedName = validatePlayerName(playerName);
+
+    // 🛡️ Лимиты (проверяем ДО выхода из прежней комнаты — отказ ничего не ломает)
+    if (roomManager.roomCount >= SERVER_LIMITS.maxRooms) {
+      logger.warn('[Lobby]', `🚫 Достигнут лимит комнат (${SERVER_LIMITS.maxRooms})`);
+      emitError(socket, 'SERVER_BUSY');
+      return;
+    }
+    if (!ipGuard.tryCreateRoom(socket.data.ip ?? 'unknown')) {
+      logger.warn('[Lobby]', '🚫 Слишком частое создание комнат с одного адреса');
+      emitError(socket, 'TOO_MANY_ROOMS');
+      return;
+    }
 
     // 🌟 Один сокет — одна комната: выходим из прежней, чтобы не плодить
     // «призрачные» комнаты и не терять привязку сокета

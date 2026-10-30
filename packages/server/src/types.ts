@@ -15,6 +15,8 @@ export interface InterServerEvents { }
 export interface SocketData {
   roomId?: string;
   playerId?: string;
+  /** IP клиента (для лимитов по адресу) */
+  ip?: string;
 }
 
 export type GameServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;

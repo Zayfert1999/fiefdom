@@ -68,9 +68,10 @@ export function useLocalClock(): void {
         return;
       }
 
-      // Новая партия (или первый запуск после загрузки сохранения) → свежие банки
+      // Новая партия → свежие банки; загруженное сохранение → банки из сохранения
+      // (loadLocalGame кладёт их в clockSnapshot, а startGame его обнуляет)
       if (clock === null || gameKey !== state.gameStartTime) {
-        clock = new FischerClock(state.players.map(p => p.id), timeControl);
+        clock = new FischerClock(state.players.map(p => p.id), timeControl, state.clockSnapshot?.banksMs);
         gameKey = state.gameStartTime;
       }
 

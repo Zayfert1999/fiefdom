@@ -74,6 +74,7 @@ export function registerGameHandlers(socket: GameSocket): void {
 
     // 2. Время старта игры
     store.setGameStartTime(snapshot.gameStartTime);
+    useGameStore.setState({ timedOutPlayerIds: [], clockSnapshot: null });
 
     // 3. Сохраняем подключение
     store._saveConnectionInfo(snapshot.yourPlayerId, snapshot.roomId, snapshot.yourSessionToken);

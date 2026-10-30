@@ -7,6 +7,7 @@ import type { PlacedTile, Tile, Player } from '@fiefdom/shared/core/types';
 import type { RegionManager } from '@fiefdom/shared/core/regionManager';
 import type { SerializedRegionManager } from '@fiefdom/shared/core/serialization';
 import type { GamePhase, LastPlacedTile } from '@/state/types';
+import type { TimeControl } from '@fiefdom/shared/core/fischerClock';
 
 // ============================================
 // 🔑 КЛЮЧИ СОХРАНЕНИЙ
@@ -19,6 +20,22 @@ export const SAVE_KEYS = {
 } as const;
 
 export type SaveKey = typeof SAVE_KEYS[keyof typeof SAVE_KEYS];
+
+// ============================================
+// 🕐 ЧАСЫ В СОХРАНЕНИИ
+// ============================================
+/**
+ * Состояние шахматных часов локальной партии. Поле опционально: сохранения, сделанные
+ * до появления часов, его не содержат (партия продолжится со свежими банками).
+ */
+export interface SavedClockState {
+    /** Контроль времени партии; null — партия без таймера */
+    timeControl: TimeControl | null;
+    /** Банки игроков (мс) на момент сохранения; null — часы ещё не запускались */
+    banksMs: Record<string, number> | null;
+    /** Игроки, у которых закончилось время (зрители) */
+    timedOutPlayerIds: string[];
+}
 
 // ============================================
 // 📦 СТРУКТУРА СОХРАНЕНИЯ
@@ -42,6 +59,8 @@ export interface SerializedLocalGame {
     gameStartTime: number | null;
     // Лобби (для восстановления)
     lobbyPlayers: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[];
+    // Часы (опционально: в старых сохранениях нет)
+    clock?: SavedClockState;
     // Мета-данные
     savedAt: number;
 }
@@ -64,6 +83,7 @@ export interface GameStateForSave {
     enabledDeckView: boolean;
     gameStartTime: number | null;
     lobbyPlayers: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[];
+    clock?: SavedClockState;
 }
 
 // ============================================
@@ -84,6 +104,7 @@ export interface DeserializedGameState {
     enabledDeckView: boolean;
     gameStartTime: number | null;
     lobbyPlayers: Omit<Player, 'score' | 'meepleCount' | 'pointsByCategory'>[];
+    clock?: SavedClockState;
     savedAt: number;
 }
 
@@ -110,6 +131,7 @@ export function serializeGameState(state: GameStateForSave): SerializedLocalGame
         enabledDeckView: state.enabledDeckView,
         gameStartTime: state.gameStartTime,
         lobbyPlayers: state.lobbyPlayers,
+        clock: state.clock,
         savedAt: Date.now(),
     };
 }
@@ -141,6 +163,7 @@ export function deserializeGameState(data: SerializedLocalGame): Omit<Deserializ
         enabledDeckView: data.enabledDeckView ?? true,
         gameStartTime: data.gameStartTime ?? null,
         lobbyPlayers: data.lobbyPlayers || [],
+        clock: data.clock,
         savedAt: data.savedAt || 0,
     };
 }

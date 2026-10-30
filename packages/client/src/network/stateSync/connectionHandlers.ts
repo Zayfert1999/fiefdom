@@ -144,6 +144,14 @@ export function registerConnectionHandlers(socket: GameSocket): void {
   // ============================================
   socket.on('connect_error', (error) => {
     useGameStore.getState()._setConnectionError(error.message);
+
+    // Сервер отклонил соединение: с этого адреса уже открыто слишком много подключений
+    if (error.message === 'TOO_MANY_CONNECTIONS') {
+      toast.error('Слишком много подключений с вашего адреса. Закройте лишние вкладки.', {
+        dedupeKey: 'too-many-connections',
+        duration: 8000,
+      });
+    }
   });
 
   // ============================================

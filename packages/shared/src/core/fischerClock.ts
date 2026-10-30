@@ -73,9 +73,21 @@ export class FischerClock {
   /** Момент (мс), с которого тикает банк активного игрока */
   private startedAt = 0;
 
-  constructor(playerIds: readonly string[], private readonly control: TimeControl) {
+  /**
+   * @param initialBanksMs — банки игроков, если партия продолжается (загрузка сохранения);
+   *   для игрока без записи (или с некорректным значением) выдаётся полный банк.
+   */
+  constructor(
+    playerIds: readonly string[],
+    private readonly control: TimeControl,
+    initialBanksMs?: Readonly<Record<string, number>> | null
+  ) {
     for (const id of playerIds) {
-      this.banksMs.set(id, control.baseSeconds * 1000);
+      const saved = initialBanksMs?.[id];
+      this.banksMs.set(
+        id,
+        typeof saved === 'number' && Number.isFinite(saved) ? Math.max(0, Math.round(saved)) : control.baseSeconds * 1000
+      );
     }
   }
 

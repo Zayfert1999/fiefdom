@@ -6,6 +6,18 @@ import type { GameSocket, ServerEventName, ServerEventArgs } from '../types';
 import type { Player } from '@fiefdom/shared/core/types';
 import type { LobbyPlayer } from '@fiefdom/shared/protocol/events';
 
+/** Сколько после ротации ещё принимается прежний токен */
+export const SESSION_TOKEN_GRACE_MS = 60_000;
+
+const generateToken = (): string => randomBytes(32).toString('base64url');
+
+/** Сравнение строк за постоянное время (timingSafeEqual требует буферы одинаковой длины) */
+function safeEqual(expected: string, actual: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(actual);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /** Нетипизированный emit — только для внутренней реализации PlayerConnection.emit */
 interface RawEmitter {
   emit(event: string, ...args: unknown[]): boolean;
@@ -19,8 +31,17 @@ export class PlayerConnection {
    * единственный раз — в его собственном снапшоте. playerId, напротив, публичен
    * (его видят все в комнате), поэтому сам по себе для reconnect не годится.
    * НИКОГДА не логировать и не включать в рассылки.
+   *
+   * Токен меняется при каждом успешном reconnect (rotateSessionToken): украденный
+   * или устаревший токен перестаёт работать. Прежний токен ещё SESSION_TOKEN_GRACE_MS
+   * принимается — на случай, если ответ с новым токеном потерялся по дороге.
    */
-  public readonly sessionToken: string = randomBytes(32).toString('base64url');
+  private currentToken: string = generateToken();
+  private previousToken: { value: string; expiresAt: number } | null = null;
+
+  get sessionToken(): string {
+    return this.currentToken;
+  }
   /** Текущий socket (может меняться при reconnect) */
   public socket: GameSocket | null;
   /** Готовность в лобби */
@@ -35,12 +56,25 @@ export class PlayerConnection {
     this.socket = socket;
   }
 
-  /** Проверка токена за постоянное время (без утечки по времени ответа) */
-  verifySessionToken(candidate: string): boolean {
-    const expected = Buffer.from(this.sessionToken);
-    const actual = Buffer.from(candidate);
-    // timingSafeEqual требует буферы одинаковой длины
-    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  /**
+   * Проверка токена за постоянное время (без утечки по времени ответа).
+   * Принимается текущий токен, а также прежний — в течение SESSION_TOKEN_GRACE_MS после ротации.
+   */
+  verifySessionToken(candidate: string, now = Date.now()): boolean {
+    // Оба сравнения выполняются всегда (без раннего выхода)
+    const matchesCurrent = safeEqual(this.currentToken, candidate);
+    const matchesPrevious =
+      this.previousToken !== null &&
+      now < this.previousToken.expiresAt &&
+      safeEqual(this.previousToken.value, candidate);
+    return matchesCurrent || matchesPrevious;
+  }
+
+  /** Выдать новый токен (после успешного reconnect). Прежний действует ещё короткое время. */
+  rotateSessionToken(now = Date.now()): string {
+    this.previousToken = { value: this.currentToken, expiresAt: now + SESSION_TOKEN_GRACE_MS };
+    this.currentToken = generateToken();
+    return this.currentToken;
   }
 
   get id(): string {

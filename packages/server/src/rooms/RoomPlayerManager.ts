@@ -157,6 +157,10 @@ export class RoomPlayerManager {
       delete oldSocket.data.playerId;
     }
 
+    // 🔐 Токен меняется при каждом успешном возврате: снапшот ниже уже несёт новый.
+    // Если ответ потеряется, прежний токен ещё минуту будет принят.
+    conn.rotateSessionToken();
+
     // Восстанавливаем подключение
     newSocket.join(this.roomId);
     conn.markReconnected(newSocket);

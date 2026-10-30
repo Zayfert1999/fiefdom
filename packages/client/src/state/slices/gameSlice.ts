@@ -9,12 +9,14 @@ import {
     loadGameState,
     clearGameState,
     type GameStateForSave,
+    type SavedClockState,
 } from '@/core/gameSaveManager';
 import { RegionManager } from '@fiefdom/shared/core/regionManager';
 import { findCompletedRegionsOnTile, findAllIncompleteRegionsWithMeeples, type CompletedRegion } from '@fiefdom/shared/core/scoring';
 import { COMPLITED_REGION_ANIMATION_DURATION, CAMERA_CONFIG } from '@fiefdom/shared/core/constants'
 import { createDeck, drawPlayableTile } from '@fiefdom/shared/core/deck';
 import { toast } from '@/state/useToastStore';
+import { normalizeTimeControl, type TimeControl } from '@fiefdom/shared/core/fischerClock';
 
 
 export interface GameSlice {
@@ -79,6 +81,45 @@ function nextActiveTurn(players: Player[], current: number, timedOutIds: string[
         if (!timedOutIds.includes(players[index].id)) return index;
     }
     return (current + 1) % players.length;
+}
+
+/**
+ * 🕐 Часы для сохранения: банки игроков на ТЕКУЩИЙ момент (у игрока с идущими часами
+ * вычитается время, прошедшее с последнего снимка).
+ */
+function captureClock(state: GameStore): SavedClockState {
+    const snapshot = state.clockSnapshot;
+    let banksMs: Record<string, number> | null = null;
+    if (snapshot) {
+        const elapsed = Date.now() - snapshot.receivedAt;
+        banksMs = {};
+        for (const [id, bank] of Object.entries(snapshot.banksMs)) {
+            banksMs[id] = Math.max(0, snapshot.activePlayerId === id ? bank - elapsed : bank);
+        }
+    }
+    return {
+        timeControl: state.gameTimeControl,
+        banksMs,
+        timedOutPlayerIds: state.timedOutPlayerIds,
+    };
+}
+
+/**
+ * 🕐 Состояние часов после загрузки сохранения.
+ * Сохранение без часов (старое) — партия продолжается с текущей настройкой таймера и свежими банками.
+ */
+function restoreClock(saved: SavedClockState | undefined, fallback: TimeControl | null) {
+    if (!saved) {
+        return { gameTimeControl: fallback, clockSnapshot: null, timedOutPlayerIds: [] as string[] };
+    }
+    const timeControl = saved.timeControl ? normalizeTimeControl(saved.timeControl) : null;
+    return {
+        gameTimeControl: timeControl,
+        clockSnapshot: timeControl && saved.banksMs
+            ? { banksMs: saved.banksMs, activePlayerId: null, receivedAt: Date.now() }
+            : null,
+        timedOutPlayerIds: Array.isArray(saved.timedOutPlayerIds) ? saved.timedOutPlayerIds : [],
+    };
 }
 
 export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set, get) => ({
@@ -691,6 +732,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             enabledDeckView: state.enabledDeckView,
             gameStartTime: state.gameStartTime,
             lobbyPlayers: state.lobbyPlayers,
+            clock: captureClock(state),
         };
         saveGameState(SAVE_KEYS.LOCAL, dataForSave);
     },
@@ -726,11 +768,8 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             enabledDeckView: data.enabledDeckView,
             gameStartTime: data.gameStartTime ?? null,
             lobbyPlayers: data.lobbyPlayers || [],
-            // 🕐 Часы в сохранение не пишутся: после загрузки партия идёт с НОВЫМИ банками
-            // по текущей настройке таймера локальной игры
-            gameTimeControl: get().localTimeControl,
-            clockSnapshot: null,
-            timedOutPlayerIds: [],
+            // 🕐 Часы восстанавливаются из сохранения (банки, зрители, контроль времени)
+            ...restoreClock(data.clock, get().localTimeControl),
             previewTile: null,
             previewRegionManager: null,
             moveSnapshot: null,
@@ -775,6 +814,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             enabledDeckView: state.enabledDeckView,
             gameStartTime: state.gameStartTime,
             lobbyPlayers: state.lobbyPlayers,
+            clock: captureClock(state),
         };
         saveGameState(SAVE_KEYS.DEBUG, dataForSave);
         console.log('💾 [GameSlice] Дебаг-сохранение создано');
@@ -812,6 +852,7 @@ export const createGameSlice: StateCreator<GameStore, [], [], GameSlice> = (set,
             enabledDeckView: loaded.enabledDeckView,
             gameStartTime: loaded.gameStartTime,
             lobbyPlayers: loaded.lobbyPlayers,
+            ...restoreClock(loaded.clock, get().localTimeControl),
             // Сброс клиентского состояния
             previewTile: null,
             previewRegionManager: null,

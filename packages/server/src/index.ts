@@ -13,6 +13,7 @@ import { registerGameHandlers } from './handlers/gameHandlers';
 import { registerRoomBrowserHandlers, bindRoomBrowserBroadcast } from './handlers/roomBrowserHandlers';
 import { registerSystemHandlers } from './handlers/systemHandlers';
 import { logger } from './utils/logger';
+import { ipGuard, getClientIp, TRUST_PROXY } from './utils/ipGuard';
 
 // 🌟 Разрешённые источники. Для продакшена: CORS_ORIGINS="https://game.example.com,https://example.github.io"
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://127.0.0.1:5173')
@@ -21,8 +22,16 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http
   .filter(Boolean);
 
 const app = express();
+// За прокси (TRUST_PROXY=1) req.ip берётся из X-Forwarded-For
+if (TRUST_PROXY) app.set('trust proxy', true);
 // REST и Socket.IO используют один и тот же список источников
 app.use(cors({ origin: ALLOWED_ORIGINS }));
+
+// 🛡️ Частота HTTP-запросов с одного адреса
+app.use((req, res, next) => {
+  if (ipGuard.allowHttpRequest(req.ip ?? 'unknown')) return next();
+  res.status(429).json({ error: 'Слишком много запросов' });
+});
 
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
@@ -30,6 +39,22 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
     origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
   },
+  // Сообщения протокола крошечные; по умолчанию (1 МБ) один клиент мог бы засыпать сервер крупными пакетами
+  maxHttpBufferSize: 64 * 1024,
+});
+
+// 🛡️ Лимит одновременных соединений с одного IP
+io.use((socket, next) => {
+  const ip = getClientIp(socket.handshake.address, socket.handshake.headers);
+  if (!ipGuard.tryAcquireConnection(ip)) {
+    logger.warn('[Server]', `🚫 Отклонено соединение: слишком много подключений с одного адреса`);
+    return next(new Error('TOO_MANY_CONNECTIONS'));
+  }
+  socket.data.ip = ip;
+  // Освобождаем слот по закрытию транспорта (engine.io 'close' срабатывает всегда,
+  // в отличие от socket 'disconnect', который не приходит, если клиент ушёл до завершения рукопожатия)
+  socket.conn.once('close', () => ipGuard.releaseConnection(ip));
+  next();
 });
 
 const roomManager = new RoomManager();
@@ -74,6 +99,7 @@ const shutdown = (signal: string): void => {
   logger.info('[Server]', `🛑 Получен ${signal} — остановка сервера`);
 
   roomManager.dispose();
+  ipGuard.dispose();
   io.close(() => process.exit(0));
 
   // Страховка: если соединения не закрылись — выходим принудительно

@@ -329,6 +329,7 @@ export class Room {
       yourPlayerId: viewerId,
       // 🔐 Токен виден только владельцу снапшота
       yourSessionToken: this.players.get(viewerId)?.sessionToken ?? '',
+      timedOutPlayerIds: this.gameState.timedOutIds,
       drawnTile,
     };
   }

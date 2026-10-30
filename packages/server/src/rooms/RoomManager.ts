@@ -68,6 +68,11 @@ export class RoomManager {
     this.notifyRoomsChanged();
   }
 
+  /** Сколько комнат сейчас существует */
+  get roomCount(): number {
+    return this.rooms.size;
+  }
+
   getRoom(roomId: string): Room | undefined {
     return this.rooms.get(roomId);
   }

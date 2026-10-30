@@ -96,6 +96,8 @@ export interface RoomSnapshot {
    * (LobbyPlayer, SnapshotPlayer, рассылки комнате). Нужен для lobby:reconnect.
    */
   yourSessionToken: string;
+  /** Игроки, у которых закончилось время (зрители). Нужно, чтобы вернувшийся клиент знал, кто не ходит */
+  timedOutPlayerIds?: string[];
   drawnTile?: Tile | null;  // Только если сейчас его ход
 }
 

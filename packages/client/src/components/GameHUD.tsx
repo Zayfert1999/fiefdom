@@ -34,6 +34,7 @@ export const GameHUD: React.FC = () => {
     const enabledDeckView = useGameStore(s => s.enabledDeckView);
     // 🕐 Шахматные часы: онлайн — настройка комнаты, локально — настройка партии (null = без таймера)
     const clockSnapshot = useGameStore(s => s.clockSnapshot);
+    const timedOutPlayerIds = useGameStore(s => s.timedOutPlayerIds);
     const timeControl = useGameStore(s =>
         s.roomId !== null ? (s.roomSettings?.timeControl ?? null) : s.gameTimeControl
     );
@@ -169,6 +170,7 @@ export const GameHUD: React.FC = () => {
                                         clockBankMs={timeControl && clockSnapshot ? (clockSnapshot.banksMs[player.id] ?? null) : null}
                                         clockReceivedAt={clockSnapshot?.receivedAt ?? 0}
                                         clockRunning={clockSnapshot?.activePlayerId === player.id}
+                                        isSpectator={timedOutPlayerIds.includes(player.id)}
                                     />
                                 );
                             })}
@@ -211,13 +213,15 @@ interface PlayerCardProps {
     clockReceivedAt: number;
     /** Часы этого игрока идут сейчас */
     clockRunning: boolean;
+    /** У игрока закончилось время: он больше не ходит, а наблюдает */
+    isSpectator: boolean;
 }
 
 /** Остаток времени игрока на момент now (у игрока с идущими часами — с учётом тикающего времени) */
 const bankAt = (bankMs: number, receivedAt: number, running: boolean, now: number): number =>
     Math.max(0, running ? bankMs - (now - receivedAt) : bankMs);
 
-const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, baseSeconds, clockBankMs, clockReceivedAt, clockRunning }: PlayerCardProps) => {
+const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, baseSeconds, clockBankMs, clockReceivedAt, clockRunning, isSpectator }: PlayerCardProps) => {
 
     // Часы показываем у всех игроков, если в партии есть таймер
     const hasTimer = clockBankMs !== null && baseSeconds > 0;
@@ -360,7 +364,12 @@ const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, baseSeconds
             <div className={styles.playerStats}>
                 <span className={styles.playerScore}>🏆 {player.score}</span>
                 <span className={styles.playerMeeples}>🔶 {player.meepleCount}</span>
-                {hasTimer && (
+                {isSpectator && (
+                    <span className={styles.playerClock} title="Время вышло — игрок наблюдает за партией">
+                        👁 наблюдает
+                    </span>
+                )}
+                {hasTimer && !isSpectator && (
                     <span
                         className={`${styles.playerClock} ${clockRunning ? styles.playerClockRunning : ''} ${isLowTime ? styles.playerClockLow : ''}`}
                         title="Остаток времени на партию"

@@ -254,6 +254,11 @@ export class ServerGameState {
     return true;
   }
 
+  /** Игроки, ставшие зрителями из-за времени */
+  get timedOutIds(): string[] {
+    return Array.from(this.timedOutPlayerIds);
+  }
+
   /** Игрок стал зрителем из-за времени (в отличие от вышедшего: может вернуться и наблюдать) */
   isPlayerTimedOut(playerId: string): boolean {
     return this.timedOutPlayerIds.has(playerId);

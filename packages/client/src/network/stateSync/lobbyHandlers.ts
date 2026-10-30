@@ -54,6 +54,8 @@ function applySnapshot(snapshot: RoomSnapshot): void {
   if (snapshot.gameState) {
     netLog(`🎮 [StateSync] Игра уже началась — восстанавливаем состояние`);
     applyServerState(snapshot.gameState);
+    // Кто остался без времени (зрители) — иначе вернувшийся клиент не знал бы об этом
+    useGameStore.setState({ timedOutPlayerIds: snapshot.timedOutPlayerIds ?? [] });
 
     // 🌟 Сейчас мой ход и тайл выдан → сразу переводим в фазу размещения.
     // (Раньше сервер досылал отдельный game:your-turn через setTimeout(100) — гонка.)

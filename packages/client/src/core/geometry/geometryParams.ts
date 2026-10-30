@@ -25,7 +25,13 @@
 // ============================================
 import { ROAD_PARAMS } from './generators/road';
 import { DEFAULT_PLAZA_PARAMS, resolvePlazaParams, type PlazaParams } from './generators/plaza';
-import { DEFAULT_SPOT_PARAMS, resolveSpotParams, type SpotParams } from './spots';
+import {
+    DEFAULT_SPOT_PARAMS,
+    SHIELD_ANCHORS,
+    resolveSpotParams,
+    type ShieldAnchor,
+    type SpotParams,
+} from './spots';
 import {
     EDGE_FADE_CURVES,
     NOISE_PARAMS,
@@ -64,6 +70,8 @@ export interface GenerationParams {
 export interface TileParamOverride {
     /** Seed шума вместо artId: «этот тайл вышел некрасивым — берём другой seed» */
     seed?: string;
+    /** Куда поставить щит: угол тайла (NW, NE, SE, SW) или середина стороны (N, E, S, W). Без этого — автоматически */
+    shieldAnchor?: ShieldAnchor;
     /** Свои настройки шума поверх общих */
     noise?: Partial<NoiseSettings>;
 }
@@ -137,9 +145,13 @@ export function resolveGeometryParams(input: GeometryParamsInput = {}): Geometry
         const raw = input.tiles![artId];
         const seed = typeof raw?.seed === 'string' && raw.seed.trim() ? raw.seed.trim() : undefined;
         const tileNoise = normalizeNoisePartial(raw?.noise, noise);
-        if (seed === undefined && tileNoise === undefined) continue;
+        const shieldAnchor = SHIELD_ANCHORS.includes(raw?.shieldAnchor as ShieldAnchor)
+            ? (raw!.shieldAnchor as ShieldAnchor)
+            : undefined;
+        if (seed === undefined && tileNoise === undefined && shieldAnchor === undefined) continue;
         tiles[artId] = {
             ...(seed !== undefined ? { seed } : {}),
+            ...(shieldAnchor !== undefined ? { shieldAnchor } : {}),
             ...(tileNoise ? { noise: tileNoise } : {}),
         };
     }
@@ -305,15 +317,21 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
                     continue;
                 }
                 for (const key of Object.keys(value)) {
-                    if (key !== 'seed' && key !== 'noise') {
+                    if (key !== 'seed' && key !== 'noise' && key !== 'shieldAnchor') {
                         warnings.push(`tiles.${artId}.${key}: неизвестный параметр, проигнорирован`);
                     }
+                }
+                if (value.shieldAnchor !== undefined && !SHIELD_ANCHORS.includes(value.shieldAnchor as ShieldAnchor)) {
+                    warnings.push(
+                        `tiles.${artId}.shieldAnchor: допустимо ${SHIELD_ANCHORS.join(' | ')}, получено ${JSON.stringify(value.shieldAnchor)}`
+                    );
                 }
                 if (value.seed !== undefined && typeof value.seed !== 'string') {
                     warnings.push(`tiles.${artId}.seed: ожидалась строка`);
                 }
                 tiles[artId] = {
                     seed: typeof value.seed === 'string' ? value.seed : undefined,
+                    shieldAnchor: value.shieldAnchor as ShieldAnchor | undefined,
                     noise: sanitizeSection(`tiles.${artId}.noise`, value.noise, NOISE_PARAMS, warnings) as
                         Partial<NoiseSettings> | undefined,
                 };
@@ -368,6 +386,7 @@ function canonicalObject(params: GeometryParams, onlyTile?: string): unknown {
         const override = params.tiles[artId];
         tiles[artId] = {
             ...(override.seed !== undefined ? { seed: override.seed } : {}),
+            ...(override.shieldAnchor !== undefined ? { shieldAnchor: override.shieldAnchor } : {}),
             ...(override.noise ? { noise: orderNoise(override.noise) } : {}),
         };
     }
@@ -419,6 +438,8 @@ export function hashGeometryParams(params: GeometryParams, artId?: string): stri
 export interface ResolvedTileParams {
     /** Зафиксированный seed тайла (если задан) */
     readonly seed?: string;
+    /** Заданная привязка щита (если задана) */
+    readonly shieldAnchor?: ShieldAnchor;
     /** Общие настройки шума с учётом tiles[artId].noise */
     readonly noise: NoiseSettings;
     /** Переопределения по типу фичи (применяются поверх noise) */
@@ -429,6 +450,7 @@ export function resolveTileParams(params: GeometryParams, artId: string): Resolv
     const override = params.tiles[artId];
     return {
         seed: override?.seed,
+        shieldAnchor: override?.shieldAnchor,
         noise: override?.noise ? resolveNoiseSettings({ ...params.noise, ...override.noise }) : params.noise,
         noiseByType: params.noiseByType,
     };

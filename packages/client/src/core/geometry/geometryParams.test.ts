@@ -121,6 +121,16 @@ describe('parseGeometryParams', () => {
         expect(warnings.some((w) => w.includes('spots.lolwut'))).toBe(true);
     });
 
+    it('shieldAnchor тайла: принимается допустимое значение, недопустимое отбрасывается с замечанием', () => {
+        const ok = parseGeometryParams({ version: 1, tiles: { tile_CCCC: { shieldAnchor: 'NE' } } });
+        expect(ok.warnings).toEqual([]);
+        expect(ok.params.tiles.tile_CCCC.shieldAnchor).toBe('NE');
+
+        const bad = parseGeometryParams({ version: 1, tiles: { tile_CCCC: { shieldAnchor: 'центр' } } });
+        expect(bad.warnings.some((w) => w.includes('shieldAnchor'))).toBe(true);
+        expect(bad.params.tiles.tile_CCCC).toBeUndefined();
+    });
+
     it('другая версия формата даёт предупреждение', () => {
         expect(parseGeometryParams({ version: 2 }).warnings.some((w) => w.includes('version'))).toBe(true);
     });
@@ -131,7 +141,7 @@ describe('parseGeometryParams', () => {
             noise: { areaAmplitude: 3.5 },
             noiseByType: { monastery: { areaAmplitude: 1, areaFrequency: 0.09 } },
             mesh: { heights: { road: 3 }, colors: { city: '#112233' } },
-            tiles: { tile_CCFC: { seed: 'другой', noise: { areaAmplitude: 6 } } },
+            tiles: { tile_CCFC: { seed: 'другой', shieldAnchor: 'SW', noise: { areaAmplitude: 6 } } },
         });
         const roundTrip = parseGeometryParams(JSON.parse(serializeGeometryParams(params)));
         expect(roundTrip.warnings).toEqual([]);
@@ -177,6 +187,14 @@ describe('resolveTileParams', () => {
         const resolved = resolveTileParams(GEOMETRY_PARAMS, 'tile_CCFC');
         expect(resolved.seed).toBeUndefined();
         expect(resolved.noise).toEqual(GEOMETRY_PARAMS.noise);
+    });
+
+    it('привязка щита тайла доходит до resolveTileParams и меняет хэш именно этого тайла', () => {
+        const base = withChanges({ tiles: {} });
+        const pinned = withChanges({ tiles: { tile_CCCC: { shieldAnchor: 'SE' } } });
+        expect(resolveTileParams(pinned, 'tile_CCCC').shieldAnchor).toBe('SE');
+        expect(hashGeometryParams(pinned, 'tile_CCCC')).not.toBe(hashGeometryParams(base, 'tile_CCCC'));
+        expect(hashGeometryParams(pinned, 'tile_CCFC')).toBe(hashGeometryParams(base, 'tile_CCFC'));
     });
 
     it('настройки тайла накладываются на общие', () => {

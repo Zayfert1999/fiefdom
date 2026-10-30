@@ -47,7 +47,10 @@
   },
   "spots": {
     "meepleRadius": 8,
+    "shieldRadius": 5,
     "shieldMargin": 2,
+    "shieldInset": 16,
+    "shieldEdgePenalty": 12,
     "centerBias": 0.05,
     "precision": 0.25,
     "roadSampleStep": 1

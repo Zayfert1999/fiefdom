@@ -13,6 +13,7 @@ import type { Polygon } from '@fiefdom/shared/core/geometry.types';
 import { GEOMETRY_PARAMS } from './loadedGeometryParams';
 import { auditTile, type AuditTile, type TileAudit } from './geometryAudit';
 import {
+    SHIELD_ANCHORS,
     maximizeDistance,
     poleOfInaccessibility,
     resolveSpotParams,
@@ -194,6 +195,92 @@ describe('споты на тайлах', () => {
             }
         }
         expect(checked).toBeGreaterThan(0);
+    });
+
+    it('щит стоит у края: центр на shieldInset от края тайла, привязан к углу или стороне', () => {
+        const inset = GEOMETRY_PARAMS.spots.shieldInset;
+        let checked = 0;
+        for (const tile of tiles) {
+            const audit = audits.get(tile.id)!;
+            for (const feature of tile.features) {
+                if (feature.type !== 'city' || feature.shieldSpot === undefined) continue;
+                const spot = audit.spots.get(feature.id)!;
+                const [x, y] = spot.shield!;
+                const edgeDistance = 50 - Math.max(Math.abs(x), Math.abs(y));
+                expect(Math.abs(edgeDistance - inset)).toBeLessThan(1.5);
+                expect(SHIELD_ANCHORS.includes(spot.shieldAnchor!)).toBe(true);
+                checked++;
+            }
+        }
+        expect(checked).toBeGreaterThan(0);
+    });
+
+    it('правило щита воспроизводит прежние ручные координаты там, где мипл не мешает', () => {
+        // Ручные щиты стояли в углу города на 16 от краёв (или у середины стороны).
+        // Там, где авто-мипл занял тот же угол, щит честно уходит на другое место.
+        let matched = 0;
+        let total = 0;
+        for (const tile of tiles) {
+            const audit = audits.get(tile.id)!;
+            for (const feature of tile.features) {
+                if (feature.type !== 'city' || feature.shieldSpot === undefined) continue;
+                const spot = audit.spots.get(feature.id)!;
+                const dist = Math.hypot(spot.shield![0] - feature.shieldSpot.x, spot.shield![1] - feature.shieldSpot.y);
+                if (dist < 1.5) matched++;
+                total++;
+            }
+        }
+        expect(matched).toBeGreaterThanOrEqual(Math.ceil(total / 2));
+    });
+
+    it('щит не оказывается там, где ему тесно, если есть равноценная альтернатива', () => {
+        for (const tile of tiles) {
+            const audit = audits.get(tile.id)!;
+            for (const feature of tile.features) {
+                if (feature.type !== 'city' || feature.shieldSpot === undefined) continue;
+                expect(audit.spots.get(feature.id)!.shieldClearance!).toBeGreaterThanOrEqual(
+                    GEOMETRY_PARAMS.spots.shieldRadius * 0.9
+                );
+            }
+        }
+    });
+
+    it('shieldAnchor тайла выполняется: угол NE у города на весь тайл', () => {
+        const tile = tiles.find((t) => t.id === 'tile_CCCC-S')!;
+        const audit = auditTile(tile, { ...GENERATED, shieldAnchor: undefined });
+        const params = { ...GEOMETRY_PARAMS, tiles: { tile_CCCC: { shieldAnchor: 'NE' as const } } };
+        const forced = auditTile(tile, { overwrite: true, geometryParams: params });
+
+        const feature = tile.features.find((f) => f.type === 'city')!;
+        expect(audit.spots.get(feature.id)!.shieldAnchor).toBe('NW');
+        expect(forced.spots.get(feature.id)!.shieldAnchor).toBe('NE');
+        expect(forced.spots.get(feature.id)!.shield![0]).toBeGreaterThan(30);
+        expect(forced.spots.get(feature.id)!.shield![1]).toBeLessThan(-30);
+    });
+
+    it('заданный угол выполняется даже вплотную к мипле, аудит предупреждает', () => {
+        const tile = tiles.find((t) => t.id === 'tile_CCCC-S')!;
+        const params = {
+            ...GEOMETRY_PARAMS,
+            // 30 + 20 + зазор = 52 > 48 (расстояние от центра до угла): щиту в угол не поместиться без перекрытия
+            spots: { ...GEOMETRY_PARAMS.spots, meepleRadius: 30, shieldRadius: 20 },
+            tiles: { tile_CCCC: { shieldAnchor: 'NW' as const } },
+        };
+        const audit = auditTile(tile, { overwrite: true, geometryParams: params });
+        const feature = tile.features.find((f) => f.type === 'city')!;
+        const spot = audit.spots.get(feature.id)!;
+
+        expect(spot.shieldAnchor).toBe('NW');
+        expect(spot.shield![0]).toBeLessThan(-30);
+        expect(audit.issues.some((i) => i.code === 'spot-tight' && i.featureId === feature.id)).toBe(true);
+    });
+
+    it('shieldInset двигает щит от края', () => {
+        const tile = tiles.find((t) => t.id === 'tile_CCCC-S')!;
+        const audit = auditTile(tile, { ...GENERATED, spots: { shieldInset: 10 } });
+        const feature = tile.features.find((f) => f.type === 'city')!;
+        const [x, y] = audit.spots.get(feature.id)!.shield!;
+        expect(Math.abs(50 - Math.max(Math.abs(x), Math.abs(y)) - 10)).toBeLessThan(1.5);
     });
 
     it('споты переживают сильный шум', () => {

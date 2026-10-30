@@ -67,7 +67,14 @@ import {
   DEFAULT_PLAZA_PARAMS,
   DEFAULT_SPOT_PARAMS,
 } from '@/core/geometry';
-import type { NoiseByType, NoiseSettings, PlazaParams, SpotParams, TessellationParams } from '@/core/geometry';
+import type {
+  NoiseByType,
+  NoiseSettings,
+  PlazaParams,
+  ShieldAnchor,
+  SpotParams,
+  TessellationParams,
+} from '@/core/geometry';
 import { auditGeometry, type AuditPipelineOptions } from '@/core/geometry/geometryAudit';
 import { resolveMeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
 import {
@@ -952,11 +959,31 @@ export const GeometrySandbox = () => {
       const current = prev.tiles[selectedArtId];
       if (!current) return prev;
       const tiles = { ...prev.tiles };
-      if (current.noise) tiles[selectedArtId] = { noise: current.noise };
-      else delete tiles[selectedArtId];
+      tiles[selectedArtId] = {
+        ...(current.shieldAnchor ? { shieldAnchor: current.shieldAnchor } : {}),
+        ...(current.noise ? { noise: current.noise } : {}),
+      };
       return resolveGeometryParams({ ...prev, tiles });
     });
   }, [selectedArtId]);
+
+  /** Задаёт (или снимает) привязку щита для artId выбранного тайла */
+  const handleShieldAnchor = useCallback(
+    (anchor: ShieldAnchor | undefined) => {
+      if (!selectedArtId) return;
+      setParams((prev) =>
+        resolveGeometryParams({
+          ...prev,
+          tiles: { ...prev.tiles, [selectedArtId]: { ...prev.tiles[selectedArtId], shieldAnchor: anchor } },
+        })
+      );
+    },
+    [selectedArtId]
+  );
+
+  const selectedHasShield = selectedTile
+    ? selectedTile.features.some((f) => f.type === 'city' && f.shieldSpot !== undefined)
+    : false;
 
   // ============================================
   // 📊 СТАТИСТИКА
@@ -1208,6 +1235,8 @@ export const GeometrySandbox = () => {
                 <TileOverrideControls
                   artId={selectedArtId}
                   override={params.tiles[selectedArtId]}
+                  hasShield={selectedHasShield}
+                  onShieldAnchor={handleShieldAnchor}
                   previewSeed={seedOverride}
                   overriddenCount={Object.keys(params.tiles).length}
                   onRandomize={handleRandomSeed}

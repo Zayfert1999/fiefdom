@@ -51,7 +51,8 @@ export {
     maximizeDistance,
     signedDistanceToPolygon,
 } from './spots';
-export type { SpotParams, FeatureSpot, SpotMethod, PoleResult } from './spots';
+export { SHIELD_ANCHORS } from './spots';
+export type { SpotParams, FeatureSpot, SpotMethod, PoleResult, ShieldAnchor } from './spots';
 
 // 🎛 Единый набор параметров (geometryParams.json)
 export {

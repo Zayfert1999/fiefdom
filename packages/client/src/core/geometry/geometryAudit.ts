@@ -37,7 +37,13 @@ import type { PlazaParams } from './generators/plaza';
 import { HALF } from './generators/sides';
 import { measureOutOfTile, type NoiseByType, type NoiseSettings } from './geometryPostProcessor';
 import { resolveTileParams, type GeometryParams } from './geometryParams';
-import { computeTileSpots, resolveSpotParams, type FeatureSpot, type SpotParams } from './spots';
+import {
+    computeTileSpots,
+    resolveSpotParams,
+    type FeatureSpot,
+    type ShieldAnchor,
+    type SpotParams,
+} from './spots';
 import { pointInRing, multiPolygonContainsPoint } from './geometryPointInPolygon';
 import {
     tessellateArea,
@@ -348,6 +354,8 @@ export interface AuditGeometryInput {
     readonly tessellation?: Partial<TessellationParams>;
     /** Параметры расчёта спотов (радиус мипла, точность, притяжение к центру) */
     readonly spots?: Partial<SpotParams>;
+    /** Привязка щита, заданная для этого тайла вручную */
+    readonly shieldAnchor?: ShieldAnchor;
     readonly warnings?: readonly string[];
     readonly thresholds?: Partial<AuditThresholds>;
     readonly elapsedMs?: number;
@@ -552,7 +560,7 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
 
     // --- Споты: считаются из итоговой геометрии ---
     const spotParams = resolveSpotParams(input.spots);
-    const spots = computeTileSpots(features, result, spotParams);
+    const spots = computeTileSpots(features, result, spotParams, { shieldAnchor: input.shieldAnchor });
     const spotDeltas: Record<string, number> = {};
     let minSpotClearance = Infinity;
 
@@ -738,6 +746,7 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
             result,
             tessellation,
             spots: spotParams,
+            shieldAnchor: forTile?.shieldAnchor,
             warnings,
             thresholds: options.thresholds,
             elapsedMs: performance.now() - started,

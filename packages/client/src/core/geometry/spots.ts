@@ -13,8 +13,10 @@
 //   • дорога — середина по длине ВИДИМОГО участка оси (после вычитания
 //     городов и площадей); полюс для узкой полосы выбирал бы случайную
 //     точку вдоль неё;
-//   • щит — второй полюс того же полигона, но вне круга мипла,
-//     чтобы щит не лежал под фигуркой.
+//   • щит — у края города, в углу тайла или у середины стороны (как у ручных
+//     щитов в данных: центр щита на shieldInset от границы). Углы предпочтительнее
+//     сторон, но острый угол (дуга города) проигрывает середине стороны.
+//     Фигурку щит не перекрывает. Какой именно угол — можно задать для тайла.
 //
 // Дополнительно считается clearance — расстояние от споты до границы фичи.
 // Если оно меньше радиуса мипла, фигурка не помещается: шум слишком сильно
@@ -34,8 +36,21 @@ import type { TileGeometryResult } from './types';
 export interface SpotParams {
     /** Радиус фигурки мипла (юниты): по нему оценивается, помещается ли она */
     meepleRadius: number;
-    /** Дополнительный зазор между кругом мипла и щитом (юниты) */
+    /** Радиус щита (юниты) */
+    shieldRadius: number;
+    /** Зазор между кругом мипла и щитом (юниты) */
     shieldMargin: number;
+    /**
+     * Расстояние от центра щита до границы города или тайла (юниты).
+     * В прежних ручных данных все щиты стоят на 16 от края тайла.
+     */
+    shieldInset: number;
+    /**
+     * Штраф за привязку щита к середине стороны вместо угла (юниты).
+     * Угол выбирается, пока ближайшая к нему допустимая точка не дальше
+     * «сторона + штраф»: прямой угол (≈ inset·√2) выигрывает, острый — нет.
+     */
+    shieldEdgePenalty: number;
     /**
      * Притяжение к центру фичи (0..0.5). На широких фичах точек с почти одинаковым
      * расстоянием до границы много, и «чистый» polylabel выбирает любую из них.
@@ -51,7 +66,10 @@ export interface SpotParams {
 
 export const DEFAULT_SPOT_PARAMS: Readonly<SpotParams> = {
     meepleRadius: 8,
+    shieldRadius: 5,
     shieldMargin: 2,
+    shieldInset: 16,
+    shieldEdgePenalty: 12,
     centerBias: 0.05,
     precision: 0.25,
     roadSampleStep: 1,
@@ -64,7 +82,10 @@ export function resolveSpotParams(partial?: Partial<SpotParams>): SpotParams {
     const d = DEFAULT_SPOT_PARAMS;
     return {
         meepleRadius: Math.min(30, Math.max(0.5, finite(partial?.meepleRadius, d.meepleRadius))),
+        shieldRadius: Math.min(20, Math.max(0.5, finite(partial?.shieldRadius, d.shieldRadius))),
         shieldMargin: Math.min(20, Math.max(0, finite(partial?.shieldMargin, d.shieldMargin))),
+        shieldInset: Math.min(40, Math.max(1, finite(partial?.shieldInset, d.shieldInset))),
+        shieldEdgePenalty: Math.min(60, Math.max(0, finite(partial?.shieldEdgePenalty, d.shieldEdgePenalty))),
         centerBias: Math.min(0.5, Math.max(0, finite(partial?.centerBias, d.centerBias))),
         precision: Math.min(5, Math.max(0.01, finite(partial?.precision, d.precision))),
         roadSampleStep: Math.min(10, Math.max(0.1, finite(partial?.roadSampleStep, d.roadSampleStep))),
@@ -76,6 +97,11 @@ export function resolveSpotParams(partial?: Partial<SpotParams>): SpotParams {
 // ============================================
 export type SpotMethod = 'pole' | 'centerline';
 
+/** К чему привязан щит: угол тайла (NW...) или середина стороны (N...) */
+export type ShieldAnchor = 'NW' | 'NE' | 'SE' | 'SW' | 'N' | 'E' | 'S' | 'W';
+
+export const SHIELD_ANCHORS: readonly ShieldAnchor[] = ['NW', 'NE', 'SE', 'SW', 'N', 'E', 'S', 'W'];
+
 export interface FeatureSpot {
     /** Где ставить мипла */
     readonly meeple: Point;
@@ -83,8 +109,10 @@ export interface FeatureSpot {
     readonly shield?: Point;
     /** Расстояние от споты до границы фичи (юниты); у дорог — до границы видимой полосы */
     readonly clearance: number;
-    /** Расстояние от щита до границы города и круга мипла (меньше 0 — щит перекрывает мипла) */
+    /** Свободное место вокруг щита: до границы города и до фигурки (меньше 0 — щит не помещается) */
     readonly shieldClearance?: number;
+    /** К чему привязан щит (нет, если сработал запасной вариант) */
+    readonly shieldAnchor?: ShieldAnchor;
     readonly method: SpotMethod;
 }
 
@@ -379,6 +407,164 @@ function roadSpot(line: TessellatedLine, visible: MultiPolygon, params: SpotPara
 }
 
 // ============================================
+// 🛡 ЩИТ: У КРАЯ ГОРОДА, В УГЛУ ТАЙЛА
+// ============================================
+
+const TILE_HALF = 50;
+/** Насколько близко вершина контура должна подойти к углу тайла, чтобы считаться им (юниты) */
+const CORNER_EPS = 0.75;
+/** Крутизна штрафа за нарушение ограничений: цель важнее «ближе к якорю» */
+const SHIELD_PENALTY_SLOPE = 3;
+/** Нарушение ограничений, не превышающее это значение, допустимо (юниты) */
+const SHIELD_FEASIBLE_EPS = 0.5;
+/** Штраф за место, где щиту тесно: перевешивает любую разницу в близости к углу */
+const SHIELD_CRAMPED_PENALTY = 100;
+
+interface ShieldCandidate {
+    readonly id: ShieldAnchor;
+    readonly kind: 'corner' | 'edge';
+    readonly point: Point;
+}
+
+const TILE_CORNERS: ReadonlyArray<{ id: ShieldAnchor; point: Point }> = [
+    { id: 'NW', point: [-TILE_HALF, -TILE_HALF] },
+    { id: 'NE', point: [TILE_HALF, -TILE_HALF] },
+    { id: 'SE', point: [TILE_HALF, TILE_HALF] },
+    { id: 'SW', point: [-TILE_HALF, TILE_HALF] },
+];
+
+/** Стороны тайла: ось, вдоль которой лежит сторона, и её координата */
+const TILE_SIDES: ReadonlyArray<{ id: ShieldAnchor; fixedAxis: 0 | 1; value: number }> = [
+    { id: 'N', fixedAxis: 1, value: -TILE_HALF },
+    { id: 'E', fixedAxis: 0, value: TILE_HALF },
+    { id: 'S', fixedAxis: 1, value: TILE_HALF },
+    { id: 'W', fixedAxis: 0, value: -TILE_HALF },
+];
+
+/**
+ * Места, к которым можно привязать щит: углы тайла, где контур города доходит
+ * до угла, и середины тех сторон тайла, вдоль которых идёт город.
+ */
+function shieldCandidates(polygon: Polygon, minEdgeLength: number): ShieldCandidate[] {
+    const outer = polygon[0];
+    const candidates: ShieldCandidate[] = [];
+
+    for (const corner of TILE_CORNERS) {
+        if (outer.some((v) => Math.hypot(v[0] - corner.point[0], v[1] - corner.point[1]) < CORNER_EPS)) {
+            candidates.push({ id: corner.id, kind: 'corner', point: corner.point });
+        }
+    }
+
+    for (const side of TILE_SIDES) {
+        // Отрезки контура, лежащие на этой стороне тайла
+        const along = side.fixedAxis === 0 ? 1 : 0;
+        const intervals: Array<[number, number]> = [];
+        for (let i = 0; i < outer.length; i++) {
+            const a = outer[i];
+            const b = outer[(i + 1) % outer.length];
+            if (Math.abs(a[side.fixedAxis] - side.value) < 0.5 && Math.abs(b[side.fixedAxis] - side.value) < 0.5) {
+                intervals.push([Math.min(a[along], b[along]), Math.max(a[along], b[along])]);
+            }
+        }
+        if (intervals.length === 0) continue;
+
+        // Склеиваем перекрывающиеся отрезки и берём самый длинный
+        intervals.sort((x, y) => x[0] - y[0]);
+        const merged: Array<[number, number]> = [intervals[0]];
+        for (const [from, to] of intervals.slice(1)) {
+            const last = merged[merged.length - 1];
+            if (from <= last[1] + 0.5) last[1] = Math.max(last[1], to);
+            else merged.push([from, to]);
+        }
+        const longest = merged.reduce((best, cur) => (cur[1] - cur[0] > best[1] - best[0] ? cur : best));
+        if (longest[1] - longest[0] < minEdgeLength) continue;
+
+        const mid = (longest[0] + longest[1]) / 2;
+        candidates.push({
+            id: side.id,
+            kind: 'edge',
+            point: side.fixedAxis === 0 ? [side.value, mid] : [mid, side.value],
+        });
+    }
+
+    return candidates;
+}
+
+interface ShieldPlacement {
+    readonly point: Point;
+    readonly anchor: ShieldAnchor;
+    readonly clearance: number;
+}
+
+/**
+ * Ставит щит: для каждого кандидата ищет ближайшую к нему точку, которая
+ *   • не ближе `shieldInset` к границе города (в том числе к краю тайла),
+ *   • не ближе радиус мипла + радиус щита + зазор к мипле.
+ * Среди допустимых выбирает ту, у которой «расстояние до якоря + штраф стороны» меньше;
+ * при равенстве побеждает более ранний в порядке NW, NE, SE, SW, N, E, S, W.
+ *
+ * Места, где щиту тесно (свободно меньше его радиуса), получают большой штраф:
+ * при равноценной альтернативе щит уйдёт от мипла (например, в другую «лапу» песочных часов).
+ *
+ * `forced` — угол, заданный для тайла вручную: выбор идёт только среди него, и это решение
+ * автора выполняется даже в ущерб зазору до мипла (аудит предупредит о перекрытии).
+ */
+function placeShield(
+    polygon: Polygon,
+    meeple: Point,
+    params: SpotParams,
+    forced?: ShieldAnchor
+): ShieldPlacement | null {
+    const fullKeepOut = params.meepleRadius + params.shieldRadius + params.shieldMargin;
+    const inset = params.shieldInset;
+
+    let candidates = shieldCandidates(polygon, 2 * (params.shieldRadius + 1));
+    if (forced) candidates = candidates.filter((c) => c.id === forced);
+
+    let best: { cost: number; placement: ShieldPlacement; order: number } | null = null;
+
+    for (const candidate of candidates) {
+        // Заданный вручную угол ставим даже вплотную к мипле: сначала с зазором, потом без него
+        const keepOuts = forced ? [fullKeepOut, 0] : [fullKeepOut];
+        for (const keepOut of keepOuts) {
+        const [ax, ay] = candidate.point;
+        const violation = (x: number, y: number, ko: number): number =>
+            Math.max(0, inset - signedDistanceToPolygon(x, y, polygon)) +
+            Math.max(0, ko - Math.hypot(x - meeple[0], y - meeple[1]));
+
+            // Ищем ближайшую к якорю допустимую точку в окне вокруг него
+            const window = inset * 3 + 10;
+            const found = maximizeDistance(
+                (x, y) => -(Math.hypot(x - ax, y - ay) + SHIELD_PENALTY_SLOPE * violation(x, y, keepOut)),
+                { minX: ax - window, minY: ay - window, maxX: ax + window, maxY: ay + window },
+                params.precision,
+                [],
+                1 + 2 * SHIELD_PENALTY_SLOPE
+            );
+            const [px, py] = found.point;
+            if (violation(px, py, keepOut) > SHIELD_FEASIBLE_EPS) continue;
+
+            const clearance = Math.min(
+                signedDistanceToPolygon(px, py, polygon) - params.shieldRadius,
+                Math.hypot(px - meeple[0], py - meeple[1]) - fullKeepOut
+            );
+            let cost = Math.hypot(px - ax, py - ay) + (candidate.kind === 'edge' ? params.shieldEdgePenalty : 0);
+            // Тесное место — только если нет ничего лучше
+            if (clearance < params.shieldRadius) cost += SHIELD_CRAMPED_PENALTY;
+            const order = SHIELD_ANCHORS.indexOf(candidate.id);
+
+            // Строго меньше (с допуском) — чтобы при равенстве осталась более ранняя привязка
+            if (!best || cost < best.cost - 0.5 || (Math.abs(cost - best.cost) <= 0.5 && order < best.order)) {
+                best = { cost, order, placement: { point: [px, py], anchor: candidate.id, clearance } };
+            }
+            break; // допустимая точка найдена: вариант без зазора не нужен
+        }
+    }
+
+    return best ? best.placement : null;
+}
+
+// ============================================
 // 🏛 СПОТЫ ВСЕХ ФИЧ ТАЙЛА
 // ============================================
 
@@ -398,7 +584,8 @@ function hasShield(feature: TileFeature): boolean {
 export function computeTileSpots(
     features: readonly TileFeature[],
     geometry: TileGeometryResult,
-    partialParams?: Partial<SpotParams>
+    partialParams?: Partial<SpotParams>,
+    options?: { readonly shieldAnchor?: ShieldAnchor }
 ): Map<string, FeatureSpot> {
     const params = resolveSpotParams(partialParams);
     const spots = new Map<string, FeatureSpot>();
@@ -414,22 +601,32 @@ export function computeTileSpots(
                 const meeple = found.pole.point;
                 let shield: Point | undefined;
                 let shieldClearance: number | undefined;
+                let shieldAnchor: ShieldAnchor | undefined;
 
                 if (hasShield(feature)) {
-                    // Щит — там же, но вне круга мипла
-                    const keepOut = params.meepleRadius + params.shieldMargin;
-                    const polygon = found.polygon;
-                    const result = maximizeDistance(
-                        (x, y) =>
-                            Math.min(
-                                signedDistanceToPolygon(x, y, polygon),
-                                Math.hypot(x - meeple[0], y - meeple[1]) - keepOut
-                            ),
-                        ringBounds(polygon[0]),
-                        params.precision
-                    );
-                    shield = result.point;
-                    shieldClearance = result.distance;
+                    // Щит — у края города, в углу тайла или у середины стороны
+                    const placed = placeShield(found.polygon, meeple, params, options?.shieldAnchor);
+
+                    if (placed) {
+                        shield = placed.point;
+                        shieldClearance = placed.clearance;
+                        shieldAnchor = placed.anchor;
+                    } else {
+                        // Тесный город: ни один угол или сторона не подошли — второй полюс вне круга мипла
+                        const keepOut = params.meepleRadius + params.shieldRadius + params.shieldMargin;
+                        const polygon = found.polygon;
+                        const result = maximizeDistance(
+                            (x, y) =>
+                                Math.min(
+                                    signedDistanceToPolygon(x, y, polygon) - params.shieldRadius,
+                                    Math.hypot(x - meeple[0], y - meeple[1]) - keepOut
+                                ),
+                            ringBounds(polygon[0]),
+                            params.precision
+                        );
+                        shield = result.point;
+                        shieldClearance = result.distance;
+                    }
                 }
 
                 spots.set(feature.id, {
@@ -437,6 +634,7 @@ export function computeTileSpots(
                     shield,
                     clearance: found.pole.distance,
                     shieldClearance,
+                    shieldAnchor,
                     method: 'pole',
                 });
                 break;

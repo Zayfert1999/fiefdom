@@ -47,7 +47,7 @@ export const ROAD_PARAMS = {
    * но без захода шум на контуре города оставляет щель между
    * торцом дороги и городом.
    */
-  endOverlap: 6,
+  endOverlap: 14,
 } as const;
 
 export interface RoadResult {
@@ -95,7 +95,8 @@ function build(
   road: TileFeature,
   ctx: TileContext,
   width: number,
-  arcDepth: ReadonlyMap<Side, number>
+  arcDepth: ReadonlyMap<Side, number>,
+  endOverlap: number
 ): LineGeometry | null {
   const P = ROAD_PARAMS;
   const sides = centerSides(road);
@@ -132,9 +133,9 @@ function build(
     let reach = HALF;
 
     if (ctx.monasteryHalf !== null) {
-      reach = HALF - ctx.monasteryHalf + P.endOverlap;
+      reach = HALF - ctx.monasteryHalf + endOverlap;
     } else if (ctx.cityArcSides.has(side)) {
-      reach = (arcDepth.get(side) ?? P.cityArcDepth) + P.endOverlap;
+      reach = (arcDepth.get(side) ?? P.cityArcDepth) + endOverlap;
     }
 
     return rotatePath([0, -HALF], [line([0, -HALF + reach])], side, width);
@@ -154,9 +155,11 @@ export function generateRoad(
   road: TileFeature,
   ctx: TileContext,
   width: number,
-  arcDepth: ReadonlyMap<Side, number>
+  arcDepth: ReadonlyMap<Side, number>,
+  /** Заход тупиковой дороги под город/монастырь. Должен перекрывать амплитуду шума на их контуре */
+  endOverlap: number = ROAD_PARAMS.endOverlap
 ): RoadResult | null {
-  const geometry = build(road, ctx, width, arcDepth);
+  const geometry = build(road, ctx, width, arcDepth, endOverlap);
   if (!geometry) return null;
   return { geometry };
 }

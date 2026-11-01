@@ -678,10 +678,7 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
 export interface AuditPipelineOptions {
     /** Полный набор параметров из geometryParams.json (или из песочницы) */
     readonly geometryParams?: GeometryParams;
-    /** Генерировать геометрию из портов (по умолчанию true) */
-    readonly enableGenerative?: boolean;
-    /** Перегенерировать поверх ручной геометрии (по умолчанию false) */
-    readonly overwrite?: boolean;
+    /** Ширина дорог (по умолчанию из geometryParams.generation, затем из кода) */
     readonly roadWidth?: number;
     /** Включить шум (по умолчанию true) */
     readonly noiseEnabled?: boolean;
@@ -719,17 +716,17 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
         let features: readonly TileFeature[] = tile.features;
         const warnings: string[] = [];
 
-        if (options.enableGenerative ?? true) {
-            const generated = generateFeatureGeometries(tile.features, {
-                overwrite: options.overwrite ?? params?.generation.overwrite ?? false,
-                roadWidth: options.roadWidth ?? params?.generation.roadWidth,
-            });
-            warnings.push(...generated.warnings);
-            features = tile.features.map((feature) => {
-                const geometry = generated.geometries.get(feature.id);
-                return geometry ? { ...feature, geometry } : feature;
-            });
-        }
+        // Геометрия всегда генерируется из портов; нарисованная вручную остаётся
+        // запасной, только если генератор не смог построить форму
+        const generated = generateFeatureGeometries(tile.features, {
+            roadWidth: options.roadWidth ?? params?.generation.roadWidth,
+            roadEndOverlap: params?.generation.roadEndOverlap,
+        });
+        warnings.push(...generated.warnings);
+        features = tile.features.map((feature) => {
+            const geometry = generated.geometries.get(feature.id);
+            return geometry ? { ...feature, geometry } : feature;
+        });
 
         const result = processTileGeometry(features, {
             noiseSeed: (options.noiseEnabled ?? true) ? seed : undefined,

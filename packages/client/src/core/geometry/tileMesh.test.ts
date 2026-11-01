@@ -26,7 +26,7 @@ import {
 } from './tileMesh';
 
 const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
-const GENERATED = { overwrite: true, geometryParams: GEOMETRY_PARAMS } as const;
+const GENERATED = { geometryParams: GEOMETRY_PARAMS } as const;
 const MESH = GEOMETRY_PARAMS.mesh;
 
 const audits = new Map<string, TileAudit>(tiles.map((t) => [t.id, auditTile(t, GENERATED)]));

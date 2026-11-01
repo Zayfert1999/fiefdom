@@ -32,7 +32,7 @@ const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
  * параметрами (geometryParams.json). Если подкрутить параметры в песочнице и
  * сохранить, тесты проверят именно их, а снимок сигнатур покажет, что изменилось.
  */
-const GENERATED: AuditPipelineOptions = { overwrite: true, geometryParams: GEOMETRY_PARAMS };
+const GENERATED: AuditPipelineOptions = { geometryParams: GEOMETRY_PARAMS };
 
 /** Намеренно сломанные края: торцы дорог наклоняются и вылезают за тайл */
 const BROKEN_EDGES: AuditPipelineOptions = {

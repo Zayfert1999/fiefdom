@@ -1,8 +1,8 @@
 {
   "version": 1,
   "generation": {
-    "overwrite": false,
-    "roadWidth": 20
+    "roadWidth": 20,
+    "roadEndOverlap": 14
   },
   "tessellation": {
     "curveDensity": 0.3,

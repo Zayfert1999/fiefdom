@@ -8,8 +8,13 @@
 //
 // 🌟 ИЗМЕНЕНО:
 //   • Убраны seed и jitter из GenerateOptions
-//   • needsGeometry включает monastery
-//   • Убраны импорты RngFactory и createSeededRandom
+//   • Убран переключатель `overwrite`: геометрия городов, дорог и монастырей
+//     ВСЕГДА генерируется из портов. Нарисованная вручную `feature.geometry`
+//     в данных была устаревшим снимком старого генератора (после правок
+//     генератора она расходилась с ним: дороги без захода под город, монастырь
+//     без скруглений) и давала артефакты. Она остаётся только запасным вариантом:
+//     если генератор не смог построить форму (неподдерживаемые порты), фича
+//     сохраняет то, что в ней нарисовано.
 // ============================================
 import type {
     AreaGeometry,
@@ -35,8 +40,8 @@ export { computeFieldPolygons, assignFieldFeatures } from './field';
 // ⚙️ ОПЦИИ (БЕЗ seed и jitter)
 // ============================================
 export interface GenerateOptions {
-    /** Перегенерировать фичи с уже нарисованной геометрией */
-    readonly overwrite?: boolean;
+    /** Заход тупиковых дорог под город/монастырь (юниты). Должен перекрывать амплитуду шума на их контуре */
+    readonly roadEndOverlap?: number;
     /** Ширина дорог. По умолчанию 20 */
     readonly roadWidth?: number;
 }
@@ -50,13 +55,9 @@ export interface GeneratedGeometries {
 // 🛠️ ХЕЛПЕРЫ
 // ============================================
 
-/**
- * 🌟 ИСПРАВЛЕНО: добавлен 'monastery'.
- * Раньше монастыри не проходили проверку.
- */
-const needsGeometry = (f: TileFeature, overwrite: boolean): boolean =>
-    (f.type === 'city' || f.type === 'road' || f.type === 'monastery') &&
-    (overwrite || !f.geometry || f.geometry.kind === 'derived');
+/** Какие фичи получают сгенерированную форму (поля вычисляются отдельно, как остаток) */
+const needsGeometry = (f: TileFeature): boolean =>
+    f.type === 'city' || f.type === 'road' || f.type === 'monastery';
 
 // ============================================
 // 📤 ГЕНЕРАЦИЯ
@@ -65,7 +66,6 @@ export function generateFeatureGeometries(
     features: readonly TileFeature[],
     options: GenerateOptions = {},
 ): GeneratedGeometries {
-    const overwrite = options.overwrite ?? false;
     const width = options.roadWidth ?? ROAD_PARAMS.width;
     const ctx = buildContext(features);
 
@@ -75,7 +75,7 @@ export function generateFeatureGeometries(
 
     // 1. Города
     for (const f of features) {
-        if (f.type !== 'city' || !needsGeometry(f, overwrite)) continue;
+        if (f.type !== 'city' || !needsGeometry(f)) continue;
         const res = generateCity(f, ctx);
         if (!res) {
             warnings.push(`city "${f.id}": неподдерживаемые порты [${f.ports.join(', ')}]`);
@@ -87,8 +87,8 @@ export function generateFeatureGeometries(
 
     // 2. Дороги
     for (const f of features) {
-        if (f.type !== 'road' || !needsGeometry(f, overwrite)) continue;
-        const res = generateRoad(f, ctx, width, arcDepth);
+        if (f.type !== 'road' || !needsGeometry(f)) continue;
+        const res = generateRoad(f, ctx, width, arcDepth, options.roadEndOverlap);
         if (!res) {
             warnings.push(`road "${f.id}": неподдерживаемые порты [${f.ports.join(', ')}]`);
             continue;
@@ -98,7 +98,7 @@ export function generateFeatureGeometries(
 
     // 3. Монастыри
     for (const f of features) {
-        if (f.type !== 'monastery' || !needsGeometry(f, overwrite)) continue;
+        if (f.type !== 'monastery' || !needsGeometry(f)) continue;
         const res = generateMonastery(f);
         if (!res) {
             warnings.push(`monastery "${f.id}": ошибка генерации`);

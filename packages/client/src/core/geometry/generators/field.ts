@@ -99,9 +99,8 @@ export function assignFieldFeaturesDetailed(
     const methods = new Map<string, FieldBindingMethod>();
     const used = new Set<number>();
 
-    const fieldFeatures = features.filter(
-        f => f.type === 'field' && f.geometry?.kind === 'derived'
-    );
+    // Поле — это фича типа 'field'. Маркер geometry.kind === 'derived' в данных не нужен
+    const fieldFeatures = features.filter(f => f.type === 'field');
 
     if (fieldFeatures.length === 0 || fieldPolygons.length === 0) {
         console.log(

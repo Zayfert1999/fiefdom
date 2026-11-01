@@ -60,10 +60,13 @@ export const GEOMETRY_PARAMS_VERSION = 1;
 
 /** Параметры генерации исходных контуров из портов */
 export interface GenerationParams {
-    /** Перегенерировать контуры поверх ручных (из base.json) */
-    overwrite: boolean;
     /** Ширина дорог (юниты) */
     roadWidth: number;
+    /**
+     * Заход тупиковой дороги под город или монастырь (юниты). Дорога всё равно вычитается из их
+     * контура, но без захода шум оставляет щель у торца: при амплитуде шума больше захода щель видна.
+     */
+    roadEndOverlap: number;
 }
 
 /** Настройки конкретного тайла (ключ — artId) */
@@ -157,15 +160,19 @@ export function resolveGeometryParams(input: GeometryParamsInput = {}): Geometry
     }
 
     const roadWidth = input.generation?.roadWidth;
+    const roadEndOverlap = input.generation?.roadEndOverlap;
 
     return {
         version: GEOMETRY_PARAMS_VERSION,
         generation: {
-            overwrite: input.generation?.overwrite ?? false,
             roadWidth:
                 typeof roadWidth === 'number' && Number.isFinite(roadWidth)
                     ? Math.min(60, Math.max(2, roadWidth))
                     : ROAD_PARAMS.width,
+            roadEndOverlap:
+                typeof roadEndOverlap === 'number' && Number.isFinite(roadEndOverlap)
+                    ? Math.min(30, Math.max(0, roadEndOverlap))
+                    : ROAD_PARAMS.endOverlap,
         },
         tessellation: resolveTessellationParams(input.tessellation),
         noise,
@@ -266,8 +273,15 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     }
 
     const input: GeometryParamsInput = {
-        generation: sanitizeSection('generation', raw.generation, { overwrite: false, roadWidth: 0 }, warnings) as
-            GeometryParamsInput['generation'],
+        generation: sanitizeSection(
+            'generation',
+            // `overwrite` удалён (геометрия всегда генерируется); в старых файлах его молча пропускаем
+            isRecord(raw.generation)
+                ? Object.fromEntries(Object.entries(raw.generation).filter(([key]) => key !== 'overwrite'))
+                : raw.generation,
+            { roadWidth: 0, roadEndOverlap: 0 },
+            warnings
+        ) as GeometryParamsInput['generation'],
         tessellation: sanitizeSection('tessellation', raw.tessellation, DEFAULT_TESSELLATION_PARAMS, warnings) as
             GeometryParamsInput['tessellation'],
         noise: sanitizeSection('noise', raw.noise, NOISE_PARAMS, warnings) as GeometryParamsInput['noise'],

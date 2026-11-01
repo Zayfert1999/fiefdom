@@ -27,7 +27,7 @@ const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
 const tileById = (id: string): AuditTile => tiles.find((t) => t.id === id)!;
 
 const signature = (id: string, params: GeometryParams): string =>
-    auditTile(tileById(id), { geometryParams: params, overwrite: true }).signature;
+    auditTile(tileById(id), { geometryParams: params }).signature;
 
 /** Копия закоммиченных параметров с правками (секции дополняются, а не заменяются) */
 const withChanges = (changes: Parameters<typeof resolveGeometryParams>[0] = {}): GeometryParams =>
@@ -137,7 +137,7 @@ describe('parseGeometryParams', () => {
 
     it('сериализация и разбор обратимы, в том числе для настроек по типу и по тайлу', () => {
         const params = resolveGeometryParams({
-            generation: { overwrite: true, roadWidth: 24 },
+            generation: { roadWidth: 24 },
             noise: { areaAmplitude: 3.5 },
             noiseByType: { monastery: { areaAmplitude: 1, areaFrequency: 0.09 } },
             mesh: { heights: { road: 3 }, colors: { city: '#112233' } },
@@ -216,7 +216,6 @@ describe('параметры доходят до геометрии', () => {
         const viaParams = signature(CITY, pinned);
         const viaOverride = auditTile(tileById(CITY), {
             geometryParams: GEOMETRY_PARAMS,
-            overwrite: true,
             seedOverride: 'my-seed',
         }).signature;
 
@@ -245,14 +244,24 @@ describe('параметры доходят до геометрии', () => {
     it('radius мипла из spots доходит до аудита: большой радиус даёт предупреждения о тесноте', () => {
         const roomy = auditTile(tileById('tile_CRRC'), {
             geometryParams: withChanges({ spots: { meepleRadius: 3 } }),
-            overwrite: true,
-        });
+            });
         const cramped = auditTile(tileById('tile_CRRC'), {
             geometryParams: withChanges({ spots: { meepleRadius: 14 } }),
-            overwrite: true,
-        });
+            });
         expect(roomy.issues.some((i) => i.code === 'spot-tight')).toBe(false);
         expect(cramped.issues.some((i) => i.code === 'spot-tight')).toBe(true);
+    });
+
+    it('заход дороги под город из generation.roadEndOverlap доходит до геометрии и ограничен диапазоном', () => {
+        const deep = withChanges({ generation: { roadEndOverlap: GEOMETRY_PARAMS.generation.roadEndOverlap + 6 } });
+        // у тайла с тупиковой дорогой, упирающейся в город, торец оказывается глубже
+        expect(signature('tile_CCRC', deep)).not.toBe(signature('tile_CCRC', GEOMETRY_PARAMS));
+        // а тайл без таких дорог не меняется
+        expect(signature('tile_CCCC-S', deep)).toBe(signature('tile_CCCC-S', GEOMETRY_PARAMS));
+
+        const { params, warnings } = parseGeometryParams({ version: 1, generation: { roadEndOverlap: 99 } });
+        expect(params.generation.roadEndOverlap).toBe(30);
+        expect(warnings.some((w) => w.includes('generation.roadEndOverlap'))).toBe(true);
     });
 
     it('ширина дороги из generation.roadWidth доходит до геометрии', () => {

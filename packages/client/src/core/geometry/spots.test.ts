@@ -141,7 +141,7 @@ describe('координаты портов', () => {
 // 🧱 ВСЕ ТАЙЛЫ
 // ============================================
 const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
-const GENERATED = { overwrite: true, geometryParams: GEOMETRY_PARAMS } as const;
+const GENERATED = { geometryParams: GEOMETRY_PARAMS } as const;
 const meepleRadius = GEOMETRY_PARAMS.spots.meepleRadius;
 
 const audits = new Map<string, TileAudit>(tiles.map((t) => [t.id, auditTile(t, GENERATED)]));
@@ -247,9 +247,9 @@ describe('споты на тайлах', () => {
 
     it('shieldAnchor тайла выполняется: угол NE у города на весь тайл', () => {
         const tile = tiles.find((t) => t.id === 'tile_CCCC-S')!;
-        const audit = auditTile(tile, { ...GENERATED, shieldAnchor: undefined });
+        const audit = auditTile(tile, GENERATED);
         const params = { ...GEOMETRY_PARAMS, tiles: { tile_CCCC: { shieldAnchor: 'NE' as const } } };
-        const forced = auditTile(tile, { overwrite: true, geometryParams: params });
+        const forced = auditTile(tile, { geometryParams: params });
 
         const feature = tile.features.find((f) => f.type === 'city')!;
         expect(audit.spots.get(feature.id)!.shieldAnchor).toBe('NW');
@@ -266,7 +266,7 @@ describe('споты на тайлах', () => {
             spots: { ...GEOMETRY_PARAMS.spots, meepleRadius: 30, shieldRadius: 20 },
             tiles: { tile_CCCC: { shieldAnchor: 'NW' as const } },
         };
-        const audit = auditTile(tile, { overwrite: true, geometryParams: params });
+        const audit = auditTile(tile, { geometryParams: params });
         const feature = tile.features.find((f) => f.type === 'city')!;
         const spot = audit.spots.get(feature.id)!;
 

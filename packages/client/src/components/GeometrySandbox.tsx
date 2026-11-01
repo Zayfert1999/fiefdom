@@ -53,6 +53,7 @@ import {
   TessellationControls,
   TileOverrideControls,
   ParamCheckbox,
+  ParamSlider,
 } from './SandboxParamControls';
 import { SandboxParamsBar } from './SandboxParamsBar';
 import { GeometryGallery } from './GeometryGallery';
@@ -370,7 +371,6 @@ interface SandboxTileViewProps {
   showPorts: boolean;
   showGeometry: boolean;
   // Генеративная геометрия
-  enableGenerative: boolean;
   seedOverride?: string;
   noiseEnabled: boolean;
   /** Все параметры геометрии (тесселяция, шум, площади, меш, настройки тайлов) */
@@ -387,7 +387,6 @@ const SandboxTileView = memo(({
   showAutoSpots,
   showPorts,
   showGeometry,
-  enableGenerative,
   seedOverride,
   noiseEnabled,
   params,
@@ -405,30 +404,16 @@ const SandboxTileView = memo(({
     () => seedOverride?.trim() || tileParams.seed || tile.artId || tile.id,
     [seedOverride, tileParams.seed, tile.artId, tile.id]
   );
-  const { overwrite, roadWidth } = params.generation;
+  const { roadWidth, roadEndOverlap } = params.generation;
 
   // ============================================
   // 🧬 ГЕНЕРАЦИЯ ГЕОМЕТРИИ (БЕЗ seed и jitter)
   // ============================================
   const generation = useMemo(() => {
-    if (!enableGenerative) {
-      return {
-        features: tile.features as readonly TileFeature[],
-        warnings: [] as readonly string[],
-        generatedIds: new Set<string>(),
-      };
-    }
+    console.log(`🧬 [Sandbox] Генерация: tile="${tile.id}", roadWidth=${roadWidth}, roadEndOverlap=${roadEndOverlap}`);
 
-    console.log(
-      `🧬 [Sandbox] Генерация: tile="${tile.id}", ` +
-      `overwrite=${overwrite}, roadWidth=${roadWidth}`
-    );
-
-    // 🌟 БЕЗ seed и jitter — генераторы чистые
-    const gen = generateFeatureGeometries(tile.features, {
-      overwrite,
-      roadWidth,
-    });
+    // Геометрия всегда генерируется из портов (нарисованная в данных — лишь запасная)
+    const gen = generateFeatureGeometries(tile.features, { roadWidth, roadEndOverlap });
 
     const generatedIds = new Set(gen.geometries.keys());
     const features: TileFeature[] = tile.features.map((feature) => {
@@ -441,7 +426,7 @@ const SandboxTileView = memo(({
     }
 
     return { features, warnings: gen.warnings, generatedIds };
-  }, [enableGenerative, tile, overwrite, roadWidth]);
+  }, [tile, roadWidth, roadEndOverlap]);
 
   // ============================================
   // 🏭 ПРОЦЕССОР С ШУМОМ ПЕРЛИНА
@@ -820,7 +805,6 @@ export const GeometrySandbox = () => {
   // ============================================
   // 🧬 ГЕНЕРАТИВНАЯ ГЕОМЕТРИЯ
   // ============================================
-  const [enableGenerative, setEnableGenerative] = useState(true);
   /** Временный seed для примерки: действует на все тайлы, пока не закреплён за тайлом */
   const [seedOverride, setSeedOverride] = useState('');
 
@@ -846,15 +830,14 @@ export const GeometrySandbox = () => {
   const tessParams = params.tessellation;
   const plazaParams = params.plaza;
   const meshParams = params.mesh;
-  const overwrite = params.generation.overwrite;
   const roadWidth = params.generation.roadWidth;
+  const roadEndOverlap = params.generation.roadEndOverlap;
 
   const patchGeneration = useCallback(
     (patch: Partial<GeometryParams['generation']>) =>
       setParams((prev) => ({ ...prev, generation: { ...prev.generation, ...patch } })),
     []
   );
-  const setOverwrite = useCallback((value: boolean) => patchGeneration({ overwrite: value }), [patchGeneration]);
   const setRoadWidth = useCallback((value: number) => patchGeneration({ roadWidth: value }), [patchGeneration]);
 
   const patchNoise = useCallback(
@@ -915,8 +898,8 @@ export const GeometrySandbox = () => {
 
   // Галерея и доска швов считаются теми же настройками, что и одиночный тайл
   const pipeline = useMemo<AuditPipelineOptions>(
-    () => ({ geometryParams: deferredParams, enableGenerative, noiseEnabled, seedOverride }),
-    [deferredParams, enableGenerative, noiseEnabled, seedOverride]
+    () => ({ geometryParams: deferredParams, noiseEnabled, seedOverride }),
+    [deferredParams, noiseEnabled, seedOverride]
   );
 
   // ============================================
@@ -989,17 +972,18 @@ export const GeometrySandbox = () => {
   // 📊 СТАТИСТИКА
   // ============================================
   const geometryStats = useMemo(() => {
-    let withGeometry = 0;
-    let withoutGeometry = 0;
+    // Нарисованная вручную геометрия в данных: больше не используется (см. generators/index.ts)
+    let legacyManual = 0;
     let derived = 0;
+    let withoutGeometry = 0;
     for (const tile of tiles) {
       for (const feat of tile.features) {
         if (feat.geometry?.kind === 'derived') derived++;
-        else if (feat.geometry) withGeometry++;
+        else if (feat.geometry) legacyManual++;
         else withoutGeometry++;
       }
     }
-    return { withGeometry, withoutGeometry, derived };
+    return { legacyManual, withoutGeometry, derived };
   }, [tiles]);
 
   // ============================================
@@ -1013,12 +997,10 @@ export const GeometrySandbox = () => {
   useEffect(() => {
     console.log(
       `⚙️ [Sandbox] Параметры: ` +
-      `enable=${enableGenerative}, ` +
-      `noise=${noiseEnabled}, ` +
-      `overwrite=${overwrite}, roadWidth=${roadWidth}, ` +
+      `noise=${noiseEnabled}, roadWidth=${roadWidth}, ` +
       `seedOverride="${seedOverride}"`
     );
-  }, [enableGenerative, noiseEnabled, overwrite, roadWidth, seedOverride]);
+  }, [noiseEnabled, roadWidth, seedOverride]);
 
   useEffect(() => {
     setVersion((v) => v + 1);
@@ -1131,20 +1113,15 @@ export const GeometrySandbox = () => {
                 🧬 Генеративная геометрия
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={enableGenerative} onChange={(e) => setEnableGenerative(e.target.checked)} />
-                Включить генерацию из портов
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={overwrite} disabled={!enableGenerative} onChange={(e) => setOverwrite(e.target.checked)} />
-                Перегенерировать поверх ручной геометрии
-              </label>
+              <div style={{ fontSize: 10.5, color: '#888', lineHeight: 1.3 }}>
+                Геометрия городов, дорог и монастырей всегда строится из портов.
+                Нарисованная в данных форма больше не используется.
+              </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
                 <span style={{ minWidth: 110 }}>🛣️ Ширина дорог: {roadWidth}</span>
                 <input
-                  type="number" min={4} max={40} step={1} value={roadWidth} disabled={!enableGenerative}
+                  type="number" min={4} max={40} step={1} value={roadWidth}
                   onChange={(e) => {
                     const next = Number(e.target.value);
                     if (Number.isFinite(next)) setRoadWidth(Math.max(4, Math.min(40, next)));
@@ -1152,6 +1129,12 @@ export const GeometrySandbox = () => {
                   style={{ width: 70, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
                 />
               </label>
+
+              <ParamSlider
+                label="Заход дороги под город" value={roadEndOverlap} min={0} max={30} step={0.5}
+                hint="Тупиковая дорога заходит под город или монастырь и вычитается из него. Должен быть не меньше амплитуды шума на их контуре, иначе у торца видна щель."
+                onChange={(v) => patchGeneration({ roadEndOverlap: v })}
+              />
             </div>
 
             {/* ======================================== */}
@@ -1249,7 +1232,7 @@ export const GeometrySandbox = () => {
             {/* 📊 СТАТИСТИКА */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: 12, color: '#888' }}>
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>📊 Статистика</div>
-              <p style={{ margin: '4px 0' }}>✅ С геометрией: {geometryStats.withGeometry}</p>
+              <p style={{ margin: '4px 0' }} title="Не используется: геометрия строится из портов">🗄 Ручная геометрия в данных (устарела): {geometryStats.legacyManual}</p>
               <p style={{ margin: '4px 0' }}>🌾 Derived (поля): {geometryStats.derived}</p>
               <p style={{ margin: '4px 0' }}>⬜ Без геометрии: {geometryStats.withoutGeometry}</p>
             </div>
@@ -1305,7 +1288,6 @@ export const GeometrySandbox = () => {
                     showAutoSpots={showAutoSpots}
                     showPorts={showPorts}
                     showGeometry={showGeometry}
-                    enableGenerative={enableGenerative}
                     seedOverride={seedOverride}
                     noiseEnabled={noiseEnabled}
                     params={deferredParams}

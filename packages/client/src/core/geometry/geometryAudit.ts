@@ -33,6 +33,7 @@ import { getStitchedPort, rotatePort } from '@fiefdom/shared/core/portUtils';
 import { createSeededRandom } from '@fiefdom/shared/prng/seedRandom';
 import { processTileGeometry } from './geometryProcessor';
 import { generateFeatureGeometries } from './generators';
+import type { ShapeParamsInput } from './generators/shapeParams';
 import type { PlazaParams } from './generators/plaza';
 import { HALF } from './generators/sides';
 import { measureOutOfTile, type NoiseByType, type NoiseSettings } from './geometryPostProcessor';
@@ -678,8 +679,8 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
 export interface AuditPipelineOptions {
     /** Полный набор параметров из geometryParams.json (или из песочницы) */
     readonly geometryParams?: GeometryParams;
-    /** Ширина дорог (по умолчанию из geometryParams.generation, затем из кода) */
-    readonly roadWidth?: number;
+    /** Параметры форм поверх geometryParams.shapes (город, монастырь, дорога) */
+    readonly shapes?: ShapeParamsInput;
     /** Включить шум (по умолчанию true) */
     readonly noiseEnabled?: boolean;
     /** Общий seed вместо artId (для сравнения seed на всех тайлах) */
@@ -719,8 +720,11 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
         // Геометрия всегда генерируется из портов; нарисованная вручную остаётся
         // запасной, только если генератор не смог построить форму
         const generated = generateFeatureGeometries(tile.features, {
-            roadWidth: options.roadWidth ?? params?.generation.roadWidth,
-            roadEndOverlap: params?.generation.roadEndOverlap,
+            shapes: {
+                city: { ...params?.shapes.city, ...options.shapes?.city },
+                monastery: { ...params?.shapes.monastery, ...options.shapes?.monastery },
+                road: { ...params?.shapes.road, ...options.shapes?.road },
+            },
         });
         warnings.push(...generated.warnings);
         features = tile.features.map((feature) => {

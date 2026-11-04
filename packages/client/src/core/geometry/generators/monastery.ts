@@ -5,9 +5,10 @@
 // Монастырь занимает центр тайла.
 // Форма: квадрат со скруглёнными углами (фиксированная, без рандомизации).
 //
-// Параметры:
+// Параметры (по умолчанию):
 //   • Размер: 40×40 юнитов (±20 от центра)
-//   • Скругление углов: 2 юнита
+//   • Скругление углов: 5 юнитов
+//   Задаются в geometryParams.json (shapes.monastery).
 //
 // Метка мипла всегда в центре (0, 0) — гарантированно внутри контура.
 // ============================================
@@ -17,17 +18,13 @@ import type {
   Point,
 } from '@fiefdom/shared/core/geometry.types';
 import type { TileFeature } from '@fiefdom/shared/core/types';
+import { DEFAULT_SHAPE_PARAMS, type MonasteryShapeParams } from './shapeParams';
 
 // ============================================
-// ⚙️ ПАРАМЕТРЫ ФОРМЫ (фиксированные)
+// ⚙️ ПАРАМЕТРЫ ФОРМЫ
 // ============================================
-export const MONASTERY_PARAMS = {
-  /** Половина стороны монастыря (размер 40×40) */
-  halfExtent: 20,
-  
-  /** Радиус скругления углов */
-  cornerRadius: 5,
-} as const;
+/** @deprecated Значения по умолчанию. Используйте DEFAULT_SHAPE_PARAMS.monastery или параметры из geometryParams.json */
+export const MONASTERY_PARAMS = DEFAULT_SHAPE_PARAMS.monastery;
 
 export interface MonasteryResult {
   readonly geometry: AreaGeometry;
@@ -54,7 +51,21 @@ function buildSquareWithCorners(
   cornerRadius: number
 ): AreaGeometry {
   const r = cornerRadius;
-  
+
+  // Без скругления — обычный квадрат (иначе вырожденные кривые нулевой длины)
+  if (r < 0.01) {
+    return {
+      kind: 'area',
+      start: [-half, -half],
+      outline: [
+        line([half, -half]),
+        line([half, half]),
+        line([-half, half]),
+        CLOSE,
+      ],
+    };
+  }
+
   return {
     kind: 'area',
     start: [-half, -half + r],
@@ -90,11 +101,12 @@ function buildSquareWithCorners(
  * @returns Результат генерации или null если фича не монастырь
  */
 export function generateMonastery(
-  monastery: TileFeature
+  monastery: TileFeature,
+  params: MonasteryShapeParams = DEFAULT_SHAPE_PARAMS.monastery
 ): MonasteryResult | null {
   if (monastery.type !== 'monastery') return null;
   
-  const P = MONASTERY_PARAMS;
+  const P = params;
   const geometry = buildSquareWithCorners(P.halfExtent, P.cornerRadius);
   
   console.log(

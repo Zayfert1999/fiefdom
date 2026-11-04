@@ -32,7 +32,11 @@ const signature = (id: string, params: GeometryParams): string =>
 /** Копия закоммиченных параметров с правками (секции дополняются, а не заменяются) */
 const withChanges = (changes: Parameters<typeof resolveGeometryParams>[0] = {}): GeometryParams =>
     resolveGeometryParams({
-        generation: { ...GEOMETRY_PARAMS.generation, ...changes.generation },
+        shapes: {
+            city: { ...GEOMETRY_PARAMS.shapes.city, ...changes.shapes?.city },
+            monastery: { ...GEOMETRY_PARAMS.shapes.monastery, ...changes.shapes?.monastery },
+            road: { ...GEOMETRY_PARAMS.shapes.road, ...changes.shapes?.road },
+        },
         tessellation: { ...GEOMETRY_PARAMS.tessellation, ...changes.tessellation },
         noise: { ...GEOMETRY_PARAMS.noise, ...changes.noise },
         plaza: { ...GEOMETRY_PARAMS.plaza, ...changes.plaza },
@@ -137,7 +141,7 @@ describe('parseGeometryParams', () => {
 
     it('сериализация и разбор обратимы, в том числе для настроек по типу и по тайлу', () => {
         const params = resolveGeometryParams({
-            generation: { roadWidth: 24 },
+            shapes: { road: { width: 24 } },
             noise: { areaAmplitude: 3.5 },
             noiseByType: { monastery: { areaAmplitude: 1, areaFrequency: 0.09 } },
             mesh: { heights: { road: 3 }, colors: { city: '#112233' } },
@@ -252,20 +256,20 @@ describe('параметры доходят до геометрии', () => {
         expect(cramped.issues.some((i) => i.code === 'spot-tight')).toBe(true);
     });
 
-    it('заход дороги под город из generation.roadEndOverlap доходит до геометрии и ограничен диапазоном', () => {
-        const deep = withChanges({ generation: { roadEndOverlap: GEOMETRY_PARAMS.generation.roadEndOverlap + 6 } });
+    it('заход дороги под город из shapes.road.endOverlap доходит до геометрии и ограничен диапазоном', () => {
+        const deep = withChanges({ shapes: { road: { endOverlap: GEOMETRY_PARAMS.shapes.road.endOverlap + 6 } } });
         // у тайла с тупиковой дорогой, упирающейся в город, торец оказывается глубже
         expect(signature('tile_CCRC', deep)).not.toBe(signature('tile_CCRC', GEOMETRY_PARAMS));
         // а тайл без таких дорог не меняется
         expect(signature('tile_CCCC-S', deep)).toBe(signature('tile_CCCC-S', GEOMETRY_PARAMS));
 
-        const { params, warnings } = parseGeometryParams({ version: 1, generation: { roadEndOverlap: 99 } });
-        expect(params.generation.roadEndOverlap).toBe(30);
-        expect(warnings.some((w) => w.includes('generation.roadEndOverlap'))).toBe(true);
+        const { params, warnings } = parseGeometryParams({ version: 1, shapes: { road: { endOverlap: 99 } } });
+        expect(params.shapes.road.endOverlap).toBe(30);
+        expect(warnings.some((w) => w.includes('shapes.road.endOverlap'))).toBe(true);
     });
 
-    it('ширина дороги из generation.roadWidth доходит до геометрии', () => {
-        const narrow = withChanges({ generation: { roadWidth: 12 } });
+    it('ширина дороги из shapes.road.width доходит до геометрии', () => {
+        const narrow = withChanges({ shapes: { road: { width: 12 } } });
         expect(signature('tile_CRRC', narrow)).not.toBe(signature('tile_CRRC', GEOMETRY_PARAMS));
     });
 });

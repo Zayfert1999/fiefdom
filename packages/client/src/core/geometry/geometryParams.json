@@ -1,8 +1,21 @@
 {
   "version": 1,
-  "generation": {
-    "roadWidth": 20,
-    "roadEndOverlap": 14
+  "shapes": {
+    "city": {
+      "capDepth": 20,
+      "roadArcDepth": 30,
+      "diagBulge": 20
+    },
+    "monastery": {
+      "halfExtent": 20,
+      "cornerRadius": 5
+    },
+    "road": {
+      "width": 20,
+      "cornerRadius": 25,
+      "cornerTension": 0.6,
+      "endOverlap": 14
+    }
   },
   "tessellation": {
     "curveDensity": 0.3,

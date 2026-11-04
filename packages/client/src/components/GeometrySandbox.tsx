@@ -49,11 +49,11 @@ import {
   NoiseByTypeControls,
   NoiseControls,
   PlazaControls,
+  ShapeControls,
   SpotControls,
   TessellationControls,
   TileOverrideControls,
   ParamCheckbox,
-  ParamSlider,
 } from './SandboxParamControls';
 import { SandboxParamsBar } from './SandboxParamsBar';
 import { GeometryGallery } from './GeometryGallery';
@@ -67,11 +67,13 @@ import {
   DEFAULT_TESSELLATION_PARAMS,
   DEFAULT_PLAZA_PARAMS,
   DEFAULT_SPOT_PARAMS,
+  DEFAULT_SHAPE_PARAMS,
 } from '@/core/geometry';
 import type {
   NoiseByType,
   NoiseSettings,
   PlazaParams,
+  ShapeParams,
   ShieldAnchor,
   SpotParams,
   TessellationParams,
@@ -404,16 +406,16 @@ const SandboxTileView = memo(({
     () => seedOverride?.trim() || tileParams.seed || tile.artId || tile.id,
     [seedOverride, tileParams.seed, tile.artId, tile.id]
   );
-  const { roadWidth, roadEndOverlap } = params.generation;
+  const { shapes } = params;
 
   // ============================================
   // 🧬 ГЕНЕРАЦИЯ ГЕОМЕТРИИ (БЕЗ seed и jitter)
   // ============================================
   const generation = useMemo(() => {
-    console.log(`🧬 [Sandbox] Генерация: tile="${tile.id}", roadWidth=${roadWidth}, roadEndOverlap=${roadEndOverlap}`);
+    console.log(`🧬 [Sandbox] Генерация: tile="${tile.id}"`);
 
     // Геометрия всегда генерируется из портов (нарисованная в данных — лишь запасная)
-    const gen = generateFeatureGeometries(tile.features, { roadWidth, roadEndOverlap });
+    const gen = generateFeatureGeometries(tile.features, { shapes });
 
     const generatedIds = new Set(gen.geometries.keys());
     const features: TileFeature[] = tile.features.map((feature) => {
@@ -426,7 +428,7 @@ const SandboxTileView = memo(({
     }
 
     return { features, warnings: gen.warnings, generatedIds };
-  }, [tile, roadWidth, roadEndOverlap]);
+  }, [tile, shapes]);
 
   // ============================================
   // 🏭 ПРОЦЕССОР С ШУМОМ ПЕРЛИНА
@@ -830,15 +832,17 @@ export const GeometrySandbox = () => {
   const tessParams = params.tessellation;
   const plazaParams = params.plaza;
   const meshParams = params.mesh;
-  const roadWidth = params.generation.roadWidth;
-  const roadEndOverlap = params.generation.roadEndOverlap;
 
-  const patchGeneration = useCallback(
-    (patch: Partial<GeometryParams['generation']>) =>
-      setParams((prev) => ({ ...prev, generation: { ...prev.generation, ...patch } })),
+  const patchShapes = useCallback(
+    <G extends keyof ShapeParams>(group: G, patch: Partial<ShapeParams[G]>) =>
+      setParams((prev) =>
+        resolveGeometryParams({
+          ...prev,
+          shapes: { ...prev.shapes, [group]: { ...prev.shapes[group], ...patch } },
+        })
+      ),
     []
   );
-  const setRoadWidth = useCallback((value: number) => patchGeneration({ roadWidth: value }), [patchGeneration]);
 
   const patchNoise = useCallback(
     (patch: Partial<NoiseSettings>) => setParams((prev) => ({ ...prev, noise: { ...prev.noise, ...patch } })),
@@ -882,6 +886,10 @@ export const GeometrySandbox = () => {
   );
   const resetPlaza = useCallback(
     () => setParams((prev) => ({ ...prev, plaza: { ...DEFAULT_PLAZA_PARAMS } })),
+    []
+  );
+  const resetShapes = useCallback(
+    () => setParams((prev) => ({ ...prev, shapes: structuredClone(DEFAULT_SHAPE_PARAMS) as ShapeParams })),
     []
   );
   const resetSpots = useCallback(
@@ -997,10 +1005,9 @@ export const GeometrySandbox = () => {
   useEffect(() => {
     console.log(
       `⚙️ [Sandbox] Параметры: ` +
-      `noise=${noiseEnabled}, roadWidth=${roadWidth}, ` +
-      `seedOverride="${seedOverride}"`
+      `noise=${noiseEnabled}, seedOverride="${seedOverride}"`
     );
-  }, [noiseEnabled, roadWidth, seedOverride]);
+  }, [noiseEnabled, seedOverride]);
 
   useEffect(() => {
     setVersion((v) => v + 1);
@@ -1106,35 +1113,13 @@ export const GeometrySandbox = () => {
             <Legend />
 
             {/* ======================================== */}
-            {/* 🧬 ГЕНЕРАТИВНАЯ ГЕОМЕТРИЯ */}
+            {/* 🏗 ФОРМЫ (ГОРОД, МОНАСТЫРЬ, ДОРОГА) */}
             {/* ======================================== */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                🧬 Генеративная геометрия
+                🏗 Формы
               </div>
-
-              <div style={{ fontSize: 10.5, color: '#888', lineHeight: 1.3 }}>
-                Геометрия городов, дорог и монастырей всегда строится из портов.
-                Нарисованная в данных форма больше не используется.
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13 }}>
-                <span style={{ minWidth: 110 }}>🛣️ Ширина дорог: {roadWidth}</span>
-                <input
-                  type="number" min={4} max={40} step={1} value={roadWidth}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    if (Number.isFinite(next)) setRoadWidth(Math.max(4, Math.min(40, next)));
-                  }}
-                  style={{ width: 70, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
-                />
-              </label>
-
-              <ParamSlider
-                label="Заход дороги под город" value={roadEndOverlap} min={0} max={30} step={0.5}
-                hint="Тупиковая дорога заходит под город или монастырь и вычитается из него. Должен быть не меньше амплитуды шума на их контуре, иначе у торца видна щель."
-                onChange={(v) => patchGeneration({ roadEndOverlap: v })}
-              />
+              <ShapeControls params={params.shapes} onChange={patchShapes} onReset={resetShapes} />
             </div>
 
             {/* ======================================== */}

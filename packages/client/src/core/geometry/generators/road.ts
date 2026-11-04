@@ -18,6 +18,7 @@ import type {
   Point,
 } from '@fiefdom/shared/core/geometry.types';
 import type { TileFeature } from '@fiefdom/shared/core/types';
+import { DEFAULT_SHAPE_PARAMS, type RoadShapeParams } from './shapeParams';
 import {
   HALF,
   centerSides,
@@ -28,27 +29,10 @@ import {
 } from './sides';
 
 // ============================================
-// ⚙️ ПАРАМЕТРЫ ФОРМ (ФИКСИРОВАННЫЕ)
+// ⚙️ ПАРАМЕТРЫ ФОРМЫ
 // ============================================
-export const ROAD_PARAMS = {
-  /** Ширина дороги */
-  width: 20,
-  /** Длина прямого «хвоста» у края в повороте */
-  cornerStub: 25,
-  /** Вынос контрольных точек скругления */
-  cornerCtrl: 15,
-  /** Длина прямого «хвоста» в прямой дороге */
-  straightStub: 20,
-  /** Глубина дуги города для тупиковой дороги */
-  cityArcDepth: 30,
-  /**
-   * Заход тупиковой дороги ПОД город/монастырь (юниты).
-   * Дорога всё равно вычитается из контура города в пайплайне,
-   * но без захода шум на контуре города оставляет щель между
-   * торцом дороги и городом.
-   */
-  endOverlap: 14,
-} as const;
+/** @deprecated Значения по умолчанию. Используйте DEFAULT_SHAPE_PARAMS.road или параметры из geometryParams.json */
+export const ROAD_PARAMS = DEFAULT_SHAPE_PARAMS.road;
 
 export interface RoadResult {
   readonly geometry: LineGeometry;
@@ -94,11 +78,12 @@ function rotatePath(
 function build(
   road: TileFeature,
   ctx: TileContext,
-  width: number,
   arcDepth: ReadonlyMap<Side, number>,
-  endOverlap: number
+  P: RoadShapeParams,
+  fallbackArcDepth: number
 ): LineGeometry | null {
-  const P = ROAD_PARAMS;
+  const width = P.width;
+  const endOverlap = P.endOverlap;
   const sides = centerSides(road);
 
   if (sides.length === 2) {
@@ -114,14 +99,15 @@ function build(
     // Поворот между соседними сторонами
     const a = sides.find(s => sides.includes(mod4(s + 1))) ?? s0;
     const k = mod4(a - 1);
-    const s1_ = P.cornerStub;
-    const s2_ = P.cornerStub;
-    const c1 = P.cornerCtrl;
-    const c2 = P.cornerCtrl;
+    // Поворот из (0, HALF) в (HALF, 0): прямые хвосты длиной HALF − R у обоих краёв
+    // и дуга от (0, R) до (R, 0). Вынос контрольных точек = R·натяжение
+    // (≈0.55 даёт круг). При R = 25 и натяжении 0.6 форма как у прежних констант.
+    const R = P.cornerRadius;
+    const ctrl = R * P.cornerTension;
 
     const path: PathSegment[] = [
-      line([0, HALF - s1_]),
-      bezier([0, HALF - s1_ - c1], [s2_ - c2, 0], [s2_, 0]),
+      line([0, R]),
+      bezier([0, R - ctrl], [R - ctrl, 0], [R, 0]),
       line([HALF, 0]),
     ];
     return rotatePath([0, HALF], path, k, width);
@@ -135,7 +121,7 @@ function build(
     if (ctx.monasteryHalf !== null) {
       reach = HALF - ctx.monasteryHalf + endOverlap;
     } else if (ctx.cityArcSides.has(side)) {
-      reach = (arcDepth.get(side) ?? P.cityArcDepth) + endOverlap;
+      reach = (arcDepth.get(side) ?? fallbackArcDepth) + endOverlap;
     }
 
     return rotatePath([0, -HALF], [line([0, -HALF + reach])], side, width);
@@ -154,12 +140,12 @@ function build(
 export function generateRoad(
   road: TileFeature,
   ctx: TileContext,
-  width: number,
   arcDepth: ReadonlyMap<Side, number>,
-  /** Заход тупиковой дороги под город/монастырь. Должен перекрывать амплитуду шума на их контуре */
-  endOverlap: number = ROAD_PARAMS.endOverlap
+  params: RoadShapeParams = DEFAULT_SHAPE_PARAMS.road,
+  /** Глубина выреза города под дорогу, если города на этой стороне нет в arcDepth (запасное значение) */
+  fallbackArcDepth: number = DEFAULT_SHAPE_PARAMS.city.roadArcDepth
 ): RoadResult | null {
-  const geometry = build(road, ctx, width, arcDepth, endOverlap);
+  const geometry = build(road, ctx, arcDepth, params, fallbackArcDepth);
   if (!geometry) return null;
   return { geometry };
 }

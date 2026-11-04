@@ -69,7 +69,6 @@ export {
 export type {
     GeometryParams,
     GeometryParamsInput,
-    GenerationParams,
     TileParamOverride,
     ResolvedTileParams,
     ParseGeometryParamsResult,
@@ -82,13 +81,20 @@ export {
     CITY_PARAMS,
     ROAD_PARAMS,
     MONASTERY_PARAMS,
+    DEFAULT_SHAPE_PARAMS,
+    SHAPE_PARAM_LIMITS,
+    resolveShapeParams,
+    roadCornerRadiusFloor,
     generatePlazas,
     DEFAULT_PLAZA_PARAMS,
     resolvePlazaParams,
     computeFieldPolygons,
     assignFieldFeatures,
 } from './generators';
-export type { GenerateOptions, GeneratedGeometries, PlazaParams } from './generators';
+export type {
+    GenerateOptions, GeneratedGeometries, PlazaParams,
+    CityShapeParams, MonasteryShapeParams, RoadShapeParams, ShapeParams, ShapeParamsInput,
+} from './generators';
 
 // Типы из shared
 export type {

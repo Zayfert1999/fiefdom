@@ -6,7 +6,7 @@
 // в geometryParams.json. Песочница редактирует его и сохраняет обратно.
 //
 //   {
-//     version, generation, tessellation, noise,
+//     version, shapes, tessellation, noise,
 //     noiseByType: { city?, monastery?, road? },   ← свои настройки шума для типа фичи
 //     plaza, spots, mesh,
 //     tiles: { "<artId>": { seed?, noise? } }      ← настройки конкретного тайла
@@ -20,10 +20,17 @@
 //   • hashGeometryParams — хэш для ключей кэша (можно по одному тайлу)
 //   • resolveTileParams — что реально применяется к тайлу с данным artId
 //
-// 🚧 ЧЕГО ЗДЕСЬ ПОКА НЕТ: параметров формы городов, монастырей и дорог
-//    (CITY_PARAMS, MONASTERY_PARAMS, ROAD_PARAMS). Только ширина дороги.
+// 🏗 `shapes` — параметры форм городов, монастырей и дорог (раньше константы
+//    CITY_PARAMS / MONASTERY_PARAMS / ROAD_PARAMS в генераторах). Старая секция
+//    `generation` (roadWidth, roadEndOverlap) при чтении молча переносится в
+//    shapes.road.width / shapes.road.endOverlap.
 // ============================================
-import { ROAD_PARAMS } from './generators/road';
+import {
+    resolveShapeParams,
+    DEFAULT_SHAPE_PARAMS,
+    type ShapeParams,
+    type ShapeParamsInput,
+} from './generators/shapeParams';
 import { DEFAULT_PLAZA_PARAMS, resolvePlazaParams, type PlazaParams } from './generators/plaza';
 import {
     DEFAULT_SPOT_PARAMS,
@@ -58,17 +65,6 @@ export const GEOMETRY_PARAMS_VERSION = 1;
 // 📦 ТИПЫ
 // ============================================
 
-/** Параметры генерации исходных контуров из портов */
-export interface GenerationParams {
-    /** Ширина дорог (юниты) */
-    roadWidth: number;
-    /**
-     * Заход тупиковой дороги под город или монастырь (юниты). Дорога всё равно вычитается из их
-     * контура, но без захода шум оставляет щель у торца: при амплитуде шума больше захода щель видна.
-     */
-    roadEndOverlap: number;
-}
-
 /** Настройки конкретного тайла (ключ — artId) */
 export interface TileParamOverride {
     /** Seed шума вместо artId: «этот тайл вышел некрасивым — берём другой seed» */
@@ -81,7 +77,8 @@ export interface TileParamOverride {
 
 export interface GeometryParams {
     version: typeof GEOMETRY_PARAMS_VERSION;
-    generation: GenerationParams;
+    /** Формы городов, монастырей и дорог */
+    shapes: ShapeParams;
     tessellation: TessellationParams;
     noise: NoiseSettings;
     noiseByType: NoiseByType;
@@ -94,7 +91,7 @@ export interface GeometryParams {
 /** Любая часть параметров: недостающее достраивается значениями по умолчанию */
 export interface GeometryParamsInput {
     version?: number;
-    generation?: Partial<GenerationParams>;
+    shapes?: ShapeParamsInput;
     tessellation?: Partial<TessellationParams>;
     noise?: Partial<NoiseSettings>;
     noiseByType?: NoiseByType;
@@ -159,21 +156,9 @@ export function resolveGeometryParams(input: GeometryParamsInput = {}): Geometry
         };
     }
 
-    const roadWidth = input.generation?.roadWidth;
-    const roadEndOverlap = input.generation?.roadEndOverlap;
-
     return {
         version: GEOMETRY_PARAMS_VERSION,
-        generation: {
-            roadWidth:
-                typeof roadWidth === 'number' && Number.isFinite(roadWidth)
-                    ? Math.min(60, Math.max(2, roadWidth))
-                    : ROAD_PARAMS.width,
-            roadEndOverlap:
-                typeof roadEndOverlap === 'number' && Number.isFinite(roadEndOverlap)
-                    ? Math.min(30, Math.max(0, roadEndOverlap))
-                    : ROAD_PARAMS.endOverlap,
-        },
+        shapes: resolveShapeParams(input.shapes),
         tessellation: resolveTessellationParams(input.tessellation),
         noise,
         noiseByType,
@@ -266,22 +251,14 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     }
 
     const topLevel = new Set([
-        'version', 'generation', 'tessellation', 'noise', 'noiseByType', 'plaza', 'spots', 'mesh', 'tiles',
+        'version', 'shapes', 'generation', 'tessellation', 'noise', 'noiseByType', 'plaza', 'spots', 'mesh', 'tiles',
     ]);
     for (const key of Object.keys(raw)) {
         if (!topLevel.has(key)) warnings.push(`${key}: неизвестная секция, проигнорирована`);
     }
 
     const input: GeometryParamsInput = {
-        generation: sanitizeSection(
-            'generation',
-            // `overwrite` удалён (геометрия всегда генерируется); в старых файлах его молча пропускаем
-            isRecord(raw.generation)
-                ? Object.fromEntries(Object.entries(raw.generation).filter(([key]) => key !== 'overwrite'))
-                : raw.generation,
-            { roadWidth: 0, roadEndOverlap: 0 },
-            warnings
-        ) as GeometryParamsInput['generation'],
+        shapes: sanitizeSection('shapes', raw.shapes, DEFAULT_SHAPE_PARAMS, warnings) as GeometryParamsInput['shapes'],
         tessellation: sanitizeSection('tessellation', raw.tessellation, DEFAULT_TESSELLATION_PARAMS, warnings) as
             GeometryParamsInput['tessellation'],
         noise: sanitizeSection('noise', raw.noise, NOISE_PARAMS, warnings) as GeometryParamsInput['noise'],
@@ -289,6 +266,30 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
         spots: sanitizeSection('spots', raw.spots, DEFAULT_SPOT_PARAMS, warnings) as GeometryParamsInput['spots'],
         mesh: sanitizeSection('mesh', raw.mesh, DEFAULT_MESH_PARAMS, warnings) as GeometryParamsInput['mesh'],
     };
+
+    // Старая секция generation: roadWidth и roadEndOverlap переехали в shapes.road, overwrite удалён
+    if (raw.generation !== undefined) {
+        if (!isRecord(raw.generation)) {
+            warnings.push('generation: ожидался объект, секция пропущена');
+        } else {
+            const legacy: Record<string, string> = { roadWidth: 'width', roadEndOverlap: 'endOverlap' };
+            for (const [key, value] of Object.entries(raw.generation)) {
+                if (key === 'overwrite') continue;
+                const target = legacy[key];
+                if (!target) {
+                    warnings.push(`generation.${key}: неизвестный параметр, проигнорирован`);
+                } else if (typeof value === 'number' && Number.isFinite(value)) {
+                    // Значение из новой секции shapes.road важнее перенесённого
+                    const shapes: ShapeParamsInput = input.shapes ?? {};
+                    const road: Record<string, number> = { ...(shapes.road as Record<string, number> | undefined) };
+                    if (road[target] === undefined) road[target] = value;
+                    input.shapes = { ...shapes, road };
+                } else {
+                    warnings.push(`generation.${key}: ожидалось число, получено ${JSON.stringify(value)}`);
+                }
+            }
+        }
+    }
 
     // Цвета меша должны быть #rrggbb
     const colors = input.mesh?.colors as Record<string, unknown> | undefined;
@@ -357,7 +358,7 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     const params = resolveGeometryParams(input);
 
     // Значения, которые пришлось обрезать до допустимых
-    reportClamped('generation', input.generation, params.generation, warnings);
+    reportClamped('shapes', input.shapes, params.shapes, warnings);
     reportClamped('tessellation', input.tessellation, params.tessellation, warnings);
     reportClamped('noise', input.noise, params.noise, warnings);
     reportClamped('plaza', input.plaza, params.plaza, warnings);
@@ -407,7 +408,7 @@ function canonicalObject(params: GeometryParams, onlyTile?: string): unknown {
 
     return {
         version: params.version,
-        generation: params.generation,
+        shapes: params.shapes,
         tessellation: params.tessellation,
         noise: params.noise,
         noiseByType,

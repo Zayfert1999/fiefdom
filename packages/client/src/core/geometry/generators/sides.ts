@@ -90,7 +90,11 @@ export interface TileContext {
   readonly cityArcSides: ReadonlySet<Side>;
 }
 
-export function buildContext(features: readonly TileFeature[]): TileContext {
+export function buildContext(
+  features: readonly TileFeature[],
+  /** Половина стороны монастыря (shapes.monastery.halfExtent) */
+  monasteryHalfExtent: number = MONASTERY_HALF_DEFAULT
+): TileContext {
   const deadEnd = new Set<Side>();
   const roadSides = new Set<Side>();
   const arcSides = new Set<Side>();
@@ -104,7 +108,7 @@ export function buildContext(features: readonly TileFeature[]): TileContext {
     } else if (f.type === 'city') {
       for (const s of cityArcSides(centerSides(f))) arcSides.add(s);
     } else if (f.type === 'monastery') {
-      monasteryHalf = MONASTERY_HALF_DEFAULT;
+      monasteryHalf = monasteryHalfExtent;
     }
   }
 

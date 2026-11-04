@@ -22,7 +22,8 @@ import type {
 } from '@fiefdom/shared/core/geometry.types';
 import type { TileFeature } from '@fiefdom/shared/core/types';
 import { generateCity } from './city';
-import { generateRoad, ROAD_PARAMS } from './road';
+import { generateRoad } from './road';
+import { resolveShapeParams, type ShapeParamsInput } from './shapeParams';
 import { generateMonastery } from './monastery';
 import { buildContext, type Side } from './sides';
 
@@ -32,6 +33,19 @@ import { buildContext, type Side } from './sides';
 export { CITY_PARAMS } from './city';
 export { ROAD_PARAMS } from './road';
 export { MONASTERY_PARAMS } from './monastery';
+export {
+    DEFAULT_SHAPE_PARAMS,
+    SHAPE_PARAM_LIMITS,
+    resolveShapeParams,
+    roadCornerRadiusFloor,
+} from './shapeParams';
+export type {
+    CityShapeParams,
+    MonasteryShapeParams,
+    RoadShapeParams,
+    ShapeParams,
+    ShapeParamsInput,
+} from './shapeParams';
 export { generatePlazas, DEFAULT_PLAZA_PARAMS, resolvePlazaParams } from './plaza';
 export type { PlazaParams } from './plaza';
 export { computeFieldPolygons, assignFieldFeatures } from './field';
@@ -40,10 +54,11 @@ export { computeFieldPolygons, assignFieldFeatures } from './field';
 // ⚙️ ОПЦИИ (БЕЗ seed и jitter)
 // ============================================
 export interface GenerateOptions {
-    /** Заход тупиковых дорог под город/монастырь (юниты). Должен перекрывать амплитуду шума на их контуре */
-    readonly roadEndOverlap?: number;
-    /** Ширина дорог. По умолчанию 20 */
-    readonly roadWidth?: number;
+    /**
+     * Параметры форм городов, монастырей и дорог (shapes в geometryParams.json).
+     * Недостающее достраивается значениями по умолчанию.
+     */
+    readonly shapes?: ShapeParamsInput;
 }
 
 export interface GeneratedGeometries {
@@ -66,8 +81,8 @@ export function generateFeatureGeometries(
     features: readonly TileFeature[],
     options: GenerateOptions = {},
 ): GeneratedGeometries {
-    const width = options.roadWidth ?? ROAD_PARAMS.width;
-    const ctx = buildContext(features);
+    const shapes = resolveShapeParams(options.shapes);
+    const ctx = buildContext(features, shapes.monastery.halfExtent);
 
     const geometries = new Map<string, AreaGeometry | LineGeometry>();
     const warnings: string[] = [];
@@ -76,7 +91,7 @@ export function generateFeatureGeometries(
     // 1. Города
     for (const f of features) {
         if (f.type !== 'city' || !needsGeometry(f)) continue;
-        const res = generateCity(f, ctx);
+        const res = generateCity(f, ctx, shapes.city);
         if (!res) {
             warnings.push(`city "${f.id}": неподдерживаемые порты [${f.ports.join(', ')}]`);
             continue;
@@ -88,7 +103,7 @@ export function generateFeatureGeometries(
     // 2. Дороги
     for (const f of features) {
         if (f.type !== 'road' || !needsGeometry(f)) continue;
-        const res = generateRoad(f, ctx, width, arcDepth, options.roadEndOverlap);
+        const res = generateRoad(f, ctx, arcDepth, shapes.road, shapes.city.roadArcDepth);
         if (!res) {
             warnings.push(`road "${f.id}": неподдерживаемые порты [${f.ports.join(', ')}]`);
             continue;
@@ -99,7 +114,7 @@ export function generateFeatureGeometries(
     // 3. Монастыри
     for (const f of features) {
         if (f.type !== 'monastery' || !needsGeometry(f)) continue;
-        const res = generateMonastery(f);
+        const res = generateMonastery(f, shapes.monastery);
         if (!res) {
             warnings.push(`monastery "${f.id}": ошибка генерации`);
             continue;

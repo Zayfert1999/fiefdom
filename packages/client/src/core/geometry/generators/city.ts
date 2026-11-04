@@ -18,6 +18,7 @@ import type {
   Point,
 } from '@fiefdom/shared/core/geometry.types';
 import type { TileFeature } from '@fiefdom/shared/core/types';
+import { DEFAULT_SHAPE_PARAMS, type CityShapeParams } from './shapeParams';
 import {
   ALL_SIDES,
   HALF,
@@ -29,16 +30,11 @@ import {
 } from './sides';
 
 // ============================================
-// ⚙️ ПАРАМЕТРЫ ФОРМ (ФИКСИРОВАННЫЕ)
+// ⚙️ ПАРАМЕТРЫ ФОРМЫ
 // ============================================
-export const CITY_PARAMS = {
-  /** Глубина «шапки» и выреза */
-  capDepth: 20,
-  /** Глубина выреза для дороги */
-  roadArcDepth: 30,
-  /** Изгиб диагональной границы */
-  diagBulge: 20,
-} as const;
+// Параметры передаются генератору аргументом (см. shapeParams.ts, geometryParams.json).
+/** @deprecated Значения по умолчанию. Используйте DEFAULT_SHAPE_PARAMS.city или параметры из geometryParams.json */
+export const CITY_PARAMS = DEFAULT_SHAPE_PARAMS.city;
 
 export interface CityResult {
   readonly geometry: AreaGeometry;
@@ -82,9 +78,9 @@ function rotateOutline(
 // ============================================
 function build(
   city: TileFeature,
-  ctx: TileContext
+  ctx: TileContext,
+  P: CityShapeParams
 ): Omit<CityResult, never> | null {
-  const P = CITY_PARAMS;
   const sides = centerSides(city);
   const arcDepth = new Map<Side, number>();
 
@@ -196,7 +192,8 @@ function build(
  */
 export function generateCity(
   city: TileFeature,
-  ctx: TileContext
+  ctx: TileContext,
+  params: CityShapeParams = DEFAULT_SHAPE_PARAMS.city
 ): CityResult | null {
-  return build(city, ctx);
+  return build(city, ctx, params);
 }

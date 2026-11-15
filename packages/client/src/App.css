@@ -7,6 +7,7 @@
 @import './styles/tiles.css';
 @import './styles/regions.css';
 @import './styles/meeples.css';
+@import './styles/board3d.css';
 
 /* Глобальная блокировка выделения */
 body {
@@ -29,4 +30,4 @@ textarea,
 /* Запрещаем скролл/зум страницы на доске */
 .board-svg {
   touch-action: none;
-}
+}

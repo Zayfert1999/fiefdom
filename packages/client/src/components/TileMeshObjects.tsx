@@ -5,7 +5,8 @@
 // • useMeshGeometry — буферы TileMeshData → THREE.BufferGeometry
 // • TileMeshObject  — один тайл одним мешем
 // • TileInstances   — один и тот же тайл, размноженный через InstancedMesh
-//                     (поворот и позиция — в матрице инстанса)
+//                     (поворот и позиция — в матрице инстанса;
+//                     onHover/onClick получают клетку и фичу под курсором)
 //
 // Геометрия строится в core/geometry/tileMesh.ts, здесь только обвязка.
 // ============================================
@@ -79,9 +80,11 @@ interface TileInstancesProps {
   placements: readonly TilePlacement[];
   wireframe?: boolean;
   onHover?: (hit: InstanceHit | null) => void;
+  /** Клик по тайлу. Обработчик сам решает, останавливать ли всплытие (event.stopPropagation()) */
+  onClick?: (hit: InstanceHit, event: ThreeEvent<MouseEvent>) => void;
 }
 
-export const TileInstances = memo(({ mesh, placements, wireframe = false, onHover }: TileInstancesProps) => {
+export const TileInstances = memo(({ mesh, placements, wireframe = false, onHover, onClick }: TileInstancesProps) => {
   const geometry = useMeshGeometry(mesh);
   const ref = useRef<THREE.InstancedMesh>(null);
 
@@ -115,6 +118,21 @@ export const TileInstances = memo(({ mesh, placements, wireframe = false, onHove
     });
   };
 
+  const handleClick = (event: ThreeEvent<MouseEvent>): void => {
+    if (!onClick) return;
+
+    const placement = event.instanceId === undefined ? undefined : placements[event.instanceId];
+    if (!placement) return;
+
+    onClick(
+      {
+        placement,
+        group: event.faceIndex == null ? null : findMeshGroup(mesh, event.faceIndex),
+      },
+      event
+    );
+  };
+
   return (
     <instancedMesh
       ref={ref}
@@ -122,11 +140,12 @@ export const TileInstances = memo(({ mesh, placements, wireframe = false, onHove
       castShadow
       receiveShadow
       frustumCulled={false}
-      onPointerMove={handleMove}
-      onPointerOut={() => onHover?.(null)}
+      onPointerMove={onHover ? handleMove : undefined}
+      onPointerOut={onHover ? () => onHover(null) : undefined}
+      onClick={onClick ? handleClick : undefined}
     >
       <meshStandardMaterial vertexColors roughness={0.75} metalness={0.05} wireframe={wireframe} />
     </instancedMesh>
   );
 });
-TileInstances.displayName = 'TileInstances';
+TileInstances.displayName = 'TileInstances';

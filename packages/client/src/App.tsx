@@ -6,7 +6,6 @@ import { HOTKEY_DEFINITIONS } from '@fiefdom/shared/core/hotkeys';
 import { useHotkeys } from '@/hooks/useHotkeys';
 
 // Статические импорты 
-import { Board } from '@/renderer/Board';
 import { GameHUD } from '@/components/GameHUD';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -22,6 +21,8 @@ const GameOverScreen = lazy(() => import('@/components/GameOverScreen').then(m =
 const DebugPanel = lazy(() => import('@/components/DebugPanel').then(m => ({ default: m.DebugPanel })));
 const NetworkLobby = lazy(() => import('@/components/NetworkLobby').then(m => ({ default: m.NetworkLobby })));
 const GeometrySandbox = lazy(() => import('@/components/GeometrySandbox').then(m => ({ default: m.GeometrySandbox })));
+// 🧊 3D-доска (three.js — отдельный чанк, грузится только при входе в игру)
+const GameBoard3D = lazy(() => import('@/renderer3d/GameBoard3D').then(m => ({ default: m.GameBoard3D })));
 
 // 🌟 Fallback для Suspense — минимальный, не мешает UX
 const LazyFallback = () => null;  // Или можно <div>Загрузка...</div>
@@ -248,9 +249,11 @@ function AppScreens() {
           <ActionPanel />
         </ErrorBoundary>
 
-        {/* 🗺️ Игровое поле */}
+        {/* 🗺️ Игровое поле (3D) */}
         <ErrorBoundary name="Board">
-          <Board onGridClick={handleBoardClick} validCells={validCells} />
+          <Suspense fallback={<LazyFallback />}>
+            <GameBoard3D onGridClick={handleBoardClick} validCells={validCells} />
+          </Suspense>
         </ErrorBoundary>
 
         {/* 🐛 Рендерим дебаг-панель поверх всего */}
@@ -270,4 +273,4 @@ function AppScreens() {
         )}
       </div>
     );
-  }
+  }

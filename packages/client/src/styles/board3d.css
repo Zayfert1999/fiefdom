@@ -1,0 +1,55 @@
+/* ============================================
+   🎲 3D-ДОСКА
+   ============================================ */
+
+/* Контейнер Canvas: тот же размер, что был у .board-svg */
+.board-3d {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #1a1a1a;
+  display: block;
+  user-select: none;
+  touch-action: none;
+}
+
+.board-3d canvas {
+  display: block;
+  outline: none;
+}
+
+/* ============================================
+   ✨ ВСПЛЫВАЮЩЕЕ «+N» НАД МИПЛОМ
+   Аналог .points-text из meeples.css (там SVG, здесь HTML поверх Canvas)
+   ============================================ */
+.board3d-points {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--n-color, #ffffff);
+  -webkit-text-stroke: 0.8px #ffffff;
+  paint-order: stroke fill;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: board3d-points-float var(--comp-reg-anim-completion, 3000ms) ease-out forwards;
+}
+
+@keyframes board3d-points-float {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.2);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-25px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.8);
+  }
+}

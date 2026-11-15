@@ -11,7 +11,7 @@
       "cornerRadius": 5
     },
     "road": {
-      "width": 20,
+      "width": 12,
       "cornerRadius": 25,
       "cornerTension": 0.6,
       "endOverlap": 14
@@ -53,8 +53,8 @@
   },
   "noiseByType": {},
   "plaza": {
-    "depth": 24,
-    "cornerRadius": 12,
+    "depth": 14,
+    "cornerRadius": 6,
     "cornerRoundness": 1,
     "clusterTolerance": 3
   },
@@ -86,7 +86,7 @@
       "monastery": "#d47843"
     },
     "wallCreaseAngle": 35,
-    "boundaryWalls": false
+    "boundaryWalls": true
   },
   "tiles": {}
 }

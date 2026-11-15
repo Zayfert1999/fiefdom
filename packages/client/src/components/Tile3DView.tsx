@@ -11,6 +11,8 @@
 //     Теперь (x, y) → (x, высота, y): юг = низ экрана, как в SVG.
 //   • Убран циклический импорт PLAZA_COLOR из GeometrySandbox
 //     (цвета теперь в MeshParams).
+//   • Рельеф полей (mesh.terrain): seed рельефа приходит пропсом `seed`
+//     (artId тайла или закреплённый seed), иначе рельеф одинаков у всех тайлов.
 // ============================================
 import { memo, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -29,10 +31,12 @@ interface Tile3DViewProps {
   /** Фичи тайла (нужны, чтобы отличить монастырь от города) */
   features?: readonly MeshFeature[];
   meshParams?: MeshParamsInput;
+  /** Seed рельефа полей: artId тайла или закреплённый seed (в песочнице — тот же, что у шума) */
+  seed?: string;
   wireframe?: boolean;
 }
 
-export const Tile3DView = memo(({ result, size, features, meshParams, wireframe = false }: Tile3DViewProps) => {
+export const Tile3DView = memo(({ result, size, features, meshParams, seed, wireframe = false }: Tile3DViewProps) => {
   const mesh = useMemo(() => {
     // Запасной вариант без features: монастырь определяем по id, как раньше
     const meshFeatures: readonly MeshFeature[] =
@@ -43,8 +47,8 @@ export const Tile3DView = memo(({ result, size, features, meshParams, wireframe 
       }));
     // Одиночный тайл показываем сплошным блоком: стены по периметру нужны,
     // иначе при взгляде сбоку видно «пустоту» под поверхностями
-    return buildTileMesh(result, meshFeatures, { ...meshParams, boundaryWalls: true });
-  }, [result, features, meshParams]);
+    return buildTileMesh(result, meshFeatures, { ...meshParams, boundaryWalls: true }, seed);
+  }, [result, features, meshParams, seed]);
 
   return (
     <div
@@ -100,3 +104,4 @@ export const Tile3DView = memo(({ result, size, features, meshParams, wireframe 
 });
 
 Tile3DView.displayName = 'Tile3DView';
+

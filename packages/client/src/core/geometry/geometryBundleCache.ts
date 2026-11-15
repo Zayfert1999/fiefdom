@@ -42,6 +42,8 @@ export function getTileBundle(tile: AuditTile, params: GeometryParams): TileBund
             features: audit.features,
             geometry: audit.geometry,
             spots: audit.spots,
+            // Рельеф полей: закреплённый seed тайла, иначе artId (подставит buildTileBundle)
+            seed: params.tiles[tile.artId ?? tile.id]?.seed,
         },
         params.mesh
     );

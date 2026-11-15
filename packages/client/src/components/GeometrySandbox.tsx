@@ -55,6 +55,7 @@ import {
   TileOverrideControls,
   ParamCheckbox,
 } from './SandboxParamControls';
+import { TerrainControls } from '@/components/TerrainControls';
 import { SandboxParamsBar } from './SandboxParamsBar';
 import { GeometryGallery } from './GeometryGallery';
 import {
@@ -686,7 +687,7 @@ const SandboxTileView = memo(({
         {/* 🎮 3D ВИД */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ marginBottom: 8, color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>3D</div>
-          <Tile3DView result={result} size={size} features={generation.features} meshParams={params.mesh} />
+          <Tile3DView result={result} size={size} features={generation.features} meshParams={params.mesh} seed={seed} />
         </div>
       </div>
 
@@ -1160,6 +1161,7 @@ export const GeometrySandbox = () => {
                 🧱 Меш (3D)
               </div>
               <MeshControls params={meshParams} onChange={patchMesh} onReset={resetMesh} />
+              <TerrainControls params={meshParams.terrain} onChange={(terrain) => patchMesh({ terrain })} />
             </div>
 
             {/* ======================================== */}

@@ -25,6 +25,15 @@
 //   был зеркален по оси север-юг относительно 2D.)
 //   Поворот тайла на θ° по часовой стрелке в 2D = rotation.y = -θ в three.
 //
+// ⛰️ РЕЛЬЕФ ПОЛЕЙ (mesh.terrain, шум Перлина, см. terrain.ts)
+//   Верх поля больше не плоский: он строится равномерной сеткой (fieldTriangulation.ts:
+//   контур, разбитый на равные отрезки + треугольная решётка внутри, триангуляция Делоне),
+//   каждой вершине задаётся высота из поля рельефа, нормали считаются по получившейся
+//   поверхности, а стены поля идут по тем же вершинам контура — щелей между верхом и
+//   стеной нет. Если равномерная сетка не построилась (например, очень острый клин поля),
+//   берётся запасной путь: earcut + измельчение длинных рёбер.
+//   Дороги, площади, города и монастыри остаются плоскими.
+//
 // 📦 ЗАВИСИМОСТЬ: пакет `earcut` (+ `@types/earcut`)
 // ============================================
 import earcut from 'earcut';
@@ -32,6 +41,16 @@ import type { Point, Polygon, Ring } from '@fiefdom/shared/core/geometry.types';
 import type { FeatureType, TileFeature } from '@fiefdom/shared/core/types';
 import { HALF } from './generators/sides';
 import type { FeatureSpot } from './spots';
+import {
+    DEFAULT_TERRAIN_PARAMS,
+    createTerrainField,
+    featureFactor,
+    resolveTerrainParams,
+    type TerrainField,
+    type TerrainParams,
+} from './terrain';
+import { triangulateFieldUniform } from './fieldTriangulation';
+import { distanceToSegments, edgeChain, refineTriangles } from './terrainSurface';
 import type { TileGeometryResult } from './types';
 
 // ============================================
@@ -51,6 +70,8 @@ export interface MeshParams {
     wallCreaseAngle: number;
     /** Строить ли стены на рёбрах, лежащих на границе тайла (и подложку) */
     boundaryWalls: boolean;
+    /** Рельеф полей (карта высот или шум) */
+    terrain: TerrainParams;
 }
 
 /** Значения повторяют прежний Tile3DView: подложка 4, поля 4, дороги/площади/города 2, монастырь 4 */
@@ -67,6 +88,7 @@ export const DEFAULT_MESH_PARAMS: Readonly<MeshParams> = {
     },
     wallCreaseAngle: 35,
     boundaryWalls: false,
+    terrain: DEFAULT_TERRAIN_PARAMS,
 };
 
 const finite = (v: unknown, fallback: number): number =>
@@ -78,6 +100,7 @@ export interface MeshParamsInput {
     colors?: Partial<MeshParams['colors']>;
     wallCreaseAngle?: number;
     boundaryWalls?: boolean;
+    terrain?: Partial<TerrainParams>;
 }
 
 export function resolveMeshParams(partial?: MeshParamsInput): MeshParams {
@@ -92,6 +115,7 @@ export function resolveMeshParams(partial?: MeshParamsInput): MeshParams {
         colors: { ...d.colors, ...partial?.colors },
         wallCreaseAngle: Math.min(180, Math.max(0, finite(partial?.wallCreaseAngle, d.wallCreaseAngle))),
         boundaryWalls: partial?.boundaryWalls ?? d.boundaryWalls,
+        terrain: resolveTerrainParams(partial?.terrain),
     };
 }
 
@@ -117,6 +141,10 @@ export interface TileMeshStats {
     readonly maxTopDeviation: number;
     /** Стены, пропущенные на границе тайла */
     readonly skippedBoundaryEdges: number;
+    /** Треугольников верха полей после измельчения под рельеф (0 — рельеф выключен) */
+    readonly terrainTriangles?: number;
+    /** Полей, для которых равномерная сетка не построилась и взят запасной путь (earcut + измельчение) */
+    readonly terrainFallbacks?: number;
 }
 
 export interface TileMeshData {
@@ -195,6 +223,21 @@ function isBoundaryEdge(a: Point, b: Point): boolean {
 // 🏗️ ПОСТРОИТЕЛЬ БУФЕРОВ
 // ============================================
 
+/** Как стены поля берут высоты и разрезы из измельчённой крышки */
+interface WallProfile {
+    /** Для каждого ребра кольца — вершины крышки вдоль него (от начала до конца ребра) */
+    readonly chains: readonly (readonly number[])[];
+    readonly xz: readonly number[];
+    /** Высота верха в каждой вершине крышки */
+    readonly ys: ArrayLike<number>;
+}
+
+/** Всё, что нужно построителю для рельефа одного тайла */
+interface TerrainContext {
+    readonly params: TerrainParams;
+    readonly field: TerrainField;
+}
+
 class MeshBuilder {
     readonly pos: number[] = [];
     readonly nor: number[] = [];
@@ -206,6 +249,8 @@ class MeshBuilder {
     wallQuads = 0;
     maxDeviation = 0;
     skippedBoundary = 0;
+    terrainTriangles = 0;
+    terrainFallbacks = 0;
 
     constructor(private readonly params: MeshParams) {}
 
@@ -243,26 +288,29 @@ class MeshBuilder {
         if (count > 0) this.groups.push({ featureId, surface, start, count });
     }
 
-    // --- Верхняя крышка ---
-    private addCap(rings: Point[][], y: number, color: readonly number[]): void {
+    // --- Триангуляция полигона с дырками ---
+    /** earcut + единая ориентация треугольников (нормаль вверх) + контроль площади */
+    private triangulate(rings: Point[][]): {
+        flat: number[];
+        offsets: number[];
+        triangles: number[];
+    } {
         const flat: number[] = [];
         const holes: number[] = [];
+        const offsets: number[] = [];
         rings.forEach((ring, i) => {
             if (i > 0) holes.push(flat.length / 2);
+            offsets.push(flat.length / 2);
             for (const [x, z] of ring) flat.push(x, z);
         });
 
-        const triangles = earcut(flat, holes, 2);
-        const base = this.pos.length / 3;
-        for (let i = 0; i < flat.length; i += 2) {
-            this.vertex(flat[i], y, flat[i + 1], [0, 1, 0], color);
-        }
-
+        const raw = earcut(flat, holes, 2);
+        const triangles: number[] = [];
         let trianglesArea = 0;
-        for (let t = 0; t < triangles.length; t += 3) {
-            let a = triangles[t];
-            let b = triangles[t + 1];
-            let c = triangles[t + 2];
+        for (let t = 0; t < raw.length; t += 3) {
+            let a = raw[t];
+            let b = raw[t + 1];
+            let c = raw[t + 2];
 
             const ax = flat[a * 2], az = flat[a * 2 + 1];
             const bx = flat[b * 2], bz = flat[b * 2 + 1];
@@ -272,9 +320,7 @@ class MeshBuilder {
             // Нормаль (B−A)×(C−A) смотрит вверх, когда cross < 0 (в плоскости x, z)
             if (cross > 0) [b, c] = [c, b];
             trianglesArea += Math.abs(cross) / 2;
-
-            this.idx.push(base + a, base + b, base + c);
-            this.topTriangles++;
+            triangles.push(a, b, c);
         }
 
         // Контроль триангуляции: сумма площадей против площади полигона
@@ -285,10 +331,143 @@ class MeshBuilder {
         if (polygonArea > 1e-9) {
             this.maxDeviation = Math.max(this.maxDeviation, Math.abs(trianglesArea - polygonArea) / polygonArea);
         }
+
+        return { flat, offsets, triangles };
+    }
+
+    // --- Верхняя крышка (плоская) ---
+    private addCap(rings: Point[][], y: number, color: readonly number[]): void {
+        const { flat, triangles } = this.triangulate(rings);
+        const base = this.pos.length / 3;
+        for (let i = 0; i < flat.length; i += 2) {
+            this.vertex(flat[i], y, flat[i + 1], [0, 1, 0], color);
+        }
+        for (let t = 0; t < triangles.length; t += 3) {
+            this.idx.push(base + triangles[t], base + triangles[t + 1], base + triangles[t + 2]);
+            this.topTriangles++;
+        }
+    }
+
+    // --- Верх поля с рельефом ---
+    /**
+     * Поле с рельефом: крышка измельчается, вершины получают высоту,
+     * стены идут по разрезанным рёбрам. Одна группа на полигон, как и у плоских поверхностей.
+     */
+    addFieldPolygon(featureId: string, polygon: Polygon, top: number, bottom: number, terrain: TerrainContext): void {
+        const rings = polygon.map(cleanRing).filter((r) => r.length >= 3);
+        if (rings.length === 0 || signedArea(rings[0]) === 0 || !(top > bottom)) return;
+
+        const tp = terrain.params;
+        const baseColor = hexToLinear(this.params.colors.field);
+        const start = this.idx.length;
+
+        // 1) Равномерная сетка верха; нет — запасной путь (earcut + измельчение длинных рёбер)
+        let surface: { xz: number[]; triangles: number[]; chains: number[][][] };
+        const grid = triangulateFieldUniform(rings, tp.gridStep, tp.maxVertices);
+        if (grid) {
+            surface = grid;
+            this.maxDeviation = Math.max(this.maxDeviation, grid.areaDeviation);
+        } else {
+            this.terrainFallbacks++;
+            const tri = this.triangulate(rings);
+            const refined = refineTriangles(tri.flat, tri.triangles, tp.gridStep, tp.maxVertices);
+            surface = {
+                xz: refined.xz,
+                triangles: refined.triangles,
+                chains: rings.map((ring, r) =>
+                    ring.map((_, i) =>
+                        edgeChain(tri.offsets[r] + i, tri.offsets[r] + ((i + 1) % ring.length), refined.splits)
+                    )
+                ),
+            };
+        }
+        const vertexCount = surface.xz.length / 2;
+
+        // 2) Рёбра, у которых рельеф должен затухать: всё, что не лежит на границе тайла
+        //    (то есть края дорог, площадей, городов, монастырей)
+        const segments: number[] = [];
+        if (tp.featureFade > 0) {
+            for (const ring of rings) {
+                for (let i = 0; i < ring.length; i++) {
+                    const a = ring[i];
+                    const b = ring[(i + 1) % ring.length];
+                    if (!isBoundaryEdge(a, b)) segments.push(a[0], a[1], b[0], b[1]);
+                }
+            }
+        }
+
+        // 3) Высота каждой вершины
+        const ys = new Float64Array(vertexCount);
+        const levels = new Float64Array(vertexCount);
+        for (let v = 0; v < vertexCount; v++) {
+            const x = surface.xz[v * 2];
+            const z = surface.xz[v * 2 + 1];
+            const factor = segments.length > 0 ? featureFactor(distanceToSegments(x, z, segments), tp.featureFade) : 1;
+            const level = terrain.field.elevation(x, z) * factor;
+            levels[v] = level;
+            ys[v] = top + tp.amplitude * level;
+        }
+
+        // 4) Нормали: сумма нормалей смежных граней, взвешенных площадью
+        const nx = new Float64Array(vertexCount);
+        const ny = new Float64Array(vertexCount);
+        const nz = new Float64Array(vertexCount);
+        const T = surface.triangles;
+        for (let t = 0; t < T.length; t += 3) {
+            const ia = T[t], ib = T[t + 1], ic = T[t + 2];
+            const ux = surface.xz[ib * 2] - surface.xz[ia * 2];
+            const uy = ys[ib] - ys[ia];
+            const uz = surface.xz[ib * 2 + 1] - surface.xz[ia * 2 + 1];
+            const wx = surface.xz[ic * 2] - surface.xz[ia * 2];
+            const wy = ys[ic] - ys[ia];
+            const wz = surface.xz[ic * 2 + 1] - surface.xz[ia * 2 + 1];
+            const cx = uy * wz - uz * wy;
+            const cy = uz * wx - ux * wz;
+            const cz = ux * wy - uy * wx;
+            for (const i of [ia, ib, ic]) {
+                nx[i] += cx;
+                ny[i] += cy;
+                nz[i] += cz;
+            }
+        }
+
+        // 5) Вершины верха: позиция, нормаль, цвет с подсветкой возвышенностей
+        const base = this.pos.length / 3;
+        for (let v = 0; v < vertexCount; v++) {
+            const len = Math.hypot(nx[v], ny[v], nz[v]);
+            const n: [number, number, number] = len > 1e-12 ? [nx[v] / len, ny[v] / len, nz[v] / len] : [0, 1, 0];
+            const k = 1 + tp.heightTint * levels[v];
+            const color = [Math.min(1, baseColor[0] * k), Math.min(1, baseColor[1] * k), Math.min(1, baseColor[2] * k)];
+            this.vertex(surface.xz[v * 2], ys[v], surface.xz[v * 2 + 1], n, color);
+        }
+        for (let t = 0; t < T.length; t += 3) {
+            this.idx.push(base + T[t], base + T[t + 1], base + T[t + 2]);
+        }
+        this.topTriangles += T.length / 3;
+        this.terrainTriangles += T.length / 3;
+
+        // 6) Стены по тем же разрезанным рёбрам и с теми же высотами
+        rings.forEach((ring, ringIndex) =>
+            this.addWalls(ring, ringIndex > 0, top, bottom, baseColor, {
+                chains: surface.chains[ringIndex],
+                xz: surface.xz,
+                ys,
+            })
+        );
+
+        const count = this.idx.length - start;
+        if (count > 0) this.groups.push({ featureId, surface: 'field', start, count });
     }
 
     // --- Стены ---
-    private addWalls(ring: Point[], isHole: boolean, top: number, bottom: number, color: readonly number[]): void {
+    private addWalls(
+        ring: Point[],
+        isHole: boolean,
+        top: number,
+        bottom: number,
+        color: readonly number[],
+        profile?: WallProfile
+    ): void {
         const n = ring.length;
         if (top <= bottom) return;
 
@@ -334,19 +513,39 @@ class MeshBuilder {
             const na = cornerNormal(prev, i, i);
             const nb = cornerNormal(i, next, i);
 
-            const v0 = this.vertex(a[0], bottom, a[1], [na[0], 0, na[1]], color);
-            const v1 = this.vertex(b[0], bottom, b[1], [nb[0], 0, nb[1]], color);
-            const v2 = this.vertex(b[0], top, b[1], [nb[0], 0, nb[1]], color);
-            const v3 = this.vertex(a[0], top, a[1], [na[0], 0, na[1]], color);
+            // Точки стены вдоль ребра: две (плоский верх) или вся цепочка разрезов (рельеф)
+            let pts: { x: number; z: number; top: number }[];
+            if (profile) {
+                const chain = profile.chains[i];
+                pts = chain.map((v) => ({ x: profile.xz[v * 2], z: profile.xz[v * 2 + 1], top: profile.ys[v] }));
+            } else {
+                pts = [
+                    { x: a[0], z: a[1], top },
+                    { x: b[0], z: b[1], top },
+                ];
+            }
 
             // Геометрическая нормаль треугольника (v0, v1, v2) должна совпасть с нормалью ребра
             const ex = b[0] - a[0];
             const ez = b[1] - a[1];
             // (v1−v0) = (ex, 0, ez); (v2−v0) = (ex, h, ez);  cross.x = −h·ez,  cross.z = h·ex
             const facing = -ez * own[0] + ex * own[1];
-            if (facing >= 0) this.idx.push(v0, v1, v2, v0, v2, v3);
-            else this.idx.push(v0, v2, v1, v0, v3, v2);
-            this.wallQuads++;
+
+            for (let j = 0; j + 1 < pts.length; j++) {
+                const p = pts[j];
+                const q = pts[j + 1];
+                const np = j === 0 ? na : own;
+                const nq = j + 2 === pts.length ? nb : own;
+
+                const v0 = this.vertex(p.x, bottom, p.z, [np[0], 0, np[1]], color);
+                const v1 = this.vertex(q.x, bottom, q.z, [nq[0], 0, nq[1]], color);
+                const v2 = this.vertex(q.x, q.top, q.z, [nq[0], 0, nq[1]], color);
+                const v3 = this.vertex(p.x, p.top, p.z, [np[0], 0, np[1]], color);
+
+                if (facing >= 0) this.idx.push(v0, v1, v2, v0, v2, v3);
+                else this.idx.push(v0, v2, v1, v0, v3, v2);
+                this.wallQuads++;
+            }
         }
     }
 
@@ -365,6 +564,8 @@ class MeshBuilder {
                 wallQuads: this.wallQuads,
                 maxTopDeviation: this.maxDeviation,
                 skippedBoundaryEdges: this.skippedBoundary,
+                terrainTriangles: this.terrainTriangles,
+                terrainFallbacks: this.terrainFallbacks,
             },
         };
     }
@@ -381,11 +582,16 @@ class MeshBuilder {
  * baseHeight + heights.<тип>. Стены каждой поверхности идут от её верха до подложки.
  * У полей стены не нужны: любое их ребро граничит с более высокой поверхностью
  * либо лежит на границе тайла.
+ *
+ * С включённым рельефом (params.terrain) верх поля поднимается на 0..amplitude над плоским
+ * уровнем. Рельеф затухает у дорог и городов, поэтому поле по-прежнему лежит не ниже соседей.
  */
 export function buildTileMesh(
     geometry: TileGeometryResult,
     features: readonly MeshFeature[],
-    params?: MeshParamsInput
+    params?: MeshParamsInput,
+    /** Seed рельефа (artId тайла или закреплённый seed). Без него рельеф одинаков у всех тайлов */
+    seed?: string
 ): TileMeshData {
     const p = resolveMeshParams(params);
     const builder = new MeshBuilder(p);
@@ -403,8 +609,20 @@ export function buildTileMesh(
     for (const [featureId, multi] of geometry.assignments.fieldGeometries) {
         for (const polygon of multi) owner.set(polygon, featureId);
     }
+    // Рельеф: только у полей. Нет amplitude или рельеф выключен — плоские поля, как раньше
+    const tp = p.terrain;
+    const terrain: TerrainContext | null =
+        tp.enabled && tp.amplitude > 0
+            ? {
+                  params: tp,
+                  field: createTerrainField(tp, seed ?? 'terrain'),
+              }
+            : null;
+
     geometry.fields.fieldPolygons.forEach((polygon, i) => {
-        builder.addPolygon(owner.get(polygon) ?? `__field_${i}`, 'field', polygon, top('field'), p.baseHeight);
+        const featureId = owner.get(polygon) ?? `__field_${i}`;
+        if (terrain) builder.addFieldPolygon(featureId, polygon, top('field'), p.baseHeight, terrain);
+        else builder.addPolygon(featureId, 'field', polygon, top('field'), p.baseHeight);
     });
 
     // Дороги (после обрезки)
@@ -444,6 +662,40 @@ export function findMeshGroup(mesh: TileMeshData, faceIndex: number): MeshGroup 
     return null;
 }
 
+/**
+ * Высота верхней поверхности в точке (x, z) локальных координат тайла (без поворота) —
+ * например, чтобы поставить мипл на холм. Берётся самая высокая верхняя грань над точкой;
+ * null — под точкой нет верха (вне тайла). Перебор линейный: звать для единиц точек, не для тысяч.
+ */
+export function sampleMeshHeight(mesh: TileMeshData, x: number, z: number): number | null {
+    const P = mesh.positions;
+    const N = mesh.normals;
+    const I = mesh.indices;
+    let best: number | null = null;
+
+    for (let t = 0; t < I.length; t += 3) {
+        const a = I[t], b = I[t + 1], c = I[t + 2];
+        // Верхние грани — те, у которых нормали вершин смотрят вверх (у стен ny = 0)
+        if (N[a * 3 + 1] <= 0.01 || N[b * 3 + 1] <= 0.01 || N[c * 3 + 1] <= 0.01) continue;
+
+        const ax = P[a * 3], az = P[a * 3 + 2];
+        const bx = P[b * 3], bz = P[b * 3 + 2];
+        const cx = P[c * 3], cz = P[c * 3 + 2];
+        const det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+        if (Math.abs(det) < 1e-12) continue;
+
+        const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / det;
+        const l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / det;
+        const l3 = 1 - l1 - l2;
+        const eps = -1e-6;
+        if (l1 < eps || l2 < eps || l3 < eps) continue;
+
+        const y = l1 * P[a * 3 + 1] + l2 * P[b * 3 + 1] + l3 * P[c * 3 + 1];
+        if (best === null || y > best) best = y;
+    }
+    return best;
+}
+
 // ============================================
 // 📦 БАНДЛ ТАЙЛА
 // ============================================
@@ -466,6 +718,8 @@ export function buildTileBundle(
         readonly features: readonly MeshFeature[];
         readonly geometry: TileGeometryResult;
         readonly spots?: ReadonlyMap<string, FeatureSpot>;
+        /** Seed рельефа вместо artId (закреплённый seed тайла) */
+        readonly seed?: string;
     },
     params?: MeshParamsInput
 ): TileBundle {
@@ -474,7 +728,8 @@ export function buildTileBundle(
         artId: source.artId,
         features: source.features,
         geometry: source.geometry,
-        mesh: buildTileMesh(source.geometry, source.features, params),
+        mesh: buildTileMesh(source.geometry, source.features, params, source.seed ?? source.artId),
         spots: source.spots ?? new Map(),
     };
 }
+

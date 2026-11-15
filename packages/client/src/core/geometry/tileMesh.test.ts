@@ -36,7 +36,10 @@ const meshOf = (id: string, params?: Parameters<typeof buildTileMesh>[2]): TileM
 };
 
 const ids = tiles.map((t) => t.id);
-const MAX_Y = MESH.baseHeight + Math.max(...Object.values(MESH.heights));
+const MAX_Y =
+    MESH.baseHeight +
+    Math.max(...Object.values(MESH.heights)) +
+    (MESH.terrain.enabled ? MESH.terrain.amplitude : 0);
 
 /**
  * Треугольники с |нормаль| меньше этого порога считаются вырожденными (площадь < 5e-4 юнит²).

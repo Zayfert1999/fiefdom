@@ -101,3 +101,5 @@ export type {
     Point, Ring, Polygon, MultiPolygon,
     AreaGeometry, LineGeometry, FeatureGeometry,
 } from '@fiefdom/shared/core/geometry.types';
+
+export * from './terrain';

@@ -5,8 +5,8 @@
 // • useMeshGeometry — буферы TileMeshData → THREE.BufferGeometry
 // • TileMeshObject  — один тайл одним мешем
 // • TileInstances   — один и тот же тайл, размноженный через InstancedMesh
-//                     (поворот и позиция — в матрице инстанса;
-//                     onHover/onClick получают клетку и фичу под курсором)
+//                     (поворот и позиция — в матрице инстанса)
+// • RegionMeshObject — общий меш региона полей (мировые координаты доски, без инстансинга)
 //
 // Геометрия строится в core/geometry/tileMesh.ts, здесь только обвязка.
 // ============================================
@@ -14,6 +14,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { findMeshGroup, tileYaw, type MeshGroup, type TileMeshData } from '@/core/geometry/tileMesh';
+import type { FieldRegionMesh } from '@/core/geometry/fieldRegions';
 
 /** Сторона тайла в мировых единицах */
 export const TILE_SIZE = 100;
@@ -80,11 +81,9 @@ interface TileInstancesProps {
   placements: readonly TilePlacement[];
   wireframe?: boolean;
   onHover?: (hit: InstanceHit | null) => void;
-  /** Клик по тайлу. Обработчик сам решает, останавливать ли всплытие (event.stopPropagation()) */
-  onClick?: (hit: InstanceHit, event: ThreeEvent<MouseEvent>) => void;
 }
 
-export const TileInstances = memo(({ mesh, placements, wireframe = false, onHover, onClick }: TileInstancesProps) => {
+export const TileInstances = memo(({ mesh, placements, wireframe = false, onHover }: TileInstancesProps) => {
   const geometry = useMeshGeometry(mesh);
   const ref = useRef<THREE.InstancedMesh>(null);
 
@@ -118,21 +117,6 @@ export const TileInstances = memo(({ mesh, placements, wireframe = false, onHove
     });
   };
 
-  const handleClick = (event: ThreeEvent<MouseEvent>): void => {
-    if (!onClick) return;
-
-    const placement = event.instanceId === undefined ? undefined : placements[event.instanceId];
-    if (!placement) return;
-
-    onClick(
-      {
-        placement,
-        group: event.faceIndex == null ? null : findMeshGroup(mesh, event.faceIndex),
-      },
-      event
-    );
-  };
-
   return (
     <instancedMesh
       ref={ref}
@@ -140,12 +124,55 @@ export const TileInstances = memo(({ mesh, placements, wireframe = false, onHove
       castShadow
       receiveShadow
       frustumCulled={false}
-      onPointerMove={onHover ? handleMove : undefined}
-      onPointerOut={onHover ? () => onHover(null) : undefined}
-      onClick={onClick ? handleClick : undefined}
+      onPointerMove={handleMove}
+      onPointerOut={() => onHover?.(null)}
     >
       <meshStandardMaterial vertexColors roughness={0.75} metalness={0.05} wireframe={wireframe} />
     </instancedMesh>
   );
 });
-TileInstances.displayName = 'TileInstances';
+TileInstances.displayName = 'TileInstances';
+
+// ============================================
+// 🌿 МЕШ РЕГИОНА ПОЛЕЙ
+// ============================================
+/** Наведение на регион: сам регион и точка в координатах сцены (до сдвига на центр доски) */
+export interface RegionHit {
+  readonly region: FieldRegionMesh;
+  readonly x: number;
+  readonly z: number;
+}
+
+interface RegionMeshObjectProps {
+  region: FieldRegionMesh;
+  wireframe?: boolean;
+  onHover?: (hit: RegionHit | null) => void;
+}
+
+/**
+ * Один регион полей одним мешем. Вершины уже в мировых координатах доски,
+ * поэтому позиция и поворот не нужны — объект кладётся в ту же группу, что и тайлы.
+ */
+export const RegionMeshObject = memo(({ region, wireframe = false, onHover }: RegionMeshObjectProps) => {
+  const geometry = useMeshGeometry(region.mesh);
+
+  const handleMove = (event: ThreeEvent<PointerEvent>): void => {
+    if (!onHover) return;
+    event.stopPropagation();
+    onHover({ region, x: event.point.x, z: event.point.z });
+  };
+
+  return (
+    <mesh
+      geometry={geometry}
+      castShadow
+      receiveShadow
+      frustumCulled={false}
+      onPointerMove={handleMove}
+      onPointerOut={() => onHover?.(null)}
+    >
+      <meshStandardMaterial vertexColors roughness={0.75} metalness={0.05} wireframe={wireframe} />
+    </mesh>
+  );
+});
+RegionMeshObject.displayName = 'RegionMeshObject';

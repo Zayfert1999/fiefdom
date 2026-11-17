@@ -29,7 +29,7 @@
 // ============================================
 import type { Point } from '@fiefdom/shared/core/geometry.types';
 import { DelaunayMesh } from './delaunay';
-import { distanceToSegments } from './terrainSurface';
+import { SegmentGrid } from './terrainSurface';
 
 type Ring = Point[];
 
@@ -60,17 +60,44 @@ function ringArea(ring: Ring): number {
     return a / 2;
 }
 
-/** even-odd по всем кольцам: внутри полигона с дырками */
-function insidePolygon(x: number, y: number, rings: readonly Ring[]): boolean {
-    let inside = false;
-    for (const ring of rings) {
-        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-            const [xi, yi] = ring[i];
-            const [xj, yj] = ring[j];
-            if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+/**
+ * even-odd по всем кольцам (дырки учтены), с индексом по горизонтальным полосам:
+ * для точки перебираются только рёбра, пересекающие её полосу, а не все рёбра полигона.
+ * Для регионов из десятков тайлов это разница между миллисекундами и секундами.
+ */
+class PolygonIndex {
+    private readonly band: number;
+    private readonly bands = new Map<number, number[]>();
+    private readonly edges: number[] = [];
+
+    constructor(rings: readonly Ring[], band: number) {
+        this.band = Math.max(band, 1e-6);
+        for (const ring of rings) {
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const id = this.edges.length / 4;
+                this.edges.push(ring[j][0], ring[j][1], ring[i][0], ring[i][1]);
+                const from = Math.floor(Math.min(ring[j][1], ring[i][1]) / this.band);
+                const to = Math.floor(Math.max(ring[j][1], ring[i][1]) / this.band);
+                for (let k = from; k <= to; k++) {
+                    const list = this.bands.get(k);
+                    if (list) list.push(id);
+                    else this.bands.set(k, [id]);
+                }
+            }
         }
     }
-    return inside;
+
+    contains(x: number, y: number): boolean {
+        const list = this.bands.get(Math.floor(y / this.band));
+        if (!list) return false;
+        let inside = false;
+        const E = this.edges;
+        for (const id of list) {
+            const xj = E[id * 4], yj = E[id * 4 + 1], xi = E[id * 4 + 2], yi = E[id * 4 + 3];
+            if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+        }
+        return inside;
+    }
 }
 
 /** Детерминированный «шум» 0..1 из целых координат решётки */
@@ -87,10 +114,30 @@ interface Segment {
     chain: number[];
 }
 
+/** Попытки: шаг чуть меняется и «дрожание» решётки берётся другое — этого хватает, чтобы обойти редкие вырожденные случаи */
+const ATTEMPT_STEP_SCALE = [1, 1.08, 0.93, 1.17];
+
+/**
+ * Равномерная сетка верха полигона с дырками. null — не вышло даже с несколькими попытками
+ * (тогда вызывающий код берёт запасной путь).
+ */
 export function triangulateFieldUniform(
     polygon: readonly Ring[],
     step: number,
     maxVertices: number
+): UniformFieldSurface | null {
+    for (let attempt = 0; attempt < ATTEMPT_STEP_SCALE.length; attempt++) {
+        const result = attemptUniform(polygon, step * ATTEMPT_STEP_SCALE[attempt], maxVertices, attempt);
+        if (result) return result;
+    }
+    return null;
+}
+
+function attemptUniform(
+    polygon: readonly Ring[],
+    step: number,
+    maxVertices: number,
+    attempt: number
 ): UniformFieldSurface | null {
     const rings = polygon.filter((r) => r.length >= 3);
     if (rings.length === 0 || !(step > 0)) return null;
@@ -123,29 +170,38 @@ export function triangulateFieldUniform(
     const mesh = new DelaunayMesh(minX, minY, maxX, maxY);
     const xz: number[] = [];
 
-    const addPoint = (x: number, y: number): number => {
+    /** Одна вершина на позицию: кольца, касающиеся в точке, делят вершину, а не дублируют её */
+    const byPosition = new Map<string, number>();
+    const positionKey = (x: number, y: number): string => `${Math.round(x * 1e6)},${Math.round(y * 1e6)}`;
+
+    const vertexFor = (x: number, y: number): number => {
+        const key = positionKey(x, y);
+        const known = byPosition.get(key);
+        if (known !== undefined) return known;
+
         const v = mesh.insert(x, y);
-        if (v < 0) return -1;
-        // индексы в mesh и в xz должны совпадать
-        if (v !== xz.length / 2) return -1;
+        if (v < 0 || v !== xz.length / 2) return -1; // индексы в mesh и в xz совпадают
         xz.push(x, y);
+        byPosition.set(key, v);
         return v;
     };
 
-    // 1) Вершины колец — первыми, в порядке flat (индексы совпадают с earcut)
-    const ringStart: number[] = [];
+    // 1) Вершины колец
+    const ringVertex: number[][] = [];
     for (const ring of rings) {
-        ringStart.push(xz.length / 2);
-        for (const [x, y] of ring) if (addPoint(x, y) < 0) return null;
+        const ids: number[] = [];
+        for (const [x, y] of ring) {
+            const v = vertexFor(x, y);
+            if (v < 0) return null;
+            ids.push(v);
+        }
+        ringVertex.push(ids);
     }
 
     // 2) Равномерное деление рёбер
     const segments: Segment[] = [];
     const chains: number[][][] = rings.map((ring, r) =>
-        ring.map((_, i) => {
-            const next = (i + 1) % ring.length;
-            return [ringStart[r] + i, ringStart[r] + next];
-        })
+        ring.map((_, i) => [ringVertex[r][i], ringVertex[r][(i + 1) % ring.length]])
     );
     // Сначала все исходные вершины вставлены; теперь добавляем промежуточные
     for (let r = 0; r < rings.length; r++) {
@@ -153,15 +209,17 @@ export function triangulateFieldUniform(
         for (let i = 0; i < ring.length; i++) {
             const a = ring[i];
             const b = ring[(i + 1) % ring.length];
+            const chain = chains[r][i];
+            if (chain[0] === chain[1]) continue; // вырожденное ребро (концы слились) — нечего восстанавливать
+
             const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
             const pieces = Math.max(1, Math.ceil(length / h - 1e-9));
-            const chain = chains[r][i];
             const ids: number[] = [chain[0]];
             for (let k = 1; k < pieces; k++) {
                 const t = k / pieces;
-                const v = addPoint(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
+                const v = vertexFor(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
                 if (v < 0) return null;
-                ids.push(v);
+                if (v !== ids[ids.length - 1]) ids.push(v);
             }
             ids.push(chain[chain.length - 1]);
             chains[r][i] = ids;
@@ -180,6 +238,8 @@ export function triangulateFieldUniform(
     }
     const rowHeight = h * 0.8660254;
     const margin = 0.6 * h;
+    const edgeIndex = new SegmentGrid(edgeSegments, margin);
+    const inside = new PolygonIndex(rings, 2 * h);
     const jitter = 0.06 * h;
     const rowFrom = Math.floor(minY / rowHeight) - 1;
     const rowTo = Math.ceil(maxY / rowHeight) + 1;
@@ -189,12 +249,12 @@ export function triangulateFieldUniform(
         const colFrom = Math.floor(minX / h - shift) - 1;
         const colTo = Math.ceil(maxX / h - shift) + 1;
         for (let col = colFrom; col <= colTo; col++) {
-            const x = (col + shift) * h + (hash01(col, row, 1) - 0.5) * 2 * jitter;
-            const y = y0 + (hash01(col, row, 2) - 0.5) * 2 * jitter;
+            const x = (col + shift) * h + (hash01(col, row, 1 + attempt * 2) - 0.5) * 2 * jitter;
+            const y = y0 + (hash01(col, row, 2 + attempt * 2) - 0.5) * 2 * jitter;
             if (x < minX || x > maxX || y < minY || y > maxY) continue;
-            if (!insidePolygon(x, y, rings)) continue;
-            if (distanceToSegments(x, y, edgeSegments) < margin) continue;
-            if (addPoint(x, y) < 0) return null;
+            if (!inside.contains(x, y)) continue;
+            if (edgeIndex.distance(x, y, margin) < margin) continue; // Infinity — дальше margin
+            if (vertexFor(x, y) < 0) return null;
         }
     }
 
@@ -209,7 +269,7 @@ export function triangulateFieldUniform(
             const ax = xz[seg.a * 2], ay = xz[seg.a * 2 + 1];
             const bx = xz[seg.b * 2], by = xz[seg.b * 2 + 1];
             if (Math.hypot(bx - ax, by - ay) < MIN_SEGMENT) return null;
-            const mid = addPoint((ax + bx) / 2, (ay + by) / 2);
+            const mid = vertexFor((ax + bx) / 2, (ay + by) / 2);
             if (mid < 0) return null;
 
             const at = seg.chain.indexOf(seg.a);
@@ -229,7 +289,7 @@ export function triangulateFieldUniform(
         const ax = xz[a * 2], ay = xz[a * 2 + 1];
         const bx = xz[b * 2], by = xz[b * 2 + 1];
         const cx = xz[c * 2], cy = xz[c * 2 + 1];
-        if (!insidePolygon((ax + bx + cx) / 3, (ay + by + cy) / 3, rings)) continue;
+        if (!inside.contains((ax + bx + cx) / 3, (ay + by + cy) / 3)) continue;
         const cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax); // > 0: против часовой
         area += Math.abs(cross) / 2;
         // Обход как у плоской крышки: нормаль вверх при cross < 0

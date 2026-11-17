@@ -4,6 +4,9 @@
 // ============================================
 // Показывает набор расставленных тайлов (PlacedTile → TilePlacement) в 3D:
 //   • один InstancedMesh на каждый тип тайла (меш и вершинные цвета общие)
+//   • поля с рельефом — ОБЩИЕ меши регионов (fieldRegions.ts): поля соседних тайлов сшиты
+//     в один меш без швов, высота — мировой шум. Включаются сами, когда бандлы построены без полей
+//     (TileBundle.fieldsOmitted, т.е. mesh.terrain.enabled); иначе поля плоские, в мешах тайлов
 //   • MapControls: ЛКМ — панорама по земле, ПКМ — вращение, колесо — зум
 //   • пикинг клетки лучом до плоскости доски (без рейкаста по мешам),
 //     пикинг фичи под курсором — по индексу треугольника → группа меша
@@ -16,7 +19,13 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { Line, MapControls } from '@react-three/drei';
 import type { MeshGroup, MeshSurface, TileBundle } from '@/core/geometry/tileMesh';
-import { TILE_SIZE, TileInstances, type TilePlacement } from './TileMeshObjects';
+import {
+  FieldRegionMeshCache,
+  buildFieldRegionMeshes,
+  locateFieldFeature,
+  type FieldRegionTile,
+} from '@/core/geometry/fieldRegions';
+import { RegionMeshObject, TILE_SIZE, TileInstances, type RegionHit, type TilePlacement } from './TileMeshObjects';
 
 /** Тайл на доске: ссылка на бандл + позиция */
 export interface BoardPlacement extends TilePlacement {
@@ -32,6 +41,8 @@ export interface Board3DHover {
   readonly placement: BoardPlacement | null;
   readonly featureId?: string;
   readonly surface?: MeshSurface;
+  /** Регион полей под курсором (только для общих мешей регионов) */
+  readonly regionId?: string;
 }
 
 interface Board3DProps {
@@ -91,6 +102,7 @@ export const Board3D = memo(({
 }: Board3DProps) => {
   const [hoverCell, setHoverCell] = useState<{ col: number; row: number } | null>(null);
   const lastKey = useRef<string>('');
+  const regionCache = useRef(new FieldRegionMeshCache());
 
   // Центр доски: сдвигаем всю сцену, чтобы он оказался в мировом (0, 0, 0)
   const centerX = ((cols - 1) * TILE_SIZE) / 2;
@@ -108,11 +120,36 @@ export const Board3D = memo(({
     return [...byTile.entries()];
   }, [placements]);
 
+  // Поля региональными мешами: только если ВСЕ бандлы построены без полей (иначе поля задвоились бы)
+  const regionTiles = useMemo<FieldRegionTile[] | null>(() => {
+    if (placements.length === 0) return null;
+    const tiles: FieldRegionTile[] = [];
+    for (const placement of placements) {
+      const bundle = bundles.get(placement.tileId);
+      if (!bundle || !bundle.fieldsOmitted) return null;
+      tiles.push({
+        key: placement.key,
+        col: placement.col,
+        row: placement.row,
+        rotation: placement.rotation,
+        tileId: placement.tileId,
+        fields: bundle.fieldPolygons,
+      });
+    }
+    return tiles;
+  }, [placements, bundles]);
+
+  const regions = useMemo(() => {
+    if (!regionTiles) return [];
+    const first = bundles.get(placements[0].tileId);
+    return buildFieldRegionMeshes(regionTiles, first?.meshParams, regionCache.current);
+  }, [regionTiles, bundles, placements]);
+
   /** Сообщаем наружу только об изменениях, а не о каждом движении мыши */
   const emit = useCallback(
     (next: Board3DHover | null) => {
       const key = next
-        ? `${next.col},${next.row},${next.featureId ?? ''},${next.placement?.rotation ?? ''}`
+        ? `${next.col},${next.row},${next.featureId ?? ''},${next.regionId ?? ''},${next.placement?.rotation ?? ''}`
         : '';
       if (key === lastKey.current) return;
       lastKey.current = key;
@@ -138,6 +175,24 @@ export const Board3D = memo(({
       });
     },
     [emit]
+  );
+
+  const handleRegionHover = useCallback(
+    (hit: RegionHit | null) => {
+      if (!hit || !regionTiles) {
+        emit(null);
+        return;
+      }
+      // Координаты сцены → координаты доски (сцена сдвинута на центр)
+      const x = hit.x + centerX;
+      const z = hit.z + centerZ;
+      const located = locateFieldFeature(hit.region, regionTiles, x, z);
+      const col = located?.col ?? Math.round(x / TILE_SIZE);
+      const row = located?.row ?? Math.round(z / TILE_SIZE);
+      const placement = placements.find((p) => p.col === col && p.row === row) ?? null;
+      emit({ col, row, placement, featureId: located?.featureId, surface: 'field', regionId: hit.region.id });
+    },
+    [centerX, centerZ, regionTiles, placements, emit]
   );
 
   const handleGroundMove = useCallback(
@@ -193,6 +248,16 @@ export const Board3D = memo(({
               />
             );
           })}
+
+          {/* Поля: общий меш на регион (мировые координаты доски) */}
+          {regions.map((region) => (
+            <RegionMeshObject
+              key={region.signature}
+              region={region}
+              wireframe={wireframe}
+              onHover={handleRegionHover}
+            />
+          ))}
 
           {/* Невидимая плоскость для пикинга клеток, в том числе пустых */}
           <mesh

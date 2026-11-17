@@ -11,8 +11,9 @@
 //     Теперь (x, y) → (x, высота, y): юг = низ экрана, как в SVG.
 //   • Убран циклический импорт PLAZA_COLOR из GeometrySandbox
 //     (цвета теперь в MeshParams).
-//   • Рельеф полей (mesh.terrain): seed рельефа приходит пропсом `seed`
-//     (artId тайла или закреплённый seed), иначе рельеф одинаков у всех тайлов.
+//   • Рельеф полей (mesh.terrain): поля тайла строятся тем же путём, что и на доске —
+//     общим мешем региона (здесь регион из одного тайла в клетке 0,0). Шум мировой,
+//     поэтому одиночный тайл выглядит как кусок той же местности, что и на доске.
 // ============================================
 import { memo, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -20,9 +21,12 @@ import { OrbitControls } from '@react-three/drei';
 import type { TileGeometryResult } from '@/core/geometry';
 import {
   buildTileMesh,
+  collectFieldPolygons,
+  resolveMeshParams,
   type MeshFeature,
   type MeshParamsInput,
 } from '@/core/geometry/tileMesh';
+import { buildFieldRegionMeshes } from '@/core/geometry/fieldRegions';
 import { TileMeshObject } from './TileMeshObjects';
 
 interface Tile3DViewProps {
@@ -31,13 +35,11 @@ interface Tile3DViewProps {
   /** Фичи тайла (нужны, чтобы отличить монастырь от города) */
   features?: readonly MeshFeature[];
   meshParams?: MeshParamsInput;
-  /** Seed рельефа полей: artId тайла или закреплённый seed (в песочнице — тот же, что у шума) */
-  seed?: string;
   wireframe?: boolean;
 }
 
-export const Tile3DView = memo(({ result, size, features, meshParams, seed, wireframe = false }: Tile3DViewProps) => {
-  const mesh = useMemo(() => {
+export const Tile3DView = memo(({ result, size, features, meshParams, wireframe = false }: Tile3DViewProps) => {
+  const { mesh, regions } = useMemo(() => {
     // Запасной вариант без features: монастырь определяем по id, как раньше
     const meshFeatures: readonly MeshFeature[] =
       features ??
@@ -47,8 +49,21 @@ export const Tile3DView = memo(({ result, size, features, meshParams, seed, wire
       }));
     // Одиночный тайл показываем сплошным блоком: стены по периметру нужны,
     // иначе при взгляде сбоку видно «пустоту» под поверхностями
-    return buildTileMesh(result, meshFeatures, { ...meshParams, boundaryWalls: true }, seed);
-  }, [result, features, meshParams, seed]);
+    const params: MeshParamsInput = { ...meshParams, boundaryWalls: true };
+    const resolved = resolveMeshParams(params);
+    const terrainOn = resolved.terrain.enabled && resolved.terrain.amplitude > 0;
+
+    return {
+      // Рельеф включён — поля даёт меш региона, в меше тайла их нет
+      mesh: buildTileMesh(result, meshFeatures, params, { fields: terrainOn ? 'none' : 'flat' }),
+      regions: terrainOn
+        ? buildFieldRegionMeshes(
+            [{ key: '0,0', col: 0, row: 0, rotation: 0, tileId: 'sandbox', fields: collectFieldPolygons(result) }],
+            params
+          )
+        : [],
+    };
+  }, [result, features, meshParams]);
 
   return (
     <div
@@ -88,6 +103,9 @@ export const Tile3DView = memo(({ result, size, features, meshParams, seed, wire
         <directionalLight position={[-30, 40, -30]} intensity={0.3} />
 
         <TileMeshObject mesh={mesh} wireframe={wireframe} />
+        {regions.map((region) => (
+          <TileMeshObject key={region.signature} mesh={region.mesh} wireframe={wireframe} />
+        ))}
 
         {/* Управление камерой */}
         <OrbitControls

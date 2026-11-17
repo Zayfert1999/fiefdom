@@ -10,8 +10,8 @@
 //   • сплошной меш (со стенами по периметру — виден как цельный блок);
 //   • подсветка регионов превью-тайла (штриховка владельцев);
 //   • щиты;
-//   • пунктирная в SVG, здесь пульсирующая синяя рамка и заливка.
-// На земле под ним — синяя рамка клетки.
+// На земле под ним — синяя рамка клетки. Поверх тайла рамки и заливки нет:
+// они закрывали рисунок (в SVG это был .preview-tile-overlay).
 // ============================================
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -22,10 +22,9 @@ import { tileYaw, type TileBundle } from '@/core/geometry/tileMesh';
 import { useMeshGeometry } from '@/components/TileMeshObjects';
 import { useGameStore } from '@/state/useGameStore';
 import { FeatureOverlay } from '../FeatureOverlay';
-import { maxTopY } from '../boardMath';
-import { FlatSquare, FrameOutline } from '../primitives';
+import { FrameOutline } from '../primitives';
 import { useRegionHighlights } from '../useRegionHighlights';
-import { BOARD_MESH_PARAMS, getBundle, getSolidMesh } from '../tileBundles';
+import { getBundle, getSolidMesh } from '../tileBundles';
 import type { ShieldMaterials } from '../models/ShieldModel';
 import { TileShields } from './ShieldsLayer3D';
 
@@ -37,8 +36,6 @@ const BOB = 1.2;
 /** Скорость сглаживания поворота: ~300 мс (PREVIEW_ROTATION_DURATION) */
 const ROTATION_RATE = 14;
 const REGION_OPACITY = 0.7;
-const FRAME_Y = maxTopY(BOARD_MESH_PARAMS) + 0.5;
-const PREVIEW_PULSE = { min: 0.4, max: 0.8, period: 2 } as const;
 
 interface PreviewBodyProps {
   bundle: TileBundle;
@@ -120,10 +117,6 @@ const PreviewBody = memo(({ bundle, templateId, x, y, displayRotation, materials
         ))}
 
         <TileShields templateId={templateId} bundle={bundle} materials={materials} />
-
-        {/* Аналог .preview-tile-overlay: рамка и бледная заливка поверх тайла */}
-        <FlatSquare color={PREVIEW_COLOR} opacity={0.1} y={FRAME_Y} pulse={PREVIEW_PULSE} />
-        <FrameOutline color={PREVIEW_COLOR} thickness={3} y={FRAME_Y + 0.1} pulse={PREVIEW_PULSE} />
       </group>
     </group>
   );

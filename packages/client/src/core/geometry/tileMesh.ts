@@ -25,14 +25,17 @@
 //   был зеркален по оси север-юг относительно 2D.)
 //   Поворот тайла на θ° по часовой стрелке в 2D = rotation.y = -θ в three.
 //
-// ⛰️ РЕЛЬЕФ ПОЛЕЙ (mesh.terrain, шум Перлина, см. terrain.ts)
-//   Верх поля больше не плоский: он строится равномерной сеткой (fieldTriangulation.ts:
-//   контур, разбитый на равные отрезки + треугольная решётка внутри, триангуляция Делоне),
-//   каждой вершине задаётся высота из поля рельефа, нормали считаются по получившейся
-//   поверхности, а стены поля идут по тем же вершинам контура — щелей между верхом и
-//   стеной нет. Если равномерная сетка не построилась (например, очень острый клин поля),
-//   берётся запасной путь: earcut + измельчение длинных рёбер.
-//   Дороги, площади, города и монастыри остаются плоскими.
+// ⛰️ РЕЛЬЕФ ПОЛЕЙ (mesh.terrain, шум Перлина в мировых координатах, см. terrain.ts)
+//   Рельеф живёт не в мешах тайлов, а в ОБЩИХ мешах регионов (fieldRegions.ts): поля соседних
+//   тайлов сшиваются в один полигон, и верх региона строится одной равномерной сеткой
+//   (fieldTriangulation.ts: контур, разбитый на равные отрезки + треугольная решётка внутри,
+//   триангуляция Делоне). Высота вершины — мировой шум; у рёбер дорог и городов рельеф затухает.
+//   Стены поля идут по тем же вершинам контура, что и верх — щелей нет. Если равномерная
+//   сетка не построилась, берётся запасной путь: earcut + измельчение длинных рёбер.
+//   Дороги, площади, города и монастыри остаются плоскими и остаются в мешах тайлов.
+//
+//   Бандл тайла при включённом рельефе строится БЕЗ полей (fieldsOmitted) и несёт их полигоны
+//   (fieldPolygons) для сборки регионов. buildTileMesh напрямую по умолчанию строит плоские поля.
 //
 // 📦 ЗАВИСИМОСТЬ: пакет `earcut` (+ `@types/earcut`)
 // ============================================
@@ -50,7 +53,7 @@ import {
     type TerrainParams,
 } from './terrain';
 import { triangulateFieldUniform } from './fieldTriangulation';
-import { distanceToSegments, edgeChain, refineTriangles } from './terrainSurface';
+import { SegmentGrid, edgeChain, refineTriangles } from './terrainSurface';
 import type { TileGeometryResult } from './types';
 
 // ============================================
@@ -211,11 +214,20 @@ function signedArea(ring: readonly Point[]): number {
     return a / 2;
 }
 
-/** Ребро целиком лежит на одной стороне тайла */
+/** Координата лежит на линии сетки доски (граница клеток: HALF + k·TILE) */
+function onGridLine(v: number): boolean {
+    const t = (v - HALF) / (2 * HALF);
+    return Math.abs(t - Math.round(t)) * 2 * HALF < 1e-6;
+}
+
+/**
+ * Ребро целиком лежит на границе клеток доски. Для локальных координат тайла это стороны ±HALF,
+ * для мировых координат региона — любая линия сетки (там, где соседа нет, ребро остаётся границей).
+ */
 function isBoundaryEdge(a: Point, b: Point): boolean {
     const eps = 1e-6;
-    const onX = Math.abs(Math.abs(a[0]) - HALF) < eps && Math.abs(a[0] - b[0]) < eps;
-    const onY = Math.abs(Math.abs(a[1]) - HALF) < eps && Math.abs(a[1] - b[1]) < eps;
+    const onX = Math.abs(a[0] - b[0]) < eps && onGridLine(a[0]);
+    const onY = Math.abs(a[1] - b[1]) < eps && onGridLine(a[1]);
     return onX || onY;
 }
 
@@ -363,14 +375,17 @@ class MeshBuilder {
 
         // 1) Равномерная сетка верха; нет — запасной путь (earcut + измельчение длинных рёбер)
         let surface: { xz: number[]; triangles: number[]; chains: number[][][] };
-        const grid = triangulateFieldUniform(rings, tp.gridStep, tp.maxVertices);
+        // Лимит вершин задан на площадь одного тайла: большой регион получает пропорционально больше
+        const area = rings.reduce((sum, ring, i) => sum + (i === 0 ? 1 : -1) * Math.abs(signedArea(ring)), 0);
+        const budget = Math.round(tp.maxVertices * Math.max(1, area / (4 * HALF * HALF)));
+        const grid = triangulateFieldUniform(rings, tp.gridStep, budget);
         if (grid) {
             surface = grid;
             this.maxDeviation = Math.max(this.maxDeviation, grid.areaDeviation);
         } else {
             this.terrainFallbacks++;
             const tri = this.triangulate(rings);
-            const refined = refineTriangles(tri.flat, tri.triangles, tp.gridStep, tp.maxVertices);
+            const refined = refineTriangles(tri.flat, tri.triangles, tp.gridStep, budget);
             surface = {
                 xz: refined.xz,
                 triangles: refined.triangles,
@@ -383,7 +398,7 @@ class MeshBuilder {
         }
         const vertexCount = surface.xz.length / 2;
 
-        // 2) Рёбра, у которых рельеф должен затухать: всё, что не лежит на границе тайла
+        // 2) Рёбра, у которых рельеф должен затухать: всё, что не лежит на границе клеток доски
         //    (то есть края дорог, площадей, городов, монастырей)
         const segments: number[] = [];
         if (tp.featureFade > 0) {
@@ -396,13 +411,14 @@ class MeshBuilder {
             }
         }
 
-        // 3) Высота каждой вершины
+        // 3) Высота каждой вершины (координаты полигона — мировые)
+        const fadeIndex = segments.length > 0 ? new SegmentGrid(segments, tp.featureFade) : null;
         const ys = new Float64Array(vertexCount);
         const levels = new Float64Array(vertexCount);
         for (let v = 0; v < vertexCount; v++) {
             const x = surface.xz[v * 2];
             const z = surface.xz[v * 2 + 1];
-            const factor = segments.length > 0 ? featureFactor(distanceToSegments(x, z, segments), tp.featureFade) : 1;
+            const factor = fadeIndex ? featureFactor(fadeIndex.distance(x, z, tp.featureFade), tp.featureFade) : 1;
             const level = terrain.field.elevation(x, z) * factor;
             levels[v] = level;
             ys[v] = top + tp.amplitude * level;
@@ -586,12 +602,38 @@ class MeshBuilder {
  * С включённым рельефом (params.terrain) верх поля поднимается на 0..amplitude над плоским
  * уровнем. Рельеф затухает у дорог и городов, поэтому поле по-прежнему лежит не ниже соседей.
  */
+/** Поля, которые нужно описать у FieldRegion: локальный полигон + кому принадлежит */
+export interface FieldPolygonRef {
+    readonly featureId: string;
+    /** Локальные координаты тайла (без поворота) */
+    readonly polygon: Polygon;
+}
+
+/** Полигоны полей тайла с владельцем: assignFieldFeatures сохраняет ссылку на полигон */
+export function collectFieldPolygons(geometry: TileGeometryResult): FieldPolygonRef[] {
+    const owner = new Map<Polygon, string>();
+    for (const [featureId, multi] of geometry.assignments.fieldGeometries) {
+        for (const polygon of multi) owner.set(polygon, featureId);
+    }
+    return geometry.fields.fieldPolygons.map((polygon, i) => ({
+        featureId: owner.get(polygon) ?? `__field_${i}`,
+        polygon,
+    }));
+}
+
+export interface TileMeshOptions {
+    /**
+     * 'flat' — плоские поля прямо в меше тайла (по умолчанию);
+     * 'none' — без полей: их строит общий меш региона (fieldRegions.ts).
+     */
+    readonly fields?: 'flat' | 'none';
+}
+
 export function buildTileMesh(
     geometry: TileGeometryResult,
     features: readonly MeshFeature[],
     params?: MeshParamsInput,
-    /** Seed рельефа (artId тайла или закреплённый seed). Без него рельеф одинаков у всех тайлов */
-    seed?: string
+    options: TileMeshOptions = {}
 ): TileMeshData {
     const p = resolveMeshParams(params);
     const builder = new MeshBuilder(p);
@@ -604,26 +646,12 @@ export function buildTileMesh(
         builder.addWallsOnly('__base', 'base', square, p.baseHeight, 0);
     }
 
-    // Поля: владелец полигона определяется по ссылке (assignFieldFeatures её сохраняет)
-    const owner = new Map<Polygon, string>();
-    for (const [featureId, multi] of geometry.assignments.fieldGeometries) {
-        for (const polygon of multi) owner.set(polygon, featureId);
+    // Поля: плоские (или вовсе без них, если их строит меш региона)
+    if (options.fields !== 'none') {
+        for (const { featureId, polygon } of collectFieldPolygons(geometry)) {
+            builder.addPolygon(featureId, 'field', polygon, top('field'), p.baseHeight);
+        }
     }
-    // Рельеф: только у полей. Нет amplitude или рельеф выключен — плоские поля, как раньше
-    const tp = p.terrain;
-    const terrain: TerrainContext | null =
-        tp.enabled && tp.amplitude > 0
-            ? {
-                  params: tp,
-                  field: createTerrainField(tp, seed ?? 'terrain'),
-              }
-            : null;
-
-    geometry.fields.fieldPolygons.forEach((polygon, i) => {
-        const featureId = owner.get(polygon) ?? `__field_${i}`;
-        if (terrain) builder.addFieldPolygon(featureId, polygon, top('field'), p.baseHeight, terrain);
-        else builder.addPolygon(featureId, 'field', polygon, top('field'), p.baseHeight);
-    });
 
     // Дороги (после обрезки)
     for (const [featureId, multi] of geometry.clipping.clippedLines) {
@@ -642,6 +670,57 @@ export function buildTileMesh(
     }
 
     return builder.finish();
+}
+
+// ============================================
+// 🌿 МЕШ РЕГИОНА ПОЛЕЙ
+// ============================================
+
+const terrainFieldCache = new Map<string, TerrainField>();
+
+/** Поле высоты по параметрам (создание шума не бесплатно, а регионов много) */
+function terrainFieldFor(tp: TerrainParams): TerrainField {
+    const key = `${tp.seed}|${tp.frequency}|${tp.octaves}|${tp.lacunarity}|${tp.gain}|${tp.contrast}`;
+    let field = terrainFieldCache.get(key);
+    if (!field) {
+        if (terrainFieldCache.size > 16) terrainFieldCache.clear();
+        field = createTerrainField(tp);
+        terrainFieldCache.set(key, field);
+    }
+    return field;
+}
+
+/**
+ * Один меш на регион полей. Полигоны — в МИРОВЫХ координатах доски (после поворота и сдвига тайлов),
+ * ровно такими, какие даёт buildFieldRegions. Все полигоны региона попадают в одну группу
+ * (featureId = regionId, surface = 'field'), поэтому по индексу треугольника узнаётся регион.
+ *
+ * Рельеф выключен — плоский верх, но всё равно общий для региона.
+ */
+export function buildFieldRegionMesh(
+    polygons: readonly Polygon[],
+    regionId: string,
+    params?: MeshParamsInput
+): TileMeshData {
+    const p = resolveMeshParams(params);
+    const builder = new MeshBuilder(p);
+    const top = p.baseHeight + p.heights.field;
+    const tp = p.terrain;
+
+    if (tp.enabled && tp.amplitude > 0) {
+        const terrain: TerrainContext = { params: tp, field: terrainFieldFor(tp) };
+        for (const polygon of polygons) builder.addFieldPolygon(regionId, polygon, top, p.baseHeight, terrain);
+    } else {
+        for (const polygon of polygons) builder.addPolygon(regionId, 'field', polygon, top, p.baseHeight);
+    }
+    const mesh = builder.finish();
+    // Запасной путь даёт заметно худшую сетку (неравномерную, «кашу»): пусть это не проходит молча
+    if ((mesh.stats.terrainFallbacks ?? 0) > 0) {
+        console.warn(
+            `[terrain] регион ${regionId}: равномерная сетка не построилась (${mesh.stats.terrainFallbacks} полиг.), взят запасной путь`
+        );
+    }
+    return mesh;
 }
 
 /**
@@ -709,6 +788,12 @@ export interface TileBundle {
     readonly mesh: TileMeshData;
     /** Споты мипла и щита по featureId (локальные координаты тайла без поворота) */
     readonly spots: ReadonlyMap<string, FeatureSpot>;
+    /** Полигоны полей с владельцем — вход для сборки регионов (fieldRegions.ts) */
+    readonly fieldPolygons: readonly FieldPolygonRef[];
+    /** Меш тайла построен без полей: их рисует общий меш региона */
+    readonly fieldsOmitted: boolean;
+    /** Параметры меша, с которыми построен бандл (для сборки мешей регионов) */
+    readonly meshParams: MeshParams;
 }
 
 export function buildTileBundle(
@@ -718,18 +803,22 @@ export function buildTileBundle(
         readonly features: readonly MeshFeature[];
         readonly geometry: TileGeometryResult;
         readonly spots?: ReadonlyMap<string, FeatureSpot>;
-        /** Seed рельефа вместо artId (закреплённый seed тайла) */
-        readonly seed?: string;
     },
     params?: MeshParamsInput
 ): TileBundle {
+    const meshParams = resolveMeshParams(params);
+    // Рельеф включён — поля строятся общими мешами регионов, в тайле их быть не должно
+    const fieldsOmitted = meshParams.terrain.enabled && meshParams.terrain.amplitude > 0;
+
     return {
         tileId: source.tileId,
         artId: source.artId,
         features: source.features,
         geometry: source.geometry,
-        mesh: buildTileMesh(source.geometry, source.features, params, source.seed ?? source.artId),
+        mesh: buildTileMesh(source.geometry, source.features, params, { fields: fieldsOmitted ? 'none' : 'flat' }),
         spots: source.spots ?? new Map(),
+        fieldPolygons: collectFieldPolygons(source.geometry),
+        fieldsOmitted,
+        meshParams,
     };
 }
-

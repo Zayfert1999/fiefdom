@@ -23,7 +23,7 @@
     "maxCurveSegments": 32,
     "lineDensity": 0.15,
     "lineSubdivideThreshold": 4,
-    "subdivideBoundaryEdges": true,
+    "subdivideBoundaryEdges": false,
     "minRingPoints": 12,
     "maxRingPoints": 512,
     "minLinePoints": 4
@@ -89,17 +89,15 @@
     "boundaryWalls": true,
     "terrain": {
       "enabled": true,
+      "seed": "fiefdom",
       "amplitude": 5,
       "frequency": 0.03,
       "octaves": 2,
       "lacunarity": 2,
       "gain": 0.5,
       "contrast": 1.2,
-      "edgeMode": "shared",
-      "edgeFade": 14,
-      "edgeLevel": 0,
-      "featureFade": 2,
-      "gridStep": 8,
+      "featureFade": 10,
+      "gridStep": 6,
       "maxVertices": 6000,
       "heightTint": 0.3
     }

@@ -159,3 +159,67 @@ export function distanceToSegments(x: number, z: number, segments: readonly numb
     }
     return Math.sqrt(best);
 }
+
+/**
+ * Индекс отрезков для быстрого «расстояния до ближайшего отрезка не дальше cap».
+ * Нужен для больших регионов: перебор всех отрезков для каждой вершины сетки
+ * (десятки тысяч вершин × тысячи рёбер) слишком медленный.
+ *
+ * Сетка ячеек размером cap: отрезок записывается во все ячейки своего габарита, запрос смотрит
+ * 3×3 ячейки вокруг точки — этого хватает для любого отрезка ближе cap.
+ */
+export class SegmentGrid {
+    private readonly cell: number;
+    private readonly cells = new Map<number, number[]>();
+    private readonly segments: readonly number[];
+
+    /** @param segments плоский массив [ax, az, bx, bz, …] */
+    constructor(segments: readonly number[], cap: number) {
+        this.segments = segments;
+        this.cell = Math.max(cap, 1e-6);
+        for (let i = 0; i < segments.length; i += 4) {
+            const x0 = Math.floor(Math.min(segments[i], segments[i + 2]) / this.cell);
+            const x1 = Math.floor(Math.max(segments[i], segments[i + 2]) / this.cell);
+            const z0 = Math.floor(Math.min(segments[i + 1], segments[i + 3]) / this.cell);
+            const z1 = Math.floor(Math.max(segments[i + 1], segments[i + 3]) / this.cell);
+            for (let cx = x0; cx <= x1; cx++) {
+                for (let cz = z0; cz <= z1; cz++) {
+                    const key = SegmentGrid.key(cx, cz);
+                    const list = this.cells.get(key);
+                    if (list) list.push(i);
+                    else this.cells.set(key, [i]);
+                }
+            }
+        }
+    }
+
+    private static key(cx: number, cz: number): number {
+        return (cx + 524288) * 1048576 + (cz + 524288);
+    }
+
+    /** Расстояние до ближайшего отрезка, если оно ≤ cap; иначе Infinity */
+    distance(x: number, z: number, cap: number): number {
+        const cx = Math.floor(x / this.cell);
+        const cz = Math.floor(z / this.cell);
+        let best = Infinity;
+        const S = this.segments;
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dz = -1; dz <= 1; dz++) {
+                const list = this.cells.get(SegmentGrid.key(cx + dx, cz + dz));
+                if (!list) continue;
+                for (const i of list) {
+                    const ax = S[i], az = S[i + 1];
+                    const ex = S[i + 2] - ax, ez = S[i + 3] - az;
+                    const lenSq = ex * ex + ez * ez;
+                    const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / lenSq));
+                    const px = ax + t * ex - x;
+                    const pz = az + t * ez - z;
+                    const d = px * px + pz * pz;
+                    if (d < best) best = d;
+                }
+            }
+        }
+        const dist = Math.sqrt(best);
+        return dist <= cap ? dist : Infinity;
+    }
+}

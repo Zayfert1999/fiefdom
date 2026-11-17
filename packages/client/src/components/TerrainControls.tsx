@@ -10,19 +10,14 @@
 //   <TerrainControls params={meshParams.terrain} onChange={(terrain) => patchMesh({ terrain })} />
 // ============================================
 import { memo } from 'react';
-import { DEFAULT_TERRAIN_PARAMS, type TerrainEdgeMode, type TerrainParams } from '@/core/geometry/terrain';
-import { ParamCheckbox, ParamSection, ParamSelect, ParamSlider } from './SandboxParamControls';
+import { DEFAULT_TERRAIN_PARAMS, type TerrainParams } from '@/core/geometry/terrain';
+import { ParamCheckbox, ParamSection, ParamSlider } from './SandboxParamControls';
 
 interface TerrainControlsProps {
   params: TerrainParams;
   /** Всегда полный набор параметров рельефа */
   onChange: (next: TerrainParams) => void;
 }
-
-const EDGE_OPTIONS: ReadonlyArray<{ value: TerrainEdgeMode; label: string }> = [
-  { value: 'shared', label: 'Общий профиль (холмы перетекают на соседей)' },
-  { value: 'flat', label: 'Плоский край (рельеф сходит в ноль)' },
-];
 
 export const TerrainControls = memo(({ params, onChange }: TerrainControlsProps) => {
   const patch = (part: Partial<TerrainParams>): void => onChange({ ...params, ...part });
@@ -35,11 +30,21 @@ export const TerrainControls = memo(({ params, onChange }: TerrainControlsProps)
       <ParamCheckbox
         label="Объёмные поля"
         checked={params.enabled}
-        hint="Выключено — поля плоские. Дороги, площади и города рельефа не получают."
+        hint="Выключено — поля плоские. Включено — поля соседних тайлов сшиваются в общий меш региона, высота — мировой шум. Дороги, площади и города рельефа не получают."
         onChange={(enabled) => patch({ enabled })}
       />
 
       <ParamSection title="Форма">
+        <div>
+          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>Seed ландшафта (один на доску)</div>
+          <input
+            type="text"
+            value={params.seed}
+            disabled={off}
+            onChange={(event) => patch({ seed: event.target.value })}
+            style={{ width: '100%', boxSizing: 'border-box', background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px', fontSize: 12 }}
+          />
+        </div>
         <ParamSlider
           label="Амплитуда (юниты)" value={params.amplitude} min={0} max={20} step={0.25} disabled={off}
           hint="Максимальный подъём поля над плоским уровнем. Поле никогда не опускается ниже него."
@@ -69,25 +74,10 @@ export const TerrainControls = memo(({ params, onChange }: TerrainControlsProps)
         />
       </ParamSection>
 
-      <ParamSection title="Стыки и края">
-        <ParamSelect
-          label="Край тайла" value={params.edgeMode} options={EDGE_OPTIONS} disabled={off}
-          hint="Общий профиль не зависит от тайла и поворота: соседи совпадают на стыке без ступенек."
-          onChange={(edgeMode) => patch({ edgeMode })}
-        />
-        <ParamSlider
-          label="Ширина перехода у края" value={params.edgeFade} min={0} max={50} step={1} disabled={off}
-          hint="На каком расстоянии от границы тайла рельеф достигает полной силы."
-          onChange={(edgeFade) => patch({ edgeFade })}
-        />
-        <ParamSlider
-          label="Высота на краю (0..1)" value={params.edgeLevel} min={0} max={1} step={0.05}
-          disabled={off || params.edgeMode !== 'shared'}
-          onChange={(edgeLevel) => patch({ edgeLevel })}
-        />
+      <ParamSection title="Дороги и города">
         <ParamSlider
           label="Затухание у дорог и городов" value={params.featureFade} min={0} max={30} step={0.5} disabled={off}
-          hint="0 — поле обрывается стеной прямо у края дороги/города."
+          hint="Рельеф сходит к плоскому уровню у краёв дорог, площадей, городов и монастырей. 0 — поле обрывается стеной."
           onChange={(featureFade) => patch({ featureFade })}
         />
       </ParamSection>

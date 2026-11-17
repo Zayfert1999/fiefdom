@@ -171,6 +171,7 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
             regionManager,
             drawnTile,
             deck,
+            players,
 
             previewTile,
             previewTileRegionManager
@@ -181,6 +182,8 @@ export const createClientSlice: StateCreator<GameStore, [], [], ClientSlice> = (
             regionManager,
             drawnTile,
             deck,
+            // 🌟 Возвращаем игроков: иначе мипл, взятый для временной постановки, терялся бы при откате
+            players,
             previewTile,
             previewRegionManager: previewTileRegionManager,
             phase: 'placeTile',

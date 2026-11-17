@@ -135,11 +135,13 @@ export const createLobbySlice: StateCreator<GameStore, [], [], LobbySlice> = (se
             get().leaveRoom();
         }
 
-        // Сбрасываем всё игровое состояние
+        // Сбрасываем всё игровое состояние (и очередь анимаций подсчёта очков)
+        get().resetScoreAnimations();
         set({
             lobbyPlayers: [],
             deck: [],
             totalTiles: 0,
+            deckCount: 0,
             board: new Map(),
             players: [],
             currentTurn: 0,

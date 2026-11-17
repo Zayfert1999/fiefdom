@@ -1,82 +1,146 @@
 // renderer/MeepleLayer.tsx
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { Meeple } from './Meeple';
 import { TILE_SIZE } from '@fiefdom/shared/core/constants'
 import { darkenColor } from '@/utils/color';
 
-
 /**
  * 🔶 Слой размещённых миплов поверх всех регионов.
- * Мемоизирован — перерендеривается при изменении board/placementAnimation.
+ * Мемоизирован — перерендеривается при изменении board/placementAnimation/ghostMeeples.
+ *
+ * Рисует два источника:
+ *  • миплы с доски (board) — живые;
+ *  • «призрачные» миплы (ghostMeeples) — уже снятые с доски в состоянии, но ещё
+ *    показываемые анимацией завершения региона. Ждущие стоят на месте, активные
+ *    исчезают с «+N». Анимация целиком живёт здесь и не зависит от того, что
+ *    сейчас лежит на доске.
  */
+
+interface MeepleItem {
+  key: string;
+  tileX: number;
+  tileY: number;
+  rotation: number;
+  featureType: string | undefined;
+  x: number;
+  y: number;
+  color: string;
+  isTemporary: boolean;
+  isCompleting: boolean;
+  isPlacementAnimating: boolean;
+  points?: number;
+  /** Мипл с доски можно кликнуть (временный) */
+  clickable: boolean;
+}
 
 export const MeepleLayer = memo(() => {
   const board = useGameStore(s => s.board);
+  const ghostMeeples = useGameStore(s => s.ghostMeeples);
   const removePlacedMeeple = useGameStore(s => s.removePlacedMeeple);
   const placementAnimation = useGameStore(s => s.placementAnimation);
 
+  const items = useMemo<MeepleItem[]>(() => {
+    const result: MeepleItem[] = [];
+
+    // Мипл с доски не рисуем, если тот же мипл уже показывает призрак
+    // (между событием и state-update он мог ещё лежать на доске)
+    const ghostKeys = new Set(ghostMeeples.map(g => `${g.tileKey}:${g.featureId}`));
+
+    for (const t of board.values()) {
+      if (!t.meeple) continue;
+      if (ghostKeys.has(`${t.x},${t.y}:${t.meeple.featureId}`)) continue;
+
+      const meepleFeature = t.features.find(f => f.id === t.meeple!.featureId);
+
+      result.push({
+        key: `${t.x},${t.y}`,
+        tileX: t.x,
+        tileY: t.y,
+        rotation: t.rotation,
+        featureType: meepleFeature?.type,
+        x: t.meeple.x,
+        y: t.meeple.y,
+        color: t.meeple.color,
+        isTemporary: t.meeple.isTemporary === true,
+        isCompleting: false,
+        isPlacementAnimating: !!(
+          placementAnimation?.meeple &&
+          placementAnimation.tile?.x === t.x &&
+          placementAnimation.tile?.y === t.y &&
+          placementAnimation.meeple.featureId === t.meeple.featureId
+        ),
+        clickable: t.meeple.isTemporary === true,
+      });
+    }
+
+    for (const g of ghostMeeples) {
+      const [tx, ty] = g.tileKey.split(',').map(Number);
+      result.push({
+        key: `ghost|${g.id}`,
+        tileX: tx,
+        tileY: ty,
+        rotation: g.rotation,
+        featureType: g.featureType,
+        x: g.x,
+        y: g.y,
+        color: g.color,
+        isTemporary: false,
+        isCompleting: g.status === 'active',
+        isPlacementAnimating: false,
+        points: g.status === 'active' ? g.points : undefined,
+        clickable: false,
+      });
+    }
+
+    return result;
+  }, [board, ghostMeeples, placementAnimation]);
+
   return (
     <g className="meeple-layer" style={{ overflow: 'visible' }}>
-      {Array.from(board.values()).map((t) => {
-        if (!t.meeple) return null;
-
-        // Определяем тип фичи для компенсации поворота
-        const meepleFeature = t.features.find(f => f.id === t.meeple!.featureId);
-        const meepleFeatureType = meepleFeature?.type;
-
-        // Вычисляем компенсацию поворота
-        let compensation = -t.rotation;
-        if (meepleFeatureType === 'field') {
+      {items.map((m) => {
+        // Компенсация поворота тайла (поля повёрнуты ещё на 90°)
+        let compensation = -m.rotation;
+        if (m.featureType === 'field') {
           compensation += 90;
         }
 
-        const strokeColor = t.meeple.isCompleting ? 'none' : darkenColor(t.meeple.color, 0.4)
-
-        // Определяем, временный ли мипл
-        const isTemporary = t.meeple.isTemporary === true;
-
-        // Проверяем, анимируется ли этот мипл (установка)
-        const isAnimatingMeeple = placementAnimation?.meeple &&
-          t.meeple &&
-          placementAnimation.tile?.x === t.x &&
-          placementAnimation.tile?.y === t.y &&
-          placementAnimation.meeple.featureId === t.meeple.featureId;
+        const strokeColor = m.isCompleting ? 'none' : darkenColor(m.color, 0.4);
 
         // Приоритет классов анимации
         // Временный > Завершающийся > Установка > Idle
-        const meepleClassName = isTemporary
+        const meepleClassName = m.isTemporary
           ? 'meeple-temporary'
-          : t.meeple.isCompleting
+          : m.isCompleting
             ? 'meeple-completing'
-            : isAnimatingMeeple
+            : m.isPlacementAnimating
               ? 'meeple-placement-animation'
               : 'meeple-idle-anim';
 
         return (
           <g
-            key={`${t.x},${t.y}`}
-            transform={`translate(${t.x * TILE_SIZE}, ${t.y * TILE_SIZE}) rotate(${t.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}
+            key={m.key}
+            transform={`translate(${m.tileX * TILE_SIZE}, ${m.tileY * TILE_SIZE}) rotate(${m.rotation}, ${TILE_SIZE / 2}, ${TILE_SIZE / 2})`}
             style={{ overflow: 'visible' }}
           >
             {/* 🌟 Мипл с анимацией */}
-            <g transform={`translate(${t.meeple.x}, ${t.meeple.y})`}>
+            <g transform={`translate(${m.x}, ${m.y})`}>
               <g
                 className={meepleClassName}
-                onClick={isTemporary ? (e) => {
+                onClick={m.clickable ? (e) => {
                   e.stopPropagation();
-                  console.log(`🖱️ [MeepleLayer] Клик по временному миплу на (${t.x}, ${t.y})`);
+                  console.log(`🖱️ [MeepleLayer] Клик по временному миплу на (${m.tileX}, ${m.tileY})`);
                   removePlacedMeeple();
                 } : undefined}
                 style={{
                   overflow: 'visible',
-                  cursor: isTemporary ? 'pointer' : 'default'
+                  cursor: m.clickable ? 'pointer' : 'default'
                 } as React.CSSProperties}
               >
                 <g transform={`rotate(${compensation}, 0, 0)`}>
                   <g transform="translate(-16, -16)">
                     <Meeple
-                      color={t.meeple.color}
+                      color={m.color}
                       stroke={strokeColor}
                     />
                   </g>
@@ -85,11 +149,11 @@ export const MeepleLayer = memo(() => {
             </g>
 
             {/* 🌟 Текст "+N" для анимации получения очков */}
-            {t.meeple.isCompleting && t.meeple.points !== undefined && (
+            {m.isCompleting && m.points !== undefined && (
               <g
                 className="points-popup"
-                transform={`translate(${t.meeple.x}, ${t.meeple.y}) rotate(${-t.rotation}, 0, 0)`}
-                style={{ '--n-color': t.meeple.color, overflow: 'visible' } as React.CSSProperties}
+                transform={`translate(${m.x}, ${m.y}) rotate(${-m.rotation}, 0, 0)`}
+                style={{ '--n-color': m.color, overflow: 'visible' } as React.CSSProperties}
               >
                 <text
                   x="0"
@@ -98,7 +162,7 @@ export const MeepleLayer = memo(() => {
                   dominantBaseline="middle"
                   className="points-text"
                 >
-                  +{t.meeple.points}
+                  +{m.points}
                 </text>
               </g>
             )}

@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { TIME_CONTROL_LIMITS } from '../core/fischerClock';
+import { WORLD_BOUNDS } from '../core/constants';
 
 // ============================================
 // 🏠 Лобби
@@ -19,7 +20,7 @@ export const CreateRoomSchema = z.object({
       baseSeconds: z.number().int().min(TIME_CONTROL_LIMITS.baseSeconds.min).max(TIME_CONTROL_LIMITS.baseSeconds.max),
       incrementSeconds: z.number().int().min(TIME_CONTROL_LIMITS.incrementSeconds.min).max(TIME_CONTROL_LIMITS.incrementSeconds.max),
     }),
-    maxPlayers: z.number().min(2).max(5),
+    maxPlayers: z.number().int().min(2).max(5),
     showRegions: z.boolean().default(true),
     showDeadCells: z.boolean().default(true),
     enabledDeckView: z.boolean().default(true),
@@ -38,8 +39,8 @@ export const JoinRoomSchema = z.object({
 // ============================================
 
 export const PlaceTileSchema = z.object({
-  x: z.number().int().min(-25).max(25),
-  y: z.number().int().min(-25).max(25),
+  x: z.number().int().min(WORLD_BOUNDS.minX).max(WORLD_BOUNDS.maxX),
+  y: z.number().int().min(WORLD_BOUNDS.minY).max(WORLD_BOUNDS.maxY),
   rotation: z.union([
     z.literal(0),
     z.literal(90),

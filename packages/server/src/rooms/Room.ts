@@ -290,24 +290,31 @@ export class Room {
    */
   getSnapshot(viewerId: string): RoomSnapshot {
     // Собираем игроков с сетевым статусом
-    const players: SnapshotPlayer[] = Array.from(this.players.values()).map(conn => ({
-      // Профиль
-      id: conn.player.id,
-      name: conn.player.name,
-      color: conn.player.color,
-      // Игровое состояние (если игра началась)
-      ...(this.gameState.isGameStarted ? {
-        score: conn.player.score,
-        meepleCount: conn.player.meepleCount,
-        pointsByCategory: conn.player.pointsByCategory,
-      } : {}),
-      // Сетевой статус
-      network: {
-        isReady: conn.isReady,
-        isHost: conn.id === this.hostId,
-        isDisconnected: conn.isDisconnected,
-      },
-    }));
+    const players: SnapshotPlayer[] = Array.from(this.players.values()).map(conn => {
+      // 🌟 Живые очки и миплы хранятся в gameState.players (initialize копирует профили),
+      // а conn.player содержит только профиль — раньше сюда попадали устаревшие значения.
+      const live = this.gameState.isGameStarted
+        ? this.gameState.players.find(p => p.id === conn.player.id)
+        : undefined;
+      return {
+        // Профиль
+        id: conn.player.id,
+        name: conn.player.name,
+        color: conn.player.color,
+        // Игровое состояние (если игра началась)
+        ...(live ? {
+          score: live.score,
+          meepleCount: live.meepleCount,
+          pointsByCategory: live.pointsByCategory,
+        } : {}),
+        // Сетевой статус
+        network: {
+          isReady: conn.isReady,
+          isHost: conn.id === this.hostId,
+          isDisconnected: conn.isDisconnected,
+        },
+      };
+    });
 
     // Игровое состояние (если игра началась)
     const gameState = this.gameState.isGameStarted

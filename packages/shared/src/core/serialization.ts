@@ -28,5 +28,7 @@ export interface SerializedGameState {
   phase: string;
   drawnTile: Tile | null;
   totalTiles: number;
+  /** Сколько тайлов осталось в колоде (число публично, сама колода — нет) */
+  deckCount: number;
   lastPlacedTiles: Record<string, { x: number; y: number; color: string }>;
 }

@@ -13,7 +13,7 @@ import { netLog } from '@/network/netLog';
  *
  * Особенности:
  * - Десериализует board (Record → Map) и regionManager
- * - Сохраняет миплов с isCompleting, если есть активные анимации
+ * - Анимации завершения регионов живут в presentationSlice (ghostMeeples) и от доски не зависят
  * - Сбрасывает клиентское preview-состояние
  *
  * @param gameState Сериализованное состояние от сервера
@@ -92,29 +92,6 @@ export function applyServerState(
   }
 
   // ============================================
-  // 🛡️ СОХРАНЕНИЕ МИПЛОВ С АНИМАЦИЕЙ ЗАВЕРШЕНИЯ
-  // Если есть активные анимации — переносим isCompleting миплов
-  // на серверные тайлы, чтобы анимация не прервалась
-  // ============================================
-  const hasActiveAnimations = currentState.completionAnimations.length > 0;
-
-  if (hasActiveAnimations) {
-    netLog(`📥 [StateSync] Есть активные анимации — сохраняем isCompleting миплы`);
-    for (const [key, currentTile] of currentState.board) {
-      if (currentTile.meeple?.isCompleting) {
-        const serverTile = board.get(key);
-        if (serverTile) {
-          // Переносим мипла с isCompleting на серверный тайл
-          board.set(key, {
-            ...serverTile,
-            meeple: currentTile.meeple,
-          });
-        }
-      }
-    }
-  }
-
-  // ============================================
   // 💾 ПРИМЕНЕНИЕ К STORE
   // ============================================
   useGameStore.setState({
@@ -125,6 +102,7 @@ export function applyServerState(
     phase: gameState.phase as any,
     drawnTile: gameState.drawnTile,
     totalTiles: gameState.totalTiles,
+    deckCount: gameState.deckCount ?? 0,
     lastPlacedTiles,
     // Сбрасываем клиентское preview-состояние
     previewTile: null,

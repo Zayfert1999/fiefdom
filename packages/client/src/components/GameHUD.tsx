@@ -24,8 +24,6 @@ export const GameHUD: React.FC = () => {
     const currentTurn = useGameStore(s => s.currentTurn);
     const phase = useGameStore(s => s.phase);
     const totalTiles = useGameStore(s => s.totalTiles);
-    const board = useGameStore(s => s.board);
-    const drawnTile = useGameStore(s => s.drawnTile);
     const roomId = useGameStore(s => s.roomId);
     const playerId = useGameStore(s => s.playerId);
     const networkLobbyPlayers = useGameStore(s => s.networkLobbyPlayers);
@@ -43,11 +41,9 @@ export const GameHUD: React.FC = () => {
     // ============================================
     // 🎴 Колода
     // ============================================
-    const deckRemaining = useMemo(() => {
-        let remaining = totalTiles - board.size;
-        if (drawnTile) remaining -= 1;
-        return Math.max(0, remaining);
-    }, [totalTiles, board, drawnTile]);
+    // Остаток колоды приходит из стора: локально — deck.length, онлайн — deckCount от сервера
+    // (формула «всего − на доске − в руке» врала после пропущенных и выброшенных тайлов)
+    const deckRemaining = useGameStore(s => s.deckCount);
 
     // ============================================
     // 👥 Разбивка игроков на ряды по 3
@@ -222,6 +218,8 @@ const bankAt = (bankMs: number, receivedAt: number, running: boolean, now: numbe
     Math.max(0, running ? bankMs - (now - receivedAt) : bankMs);
 
 const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, baseSeconds, clockBankMs, clockReceivedAt, clockRunning, isSpectator }: PlayerCardProps) => {
+    // 🌟 Очки, уже начисленные в состоянии, но ещё не «показанные» анимацией региона
+    const pendingPoints = useGameStore(s => s.pendingScore[player.id] ?? 0);
 
     // Часы показываем у всех игроков, если в партии есть таймер
     const hasTimer = clockBankMs !== null && baseSeconds > 0;
@@ -362,7 +360,7 @@ const PlayerCard = memo(({ player, isActive, isSelf, isDisconnected, baseSeconds
 
             {/* Статистика */}
             <div className={styles.playerStats}>
-                <span className={styles.playerScore}>🏆 {player.score}</span>
+                <span className={styles.playerScore}>🏆 {player.score - pendingPoints}</span>
                 <span className={styles.playerMeeples}>🔶 {player.meepleCount}</span>
                 {isSpectator && (
                     <span className={styles.playerClock} title="Время вышло — игрок наблюдает за партией">

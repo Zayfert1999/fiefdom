@@ -1,7 +1,6 @@
 // core/scoring.ts
 import { RegionManager, type FeatureKey } from './regionManager';
 import type { PlacedTile, FeatureType, Port } from './types';
-import { TILE_DEFINITIONS } from './tileData';
 import {
   getPortSide,
   getStitchedPort,
@@ -145,32 +144,25 @@ function calculateCityPoints(
   const meta = rm.getMetadata(rootKey);
   if (!meta || meta.type !== 'city') return 0;
 
-  let basePoints = 0;
-  const processedTiles = new Set<string>();
+  // 🌟 Каждый тайл региона даёт 1 очко (один раз, даже если на нём две городские
+  // фичи региона), каждый щит региона — ещё 1. Щиты считаются по ВСЕМ фичам региона,
+  // а не только по первой фиче тайла.
+  const uniqueTiles = new Set<string>();
+  let shields = 0;
 
   for (const featureKey of meta.featureKeys) {
     const [tileCoord, featureId] = featureKey.split(':');
-
-    if (processedTiles.has(tileCoord)) continue;
-    processedTiles.add(tileCoord);
-
-    const [xStr, yStr] = tileCoord.split(',');
-    const x = parseInt(xStr, 10);
-    const y = parseInt(yStr, 10);
-    const placedTile = board.get(`${x},${y}`);
-
+    const placedTile = board.get(tileCoord);
     if (!placedTile) continue;
 
     const feature = placedTile.features.find(f => f.id === featureId);
     if (!feature || feature.type !== 'city') continue;
 
-    const tileDef = TILE_DEFINITIONS.find(def => def.id === placedTile.templateId);
-    const hasShield = tileDef?.features.some(
-      f => f.id === featureId && f.shieldSpot !== undefined
-    );
-
-    basePoints += hasShield ? 2 : 1;
+    uniqueTiles.add(tileCoord);
+    if (feature.shieldSpot !== undefined) shields += 1;
   }
+
+  const basePoints = uniqueTiles.size + shields;
 
   const isComplete = checkRegionCompleteness(board, rm, rootKey, 'city');
   // 🌟 В середине игры завершённые города удваиваются, в конце — нет
@@ -263,6 +255,22 @@ function calculateFieldPoints(
  * Проверка завершённых регионов на конкретном тайле
  * Возвращает список завершённых регионов с их данными
  */
+/**
+ * Мипл, который участвует в завершённом регионе. Содержит всё, что нужно для
+ * анимации, — клиенту не нужно искать мипла на своей доске (она к моменту
+ * анимации уже может быть обновлена сервером).
+ */
+export interface RegionMeeple {
+  tileKey: string;       // "x,y" тайла
+  featureId: string;
+  playerId: string;
+  color: string;
+  x: number;             // SVG-координаты мипла внутри тайла
+  y: number;
+  rotation: number;      // поворот тайла
+  featureType: FeatureType;
+}
+
 export interface CompletedRegion {
   rootKey: FeatureKey;
   type: FeatureType;
@@ -270,6 +278,7 @@ export interface CompletedRegion {
   winners: string[]; // ID игроков-победителей
   allMeepleOwners: string[]; // ID всех игроков с миплами в регионе
   featureKeys: string[]; // Все featureKey в регионе
+  meeples: RegionMeeple[]; // Миплы региона на момент завершения (для анимации)
 }
 
 /**
@@ -304,6 +313,27 @@ export function buildCompletedRegion(
 
   const allMeepleOwners = Array.from(meta.meepleCounts.keys());
 
+  // Миплы региона — собираем ДО того, как они будут сняты с доски
+  const meeples: RegionMeeple[] = [];
+  for (const featureKey of meta.featureKeys) {
+    const [tileKey, featureId] = featureKey.split(':');
+    const tile = board.get(tileKey);
+    const meeple = tile?.meeple;
+    if (!tile || !meeple || meeple.isTemporary || meeple.featureId !== featureId) continue;
+
+    const feature = tile.features.find(f => f.id === featureId);
+    meeples.push({
+      tileKey,
+      featureId,
+      playerId: meeple.playerId,
+      color: meeple.color,
+      x: meeple.x,
+      y: meeple.y,
+      rotation: tile.rotation,
+      featureType: feature?.type ?? meta.type,
+    });
+  }
+
   return {
     rootKey,
     type: meta.type,
@@ -311,6 +341,7 @@ export function buildCompletedRegion(
     winners,
     allMeepleOwners,
     featureKeys: [...meta.featureKeys],
+    meeples,
   };
 }
 

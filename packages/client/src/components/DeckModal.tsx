@@ -64,11 +64,9 @@ export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
   // ============================================
   // 🧮 Общее количество оставшихся тайлов
   // ============================================
-  const deckRemaining = useMemo(() => {
-    let remaining = totalTiles - board.size;
-    if (drawnTile) remaining -= 1;
-    return Math.max(0, remaining);
-  }, [totalTiles, board, drawnTile]);
+  // Остаток колоды приходит из стора: локально — deck.length, онлайн — deckCount от сервера
+  // (формула «всего − на доске − в руке» врала после пропущенных и выброшенных тайлов)
+  const deckRemaining = useGameStore(s => s.deckCount);
 
   // ============================================
   // 📋 Сортировка: сначала с остатком, затем пустые

@@ -21,6 +21,9 @@ import { netLog } from '@/network/netLog';
 function applySnapshot(snapshot: RoomSnapshot): void {
   const store = useGameStore.getState();
 
+  // Снапшот — это итоговое состояние: недоигранные анимации подсчёта очков не нужны
+  store.skipScoreAnimations();
+
   // 1. Мета-данные комнаты
   store._setRoomInfo(snapshot.roomId, snapshot.yourPlayerId);
   store._setRoomSettings(snapshot.settings);

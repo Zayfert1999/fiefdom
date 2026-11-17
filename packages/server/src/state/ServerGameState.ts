@@ -6,7 +6,9 @@
 import type { Player, PlacedTile, Tile } from '@fiefdom/shared/core/types';
 import type { FeatureKey } from '@fiefdom/shared/core/regionManager';
 import { RegionManager } from '@fiefdom/shared/core/regionManager';
-import { createDeck, drawPlayableTile } from '@fiefdom/shared/core/deck';
+import { createDeck, drawPlayableTile, takeStartTile } from '@fiefdom/shared/core/deck';
+import { settleRegions } from '@fiefdom/shared/core/applyRegions';
+import { toSvg } from '@fiefdom/shared/core/coordUtils';
 import {
   applyTileToBoardAndRM,
   getTilePorts,
@@ -20,7 +22,6 @@ import {
   type CompletedRegion,
 } from '@fiefdom/shared/core/scoring';
 import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
-import { createSeededRandom } from '@fiefdom/shared/prng/seedRandom';
 import { logger } from '../utils/logger';
 
 export type ServerPhase = 'lobby' | 'playing' | 'gameOver';
@@ -46,6 +47,8 @@ export class ServerGameState {
   public phase: ServerPhase = 'lobby';
   public seed: string = '';
   public lastPlacedTiles: Record<string, { x: number; y: number; color: string }> = {};
+  /** Клетка последнего поставленного тайла (явно, а не «последний в Map») */
+  private lastPlacedCoord: { x: number; y: number } | null = null;
   // 🌟 НОВОЕ: время начала игры
   public gameStartTime: number | null = null;
   // 🌟 НОВОЕ: флаг старта игры
@@ -63,18 +66,20 @@ export class ServerGameState {
       score: 0,
       pointsByCategory: { road: 0, city: 0, field: 0, monastery: 0 },
     }));
-    this.deck = createDeck(seed);
-    this.totalTiles = this.deck.length;
+    // 🌟 Стартовый тайл фиксирован (город + дорога), остальная колода — перемешана по seed
+    const { startTile: startingTile, deck } = takeStartTile(createDeck(seed));
+    this.deck = deck;
+    this.totalTiles = deck.length + 1; // колода + стартовый тайл
     this.board = new Map();
     this.regionManager = new RegionManager();
     this.currentTurn = 0;
     this.phase = 'playing';
     this.lastPlacedTiles = {};
+    this.lastPlacedCoord = null;
     this.leftPlayerIds.clear();
     this.timedOutPlayerIds.clear();
 
     // 🌟 Стартовый тайл в центре (0,0)
-    const startingTile = this.deck.pop();
     if (startingTile) {
       this.board.set('0,0', {
         templateId: startingTile.id,
@@ -95,14 +100,8 @@ export class ServerGameState {
 
   /** Выдать тайл текущему игроку. false → конец игры */
   drawTile(): boolean {
-    // 🌟 ИСПОЛЬЗУЕМ ОБЩУЮ ФУНКЦИЮ ИЗ SHARED
-    // Передаём seed-based PRNG для детерминизма
-    const { drawnTile, newDeck } = drawPlayableTile(
-      this.deck,
-      this.board,
-      // 🌟 Детерминированный PRNG на основе seed
-      createSeededRandom(`${this.seed}-draw-${this.deck.length}`)
-    );
+    // 🌟 ОБЩАЯ ФУНКЦИЯ ИЗ SHARED: детерминированный поиск играбельного тайла сверху колоды
+    const { drawnTile, newDeck } = drawPlayableTile(this.deck, this.board);
 
     this.deck = newDeck;
 
@@ -148,7 +147,8 @@ export class ServerGameState {
       return { error: 'CELL_OCCUPIED' };
     }
 
-    const rotatedFeatures = rotateFeatures(this.drawnTile.features, tileData.rotation);
+    const drawnTile = this.drawnTile;
+    const rotatedFeatures = rotateFeatures(drawnTile.features, tileData.rotation);
     if (!isValidPlacement(this.board, tileData.x, tileData.y, rotatedFeatures)) {
       return { error: 'INVALID_PLACEMENT' };
     }
@@ -164,11 +164,20 @@ export class ServerGameState {
       }
     }
 
+    // 🌟 Позицию мипла определяет СЕРВЕР: SVG-координаты спота неповёрнутой фичи тайла
+    // (так же, как рисует MeepleSelectionLayer). x/y от клиента игнорируются.
+    const meepleSpot = meepleData
+      ? drawnTile.features.find(f => f.id === meepleData.featureId)?.meepleSpot
+      : undefined;
+    if (meepleData && !meepleSpot) {
+      return { error: 'FEATURE_NOT_FOUND' };
+    }
+
     // ============================================
     // 2. ПРИМЕНЯЕМ НА КОПИЯХ (applyTileToBoardAndRM не мутирует исходные board/RM)
     // ============================================
     const { newBoard, newRM } = applyTileToBoardAndRM(
-      this.board, this.regionManager, this.drawnTile,
+      this.board, this.regionManager, drawnTile,
       tileData.x, tileData.y, tileData.rotation
     );
 
@@ -189,6 +198,7 @@ export class ServerGameState {
     this.board = newBoard;
     this.regionManager = newRM;
     this.drawnTile = null;
+    this.lastPlacedCoord = { x: tileData.x, y: tileData.y };
 
     this.lastPlacedTiles[playerId] = {
       x: tileData.x,
@@ -204,8 +214,8 @@ export class ServerGameState {
         playerId: player.id,
         featureId: meepleData.featureId,
         color: player.color,
-        x: meepleData.x,
-        y: meepleData.y,
+        x: toSvg(meepleSpot!.x),
+        y: toSvg(meepleSpot!.y),
       };
       player.meepleCount -= 1;
       this.regionManager.addMeeple(featureKey, player.id);
@@ -275,33 +285,27 @@ export class ServerGameState {
 
   /** Проверка завершённых регионов после установки тайла */
   findCompletedRegions(): CompletedRegion[] {
-    const tiles = Array.from(this.board.values());
-    const lastTile = tiles[tiles.length - 1];
+    if (!this.lastPlacedCoord) return [];
+    const lastTile = this.board.get(`${this.lastPlacedCoord.x},${this.lastPlacedCoord.y}`);
     if (!lastTile) return [];
     return findCompletedRegionsOnTile(this.board, this.regionManager, lastTile);
   }
 
-  /** Применение завершённых регионов: очки + возврат миплов */
+  /** Применение завершённых регионов: очки + возврат миплов (общая логика из shared) */
   applyCompletedRegions(regions: CompletedRegion[]): void {
-    for (const region of regions) {
-      this.regionManager.markComplete(region.rootKey, region.points);
-      // Очки победителям
-      for (const winnerId of region.winners) {
-        const player = this.players.find(p => p.id === winnerId);
-        if (player) {
-          player.score += region.points;
-          player.pointsByCategory[region.type] += region.points;
-        }
+    // Очки и возврат миплов — та же функция, что использует локальная игра
+    const deltas = settleRegions(this.regionManager, regions);
+    for (const [playerId, d] of deltas) {
+      const player = this.players.find(p => p.id === playerId);
+      if (!player) continue;
+      player.score += d.score;
+      player.meepleCount += d.meeplesReturned;
+      for (const category of ['road', 'city', 'field', 'monastery'] as const) {
+        player.pointsByCategory[category] += d.pointsByCategory[category];
       }
-      // Возврат миплов
-      for (const ownerId of region.allMeepleOwners) {
-        const player = this.players.find(p => p.id === ownerId);
-        const meta = this.regionManager.getMetadata(region.rootKey);
-        if (player && meta) {
-          player.meepleCount += meta.meepleCounts.get(ownerId) ?? 0;
-        }
-      }
+    }
 
+    for (const region of regions) {
       // Удаляем миплы с board
       for (const featureKey of region.featureKeys) {
         const [tileCoord, featureId] = featureKey.split(':');
@@ -362,6 +366,7 @@ export class ServerGameState {
       phase: this.phase,
       drawnTile: isCurrentPlayer ? this.drawnTile : null, // 🌟 приватно
       totalTiles: this.totalTiles,
+      deckCount: this.deck.length,
       lastPlacedTiles: this.lastPlacedTiles,
     };
   }

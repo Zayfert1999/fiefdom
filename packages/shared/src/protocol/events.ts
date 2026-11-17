@@ -246,14 +246,7 @@ export interface ServerToClientEvents {
   }) => void;
 
   'game:regions-completed': (data: {
-    regions: Array<{
-      rootKey: string;
-      type: string;
-      points: number;
-      winners: string[];
-      allMeepleOwners: string[];
-      featureKeys: string[];
-    }>;
+    regions: CompletedRegion[];
   }) => void;
 
   'game:final-scoring': (data: {

@@ -5,7 +5,6 @@
 import type { GameSocket } from '@/network/socket';
 import { useGameStore } from '@/state/useGameStore';
 import { toast } from '@/state/useToastStore';
-import type { FeatureType } from '@fiefdom/shared/core/types';
 import { getErrorMessage } from '@fiefdom/shared/protocol/errors';
 import { applyServerState } from './applyServerState';
 import { FEATURE_LABELS, getDisplayName, isMe } from './helpers';
@@ -147,22 +146,12 @@ export function registerGameHandlers(socket: GameSocket): void {
     if (!inRoom()) return;
     netLog(`🏆 [StateSync] Завершено регионов: ${regions.length}`);
 
-    // КЛЮЧЕВОЕ: используем processCompletedRegionsInStore
-    // Она одновременно:
-    // 1. Запускает анимации (с правильной задержкой между ними)
-    // 2. Начисляет очки локально
-    // 3. Возвращает миплов локально
-    // 4. Помечает регионы как isComplete
-    useGameStore.getState().processCompletedRegionsInStore(
-      regions.map(r => ({
-        rootKey: r.rootKey,
-        type: r.type as FeatureType,
-        points: r.points,
-        winners: r.winners,
-        allMeepleOwners: r.allMeepleOwners,
-        featureKeys: r.featureKeys,
-      }))
-    );
+    // processCompletedRegionsInStore:
+    // 1. сразу применяет очки/миплов/isComplete к состоянию (state-update сервера потом
+    //    просто подтвердит те же значения);
+    // 2. ставит регионы в очередь анимаций (миплы приходят в region.meeples — доска не нужна).
+    // Предполагается порядок «событие → state-update» (WebSocket его сохраняет).
+    useGameStore.getState().processCompletedRegionsInStore(regions);
 
     toastCompletedRegions(regions);
   });
@@ -280,12 +269,7 @@ export function registerGameHandlers(socket: GameSocket): void {
     if (!inRoom()) return;
     netLog(`🏆 [StateSync] Финальный подсчёт: ${regions.length} регионов`);
 
-    useGameStore.getState().processCompletedRegionsInStore(
-      regions.map(r => ({
-        ...r,
-        type: r.type as FeatureType,
-      }))
-    );
+    useGameStore.getState().processCompletedRegionsInStore(regions);
 
     toast.info('🏁 Колода закончилась — финальный подсчёт очков');
   });
@@ -293,6 +277,8 @@ export function registerGameHandlers(socket: GameSocket): void {
   socket.on('game:over', ({ finalScores, reason }) => {
     if (!inRoom()) return;
     netLog(`🏁 [StateSync] Игра окончена!`);
+    // Итоговые очки — без «недопоказанных» анимаций
+    useGameStore.getState().skipScoreAnimations();
     useGameStore.setState({
       phase: 'gameOver',
       players: finalScores,

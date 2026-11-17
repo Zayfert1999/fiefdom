@@ -12,6 +12,7 @@
 
 import type { FeatureType, Tile, TileFeature, PlacedTile, Dir, Spot } from './types';
 import { RegionManager, type FeatureKey } from './regionManager';
+import { WORLD_BOUNDS } from './constants';
 import {
   rotatePorts,
   getSidePorts,
@@ -85,10 +86,16 @@ const CENTER_PORT: Record<Dir, number> = {
   3: 10,  // W → порт 10
 };
 
+/** Клетка внутри допустимых границ мира (те же ±25, что проверяет сетевая схема) */
+export const isWithinWorldBounds = (x: number, y: number): boolean =>
+  x >= WORLD_BOUNDS.minX && x <= WORLD_BOUNDS.maxX &&
+  y >= WORLD_BOUNDS.minY && y <= WORLD_BOUNDS.maxY;
+
 /**
  * Проверка валидности размещения тайла.
  * Для каждого соседа: типы фич на центральных портах
  * стыкуемых сторон должны совпадать.
+ * Клетка должна быть в границах мира — иначе сервер всё равно отклонит ход.
  */
 export const isValidPlacement = (
   board: Map<string, PlacedTile>,
@@ -96,6 +103,8 @@ export const isValidPlacement = (
   y: number,
   newFeatures: TileFeature[]
 ): boolean => {
+  if (!isWithinWorldBounds(x, y)) return false;
+
   let hasAdjacent = false;
 
   for (const { dx, dy, dir } of NEIGHBOR_OFFSETS) {
@@ -120,12 +129,6 @@ export const isValidPlacement = (
     if (myType !== theirType) {
       return false;
     }
-  }
-
-  if (hasAdjacent) {
-    console.log(`✅ [Validation] Все стыки совпадают. Тайл можно ставить.`);
-  } else {
-    console.warn(`⚠️ [Validation] У тайла нет соседей.`);
   }
 
   return hasAdjacent;
@@ -166,6 +169,33 @@ export const getValidPlacementCells = (
 };
 
 /**
+ * Можно ли поставить тайл хотя бы куда-нибудь (хотя бы в одном повороте).
+ * В отличие от getValidPlacementCells выходит при первой найденной клетке.
+ */
+export const hasValidPlacement = (
+  tile: Tile,
+  board: Map<string, PlacedTile>
+): boolean => {
+  const rotations = ([0, 90, 180, 270] as const).map(rot => rotateFeatures(tile.features, rot));
+  const visited = new Set<string>();
+
+  for (const existing of board.values()) {
+    for (const { dx, dy } of NEIGHBOR_OFFSETS) {
+      const nx = existing.x + dx;
+      const ny = existing.y + dy;
+      const cellKey = `${nx},${ny}`;
+      if (board.has(cellKey) || visited.has(cellKey)) continue;
+      visited.add(cellKey);
+
+      for (const features of rotations) {
+        if (isValidPlacement(board, nx, ny, features)) return true;
+      }
+    }
+  }
+  return false;
+};
+
+/**
  * Массив валидных поворотов для тайла на конкретной позиции.
  */
 export function getValidRotations(
@@ -182,11 +212,6 @@ export function getValidRotations(
       rotations.push(rotation);
     }
   }
-
-  console.log(
-    `🔄 [TileUtils] getValidRotations для ${tile.id} в (${x}, ${y}): ` +
-    `валидных ${rotations.length}/4 [${rotations.join(', ')}°]`
-  );
 
   return rotations;
 }

@@ -1,4 +1,5 @@
 // core/constants.ts
+import { ANIMATION_TIMING } from './animationTiming';
 
 // Размер тайла
 export const TILE_SIZE = 100;
@@ -12,7 +13,7 @@ export const WORLD_BOUNDS = {
 };
 
 // Длительность анимации одного региона (синхронизировано с --comp-reg-anim-completion)
-export const COMPLITED_REGION_ANIMATION_DURATION = 3000;
+export const COMPLITED_REGION_ANIMATION_DURATION = ANIMATION_TIMING.regionMs;
 
 // Длительность анимации поворота превью-тайла (синхронизировано с --preview-rotation)
 export const PREVIEW_ROTATION_DURATION = 300;

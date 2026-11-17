@@ -2,6 +2,8 @@
 // 🌟 Игровой цикл: старт, ходы, таймер, конец игры.
 // Отделён от Room для чёткого разделения ответственности.
 
+import { COMPLITED_REGION_ANIMATION_DURATION } from '@fiefdom/shared/core/constants';
+import { ANIMATION_TIMING } from '@fiefdom/shared/core/animationTiming';
 import type { RoomSettings } from '@fiefdom/shared/protocol/events';
 import type { PlayerConnection } from '../state/PlayerConnection';
 import type { ServerGameState } from '../state/ServerGameState';
@@ -11,7 +13,7 @@ import { generateGameSeed } from '@fiefdom/shared/prng/seedRandom';
 import { logger } from '../utils/logger';
 
 // 🌟 Время, в течение которого все видят мипла перед проверкой регионов
-const MEEPLE_VISIBLE_DELAY = 1000; // 1 секунда
+const MEEPLE_VISIBLE_DELAY = ANIMATION_TIMING.meepleBeatMs; // пауза, чтобы все увидели мипла
 
 // ============================================
 // 🕳️ ПОЛИТИКА ДЛЯ ОТСУТСТВУЮЩИХ ИГРОКОВ
@@ -89,6 +91,10 @@ export class RoomGameLoop {
     private missedTurns = new Map<string, number>();
     /** Игра уже завершена (защита от повторного endGame) */
     private ended = false;
+    /** Ход принят (фаза 1), но завершённые регионы ещё не применены (фазы 2–3) */
+    private moveResolutionPending = false;
+    /** Момент (мс), до которого клиенты показывают анимацию завершённых регионов */
+    private animationEndsAt = 0;
 
     constructor(
         private players: Map<string, PlayerConnection>,
@@ -517,7 +523,11 @@ export class RoomGameLoop {
                 rotation: tileData.rotation,
                 tileId: gs.board.get(`${tileData.x},${tileData.y}`)?.templateId ?? '',
             },
-            meeple: meepleData,
+            // 🌟 Позиция мипла — серверная (из состояния), а не присланная клиентом
+            meeple: (() => {
+                const placed = gs.board.get(`${tileData.x},${tileData.y}`)?.meeple;
+                return placed ? { featureId: placed.featureId, x: placed.x, y: placed.y } : null;
+            })(),
         });
 
         // 🌟 Рассылаем state С миплом (все видят мипла!)
@@ -528,46 +538,17 @@ export class RoomGameLoop {
         // ============================================
         logger.info('[GameLoop]', `⏱️ Фаза 2: пауза ${MEEPLE_VISIBLE_DELAY}мс (все видят мипла)`);
 
+        this.moveResolutionPending = true;
         this.schedule(() => {
-            // ============================================
-            // ФАЗА 3: Проверяем завершённые регионы
-            // ============================================
-            const completedRegions = gs.findCompletedRegions();
-            logger.info('[GameLoop]', `🔍 Фаза 3: найдено завершённых регионов: ${completedRegions.length}`);
+            // Игру уже завершили в окне паузы — последний ход разобран в endGame()
+            if (!this.moveResolutionPending) return;
 
-            if (completedRegions.length > 0) {
-                // Рассылаем данные для анимации ДО применения
-                this.broadcaster.broadcast('game:regions-completed', {
-                    regions: completedRegions.map(r => ({
-                        rootKey: r.rootKey,
-                        type: r.type,
-                        points: r.points,
-                        winners: r.winners,
-                        allMeepleOwners: r.allMeepleOwners,
-                        featureKeys: r.featureKeys,
-                    })),
-                });
-
-                // Применяем регионы (удаляет миплы, начисляет очки)
-                gs.applyCompletedRegions(completedRegions);
-                logger.info('[GameLoop]', `✅ Фаза 3: регионы применены (миплы удалены, очки начислены)`);
-
-                // Рассылаем state БЕЗ миплов (финальное состояние)
-                this.broadcaster.broadcastState();
-
-                // ============================================
-                // ФАЗА 4: Ждём завершения анимаций
-                // ============================================
-                const animationDelay = completedRegions.length * 3000;
+            const animationDelay = this.resolveMoveRegions();
+            if (animationDelay > 0) {
                 logger.info('[GameLoop]', `⏱️ Фаза 4: ждём ${animationDelay}мс (анимация регионов)`);
-
-                this.schedule(() => {
-                    this.proceedToNextTurn();
-                }, animationDelay);
-
+                this.schedule(() => this.proceedToNextTurn(), animationDelay);
             } else {
                 // Нет регионов — сразу передаём ход
-                logger.info('[GameLoop]', `✅ Фаза 3: регионов нет → немедленная передача хода`);
                 this.proceedToNextTurn();
             }
         }, MEEPLE_VISIBLE_DELAY);
@@ -575,12 +556,45 @@ export class RoomGameLoop {
         return { success: true };
     }
 
+    /**
+     * Фаза 3: находит завершённые регионы последнего хода, рассылает их для анимации
+     * и применяет (очки, возврат миплов). Вызывается ровно один раз на ход — либо
+     * по таймеру после паузы, либо из endGame(), если игра закончилась раньше.
+     * @returns длительность анимации (мс); 0, если завершённых регионов нет
+     */
+    private resolveMoveRegions(): number {
+        const gs = this.gameState;
+        this.moveResolutionPending = false;
+
+        const completedRegions = gs.findCompletedRegions();
+        logger.info('[GameLoop]', `🔍 Фаза 3: найдено завершённых регионов: ${completedRegions.length}`);
+        if (completedRegions.length === 0) return 0;
+
+        // Рассылаем данные для анимации ДО применения
+        // (в каждом регионе уже лежат meeples — клиент анимирует их, не ища на своей доске)
+        this.broadcaster.broadcast('game:regions-completed', { regions: completedRegions });
+
+        // Применяем регионы (удаляет миплы, начисляет очки)
+        gs.applyCompletedRegions(completedRegions);
+        logger.info('[GameLoop]', `✅ Фаза 3: регионы применены (миплы удалены, очки начислены)`);
+
+        // Рассылаем state БЕЗ миплов (финальное состояние)
+        this.broadcaster.broadcastState();
+
+        const animationDelay = completedRegions.length * COMPLITED_REGION_ANIMATION_DURATION;
+        this.animationEndsAt = Date.now() + animationDelay;
+        return animationDelay;
+    }
+
     // ============================================
     // 🏁 КОНЕЦ ИГРЫ
     // ============================================
 
     /**
-     * Финальный подсчёт очков и завершение игры.
+     * Завершение игры. Если оно случилось, пока последний ход ещё разбирался
+     * (например, соперник вышел в окне паузы), ход сначала доводится до конца —
+     * иначе замкнувшийся город получил бы очки как незамкнутый. Финальный подсчёт
+     * ждёт окончания уже идущей анимации регионов.
      */
     private endGame(reason: 'completed' | 'abandoned' | 'forfeit' = 'completed'): void {
         if (this.ended) return;
@@ -589,6 +603,20 @@ export class RoomGameLoop {
         this.clock?.stop(Date.now());
         this.clearAbsentTimer();
 
+        if (this.moveResolutionPending) {
+            this.resolveMoveRegions();
+        }
+
+        const wait = Math.max(0, this.animationEndsAt - Date.now());
+        if (wait > 0) {
+            this.schedule(() => this.finishGame(reason), wait);
+        } else {
+            this.finishGame(reason);
+        }
+    }
+
+    /** Финальный подсчёт очков и рассылка итогов */
+    private finishGame(reason: 'completed' | 'abandoned' | 'forfeit'): void {
         // Финальный подсчёт
         const finalRegions = this.gameState.finalizeGame();
 
@@ -601,7 +629,7 @@ export class RoomGameLoop {
         }
 
         // Ждём анимации перед финальным state
-        const animationDelay = finalRegions.length * 3000;
+        const animationDelay = finalRegions.length * COMPLITED_REGION_ANIMATION_DURATION;
         this.schedule(() => {
             this.broadcaster.broadcast('game:over', { finalScores: this.gameState.players, reason });
             this.broadcaster.broadcastState();

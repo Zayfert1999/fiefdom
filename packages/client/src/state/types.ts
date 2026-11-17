@@ -1,4 +1,4 @@
-import type { Tile, PlacedTile, PreviewTile, PlacedMeeple } from '@fiefdom/shared/core/types';
+import type { Tile, PlacedTile, PreviewTile, PlacedMeeple, Player } from '@fiefdom/shared/core/types';
 import type { RegionManager } from '@fiefdom/shared/core/regionManager';
 import type { CompletedRegion } from '@fiefdom/shared/core/scoring';
 
@@ -22,6 +22,8 @@ export interface MoveSnapshot {
     regionManager: RegionManager;
     drawnTile: Tile;
     deck: Tile[];
+    /** Игроки до хода: временный мипл уменьшает meepleCount, при откате его нужно вернуть */
+    players: Player[];
     previewTile: PreviewTile;
     previewTileRegionManager: RegionManager;
 }

@@ -29,6 +29,11 @@ export interface FeatureHighlight {
 export interface RegionHighlights {
   /** Подсветка тайлов доски по ключу "x,y" */
   readonly byTile: ReadonlyMap<string, readonly FeatureHighlight[]>;
+  /**
+   * Подсветка полей, нарисованных общими мешами регионов (рельеф): id региона → цвета.
+   * Пусто, если поля лежат в мешах тайлов (тогда они в byTile).
+   */
+  readonly fieldRegions: ReadonlyMap<string, readonly string[]>;
   /** Подсветка тайла-превью (его фичи в системе тайла без поворота) */
   readonly preview: readonly FeatureHighlight[];
 }
@@ -41,6 +46,11 @@ export interface HighlightInput {
   readonly previewTile: PreviewTile | null;
   /** Ключ "x,y" тайла, который сейчас падает (анимация установки): его подсветку пропускаем */
   readonly skipTileKey: string | null;
+  /**
+   * Регионы полей, нарисованные общими мешами (fieldTerrain.ts). Если передан, поля
+   * поставленных тайлов подсвечиваются через них, а не через byTile — в мешах тайлов полей нет.
+   */
+  readonly fieldRegions?: readonly { readonly id: string; readonly featureKeys: readonly string[] }[];
 }
 
 /** Цвета доминирующих владельцев региона; null — у региона нет владельца */
@@ -65,7 +75,8 @@ export function regionColors(
 }
 
 export function computeRegionHighlights(input: HighlightInput): RegionHighlights {
-  const { board, regionManager, players, visibleFeatureTypes, previewTile, skipTileKey } = input;
+  const { board, regionManager, players, visibleFeatureTypes, previewTile, skipTileKey, fieldRegions } = input;
+  const fieldsInRegions = fieldRegions !== undefined;
 
   const byTile = new Map<string, FeatureHighlight[]>();
   for (const tile of board.values()) {
@@ -75,10 +86,27 @@ export function computeRegionHighlights(input: HighlightInput): RegionHighlights
     const list: FeatureHighlight[] = [];
     for (const feature of tile.features) {
       if (!visibleFeatureTypes.includes(feature.type)) continue;
+      // Поля при рельефе рисуются общим мешем региона — их подсвечивает fieldRegions
+      if (fieldsInRegions && feature.type === 'field') continue;
       const colors = regionColors(regionManager, `${tileKey}:${feature.id}`, players);
       if (colors) list.push({ featureId: feature.id, colors });
     }
     if (list.length > 0) byTile.set(tileKey, list);
+  }
+
+  // Регион полей — один меш на несколько фич: берём цвета первой фичи с владельцем
+  // (фичи одного меша — один игровой регион, у них общие владельцы)
+  const fieldHighlights = new Map<string, readonly string[]>();
+  if (fieldRegions && visibleFeatureTypes.includes('field')) {
+    for (const region of fieldRegions) {
+      for (const featureKey of region.featureKeys) {
+        const colors = regionColors(regionManager, featureKey, players);
+        if (colors) {
+          fieldHighlights.set(region.id, colors);
+          break;
+        }
+      }
+    }
   }
 
   const preview: FeatureHighlight[] = [];
@@ -91,5 +119,5 @@ export function computeRegionHighlights(input: HighlightInput): RegionHighlights
     }
   }
 
-  return { byTile, preview };
-}
+  return { byTile, fieldRegions: fieldHighlights, preview };
+}

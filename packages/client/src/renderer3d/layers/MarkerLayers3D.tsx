@@ -7,16 +7,16 @@
 // • DebugLayer3D — фиолетовая рамка тайла, выбранного Ctrl+кликом
 //   (аналог SVG DebugOverlay).
 //
-// Рамки лежат чуть выше самой высокой поверхности тайла.
+// Рамки лежат чуть выше самой высокой точки тайла (с учётом холмов полей).
 // ============================================
 import { memo } from 'react';
 import { TILE_SIZE } from '@fiefdom/shared/core/constants';
 import { useGameStore } from '@/state/useGameStore';
-import { maxTopY } from '../boardMath';
 import { FrameOutline } from '../primitives';
-import { BOARD_MESH_PARAMS } from '../tileBundles';
+import { BOARD_TOP_Y } from '../tileBundles';
 
-const FRAME_Y = maxTopY(BOARD_MESH_PARAMS) + 0.6;
+/** Выше самого высокого холма полей, чтобы рамку не закрывал рельеф */
+const FRAME_Y = BOARD_TOP_Y + 0.6;
 const DEBUG_COLOR = '#e100ff';
 const BREATHE = { min: 0.5, max: 0.9, period: 2.5 } as const;
 
@@ -48,4 +48,4 @@ export const DebugLayer3D = memo(() => {
     </group>
   );
 });
-DebugLayer3D.displayName = 'DebugLayer3D';
+DebugLayer3D.displayName = 'DebugLayer3D';

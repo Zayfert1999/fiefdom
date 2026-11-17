@@ -5,9 +5,11 @@
 // • один InstancedMesh на каждый тип тайла (меш из процедурной геометрии);
 // • тайл, который сейчас падает (placementAnimation), в инстансы не входит —
 //   его рисует PlacedTileAnimation3D;
-// • под каждым тайлом — подложка (слой baseHeight): стены на стыках скрыты
-//   соседями, поэтому снизу тайл — тонкий лист, а подложка делает край
-//   кластера тайлов цельным.
+// • поля с рельефом рисует FieldRegionsLayer3D (общие меши регионов), а не меши тайлов;
+// • под каждым тайлом — подложка (слой baseHeight), но только если у мешей тайлов нет
+//   стен по периметру (boundaryWalls: false): стены на стыках скрыты соседями, снизу
+//   тайл — тонкий лист, а подложка делает край кластера цельным. С boundaryWalls: true
+//   (сейчас в geometryParams.json) стены уже есть, подложка не нужна.
 // ============================================
 import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -17,6 +19,7 @@ import { useGameStore } from '@/state/useGameStore';
 import type { TileBundle } from '@/core/geometry/tileMesh';
 import { TileInstances, type TilePlacement } from '@/components/TileMeshObjects';
 import { BOARD_MESH_PARAMS, getBundle } from '../tileBundles';
+import { FieldRegionsLayer3D } from './FieldRegionsLayer3D';
 
 interface BoardTilePlacement extends TilePlacement {
   readonly tileId: string;
@@ -118,7 +121,8 @@ export const TilesLayer3D = memo(({ onTileClick }: TilesLayer3DProps) => {
 
   return (
     <>
-      <Slabs placements={placements} />
+      {!BOARD_MESH_PARAMS.boundaryWalls && <Slabs placements={placements} />}
+      <FieldRegionsLayer3D />
       {groups.map(({ tileId, list, bundle }) => (
         <TileInstances
           key={tileId}
@@ -134,4 +138,4 @@ export const TilesLayer3D = memo(({ onTileClick }: TilesLayer3DProps) => {
     </>
   );
 });
-TilesLayer3D.displayName = 'TilesLayer3D';
+TilesLayer3D.displayName = 'TilesLayer3D';

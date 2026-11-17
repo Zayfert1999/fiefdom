@@ -21,6 +21,8 @@ import { featureSurface, localToWorld, surfaceTopY, toStorePoint, type LocalPoin
 import { MEEPLE_HEIGHT, MEEPLE_HIT_RADIUS, MeepleFigure, useMeepleMaterial } from '../models/MeepleModel';
 import { resolveMeepleSpot } from '../spotUtils';
 import { BOARD_MESH_PARAMS, getBundle, getTileDefinition } from '../tileBundles';
+import { fieldSurfaceY } from '../fieldTerrain';
+import { useFieldTerrain } from '../useFieldTerrain';
 
 const CLICK_DRAG_PX = 5;
 const HOVER_SCALE = 1.3;
@@ -87,6 +89,7 @@ export const MeepleSelectionLayer3D = memo(() => {
   const currentPlayer = useGameStore((s) => s.players[s.currentTurn]);
   const regionManager = useGameStore((s) => s.regionManager);
   const selectMeepleSpot = useGameStore((s) => s.selectMeepleSpot);
+  const terrain = useFieldTerrain();
 
   // Последний тайл и свободные фичи — как в SVG-версии
   const target = useMemo(() => {
@@ -115,7 +118,10 @@ export const MeepleSelectionLayer3D = memo(() => {
       const local: LocalPoint | null = resolveMeepleSpot(bundle, feature.id, feature.meepleSpot);
       if (!local) return [];
       const world = localToWorld(lastTile.x, lastTile.y, lastTile.rotation, local);
-      const y = surfaceTopY(BOARD_MESH_PARAMS, featureSurface(feature.type));
+      const flat = surfaceTopY(BOARD_MESH_PARAMS, featureSurface(feature.type));
+      // Поле с рельефом: призрак стоит на холме, а не на плоском уровне
+      const hill = feature.type === 'field' && terrain.tiles ? fieldSurfaceY(terrain, world.x, world.z) : null;
+      const y = hill ?? flat;
       return [
         {
           featureId: feature.id,
@@ -126,7 +132,7 @@ export const MeepleSelectionLayer3D = memo(() => {
       ];
     });
     return spots.length > 0 ? spots : null;
-  }, [board, phase, currentPlayer, regionManager]);
+  }, [board, phase, currentPlayer, regionManager, terrain]);
 
   if (!target || !currentPlayer) return null;
 
@@ -145,4 +151,4 @@ export const MeepleSelectionLayer3D = memo(() => {
     </>
   );
 });
-MeepleSelectionLayer3D.displayName = 'MeepleSelectionLayer3D';
+MeepleSelectionLayer3D.displayName = 'MeepleSelectionLayer3D';

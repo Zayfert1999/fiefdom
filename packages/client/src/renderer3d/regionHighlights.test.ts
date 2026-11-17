@@ -105,4 +105,51 @@ describe('computeRegionHighlights', () => {
     expect(preview).toEqual([{ featureId: 'city1', colors: ['#5555ff'] }]);
     expect(byTile.size).toBe(0);
   });
+
+  describe('поля с рельефом (общие меши регионов)', () => {
+    const withFields: HighlightInput = {
+      ...base,
+      board: new Map([
+        ['0,0', tile(0, 0, [feature('city1', 'city'), feature('field1', 'field')])],
+        ['1,0', tile(1, 0, [feature('field1', 'field')])],
+      ]),
+      visibleFeatureTypes: ['city', 'field'],
+      regionManager: fakeRegions({ '1,0:field1': { b: 2 }, '0,0:city1': { a: 1 } }),
+    };
+
+    it('без fieldRegions поля подсвечиваются как обычные фичи тайла', () => {
+      const { byTile, fieldRegions } = computeRegionHighlights({
+        ...withFields,
+        regionManager: fakeRegions({ '0,0:field1': { b: 1 } }),
+      });
+      expect(byTile.get('0,0')).toEqual([{ featureId: 'field1', colors: ['#5555ff'] }]);
+      expect(fieldRegions.size).toBe(0);
+    });
+
+    it('с fieldRegions поля тайлов пропускаются, регион получает цвета первой фичи с владельцем', () => {
+      const { byTile, fieldRegions } = computeRegionHighlights({
+        ...withFields,
+        fieldRegions: [{ id: '0,0:field1', featureKeys: ['0,0:field1', '1,0:field1'] }],
+      });
+      expect(byTile.get('0,0')).toEqual([{ featureId: 'city1', colors: ['#ff5555'] }]);
+      expect(byTile.has('1,0')).toBe(false);
+      expect(fieldRegions.get('0,0:field1')).toEqual(['#5555ff']);
+    });
+
+    it('регион без владельца и скрытый тип полей не подсвечиваются', () => {
+      const none = computeRegionHighlights({
+        ...withFields,
+        regionManager: fakeRegions({}),
+        fieldRegions: [{ id: '0,0:field1', featureKeys: ['0,0:field1'] }],
+      });
+      expect(none.fieldRegions.size).toBe(0);
+
+      const hidden = computeRegionHighlights({
+        ...withFields,
+        visibleFeatureTypes: ['city'],
+        fieldRegions: [{ id: '0,0:field1', featureKeys: ['0,0:field1', '1,0:field1'] }],
+      });
+      expect(hidden.fieldRegions.size).toBe(0);
+    });
+  });
 });

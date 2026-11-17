@@ -29,6 +29,18 @@ import {
 /** Итоговые параметры меша (высоты, цвета) из geometryParams.json */
 export const BOARD_MESH_PARAMS: Readonly<MeshParams> = resolveMeshParams(GEOMETRY_PARAMS.mesh);
 
+/** Рельеф полей включён: поля рисуют общие меши регионов (fieldTerrain.ts), а не меши тайлов */
+export const TERRAIN_ENABLED: boolean = BOARD_MESH_PARAMS.terrain.enabled && BOARD_MESH_PARAMS.terrain.amplitude > 0;
+
+/**
+ * Высота самой высокой точки тайла: плоские поверхности + холмы полей.
+ * Рамки и метки кладутся выше этой высоты, чтобы их не закрывал рельеф.
+ */
+export const BOARD_TOP_Y: number =
+  Math.max(...Object.values(BOARD_MESH_PARAMS.heights)) +
+  BOARD_MESH_PARAMS.baseHeight +
+  (TERRAIN_ENABLED ? BOARD_MESH_PARAMS.terrain.amplitude : 0);
+
 const definitions = new Map<string, Tile>(TILE_DEFINITIONS.map((def) => [def.id, def]));
 const failed = new Set<string>();
 
@@ -112,4 +124,4 @@ export function prewarmBundles(templateIds?: readonly string[]): () => void {
     cancelled = true;
     if (handle !== null) cancelIdle(handle);
   };
-}
+}

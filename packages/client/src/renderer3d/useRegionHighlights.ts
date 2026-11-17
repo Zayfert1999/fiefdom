@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { computeRegionHighlights, type RegionHighlights } from './regionHighlights';
+import { useFieldTerrain } from './useFieldTerrain';
 
 /** Подсветка регионов для текущего состояния игры */
 export function useRegionHighlights(): RegionHighlights {
@@ -24,9 +25,20 @@ export function useRegionHighlights(): RegionHighlights {
   });
 
   const regionManager = previewRegionManager ?? storeRegionManager;
+  // Рельеф включён: поля подсвечиваются через общие меши регионов
+  const terrain = useFieldTerrain();
+  const fieldRegions = terrain.tiles ? terrain.regions : undefined;
 
   return useMemo(
-    () => computeRegionHighlights({ board, regionManager, players, visibleFeatureTypes, previewTile, skipTileKey }),
-    [board, regionManager, players, visibleFeatureTypes, previewTile, skipTileKey]
+    () => computeRegionHighlights({
+        board,
+        regionManager,
+        players,
+        visibleFeatureTypes,
+        previewTile,
+        skipTileKey,
+        fieldRegions,
+      }),
+    [board, regionManager, players, visibleFeatureTypes, previewTile, skipTileKey, fieldRegions]
   );
-}
+}

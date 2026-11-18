@@ -1,0 +1,17 @@
+{
+  "_comment": "Пресет камеры игровой 3D-доски. Углы в градусах. pitchDeg — наклон камеры к плоскости земли (90 — строго сверху), yawDeg — поворот вокруг вертикали (0 — смотрим с юга на север, 45 — с юго-востока, доска выглядит «ромбом»).",
+  "pitchDeg": 30,
+  "yawDeg": 45,
+  "lockRotation": true,
+  "unlocked": {
+    "pitchMinDeg": 20,
+    "pitchMaxDeg": 80
+  },
+  "distance": 520,
+  "minDistance": 110,
+  "maxDistance": 2600,
+  "meepleDistance": 250,
+  "fov": 40,
+  "smoothing": 7,
+  "shieldsFaceCamera": true
+}

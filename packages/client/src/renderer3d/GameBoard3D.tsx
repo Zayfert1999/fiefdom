@@ -14,11 +14,13 @@
 //        Ctrl/Cmd+клик — debug-выбор тайла, как в SVG.
 // ============================================
 import { memo, useCallback, useEffect, useState } from 'react';
+import * as THREE from 'three';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { MapControls, useCursor } from '@react-three/drei';
 import { TILE_SIZE, WORLD_BOUNDS } from '@fiefdom/shared/core/constants';
 import { useGameStore } from '@/state/useGameStore';
 import { CAMERA_MAX_DISTANCE, CAMERA_MIN_DISTANCE, CameraRig, DEFAULT_CAMERA_OFFSET } from './CameraRig';
+import { CAMERA_PRESET, controlsLimits } from './cameraPreset';
 import { FrameOutline } from './primitives';
 import { useShieldMaterials } from './models/ShieldModel';
 import { worldToCell } from './boardMath';
@@ -45,6 +47,13 @@ const WORLD_WIDTH = WORLD_TILES_X * TILE_SIZE;
 const WORLD_DEPTH = WORLD_TILES_Z * TILE_SIZE;
 const WORLD_CENTER_X = ((WORLD_BOUNDS.minX + WORLD_BOUNDS.maxX) / 2) * TILE_SIZE;
 const WORLD_CENTER_Z = ((WORLD_BOUNDS.minY + WORLD_BOUNDS.maxY) / 2) * TILE_SIZE;
+
+/** Ограничения MapControls из пресета камеры (жёсткие углы или свободное вращение) */
+const LIMITS = controlsLimits(CAMERA_PRESET);
+
+/** Без вращения ПКМ и второй палец тоже панорамируют/зумят — вращать всё равно нечего */
+const LOCKED_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+const LOCKED_TOUCHES = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
 
 type BoardProps = {
   onGridClick: (x: number, y: number) => void;
@@ -158,7 +167,12 @@ const Scene = ({ onGridClick, validCells }: BoardProps) => {
         screenSpacePanning={false}
         minDistance={CAMERA_MIN_DISTANCE}
         maxDistance={CAMERA_MAX_DISTANCE}
-        maxPolarAngle={Math.PI / 3}
+        enableRotate={LIMITS.enableRotate}
+        minPolarAngle={LIMITS.minPolarAngle}
+        maxPolarAngle={LIMITS.maxPolarAngle}
+        minAzimuthAngle={LIMITS.minAzimuthAngle}
+        maxAzimuthAngle={LIMITS.maxAzimuthAngle}
+        {...(LIMITS.enableRotate ? {} : { mouseButtons: LOCKED_BUTTONS, touches: LOCKED_TOUCHES })}
       />
       <CameraRig />
     </>
@@ -189,7 +203,7 @@ export const GameBoard3D = ({ onGridClick, validCells }: BoardProps) => {
         dpr={[1, 2]}
         camera={{
           position: [DEFAULT_CAMERA_OFFSET.x, DEFAULT_CAMERA_OFFSET.y, DEFAULT_CAMERA_OFFSET.z],
-          fov: 40,
+          fov: CAMERA_PRESET.fov,
           near: 10,
           far: 8000,
         }}
@@ -198,4 +212,4 @@ export const GameBoard3D = ({ onGridClick, validCells }: BoardProps) => {
       </Canvas>
     </div>
   );
-};
+};

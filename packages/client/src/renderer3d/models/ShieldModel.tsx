@@ -8,10 +8,17 @@
 // тайла компенсировался. Цвета вынесены в SHIELD_COLORS: в SVG-версии они
 // зашиты в shield.svg, здесь их удобно править.
 //
+// Щит лежит в группе тайла и поворачивался бы вместе с ним, поэтому каждый кадр его
+// разворот пересчитывается: SHIELD_YAW минус текущий поворот родителя вокруг Y. Это
+// работает и для поставленных тайлов, и для падающего (доворот), и для превью, у которого
+// поворот плавно анимируется, — щит всегда смотрит в камеру.
+//
 // Начало координат — нижняя точка щита.
 // ============================================
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
+import { SHIELD_YAW } from '../cameraPreset';
 
 export const SHIELD_WIDTH = 15;
 export const SHIELD_HEIGHT = 17;
@@ -97,13 +104,33 @@ interface ShieldFigureProps {
   materials: ShieldMaterials;
 }
 
+const parentQuaternion = new THREE.Quaternion();
+const parentEuler = new THREE.Euler();
+
 export const ShieldFigure = memo(({ materials }: ShieldFigureProps) => {
   const { rim, face } = getShieldGeometries();
+  const facing = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const group = facing.current;
+    const parent = group?.parent;
+    if (!group || !parent) return;
+
+    // Мировой поворот родителя (тайл, превью) вокруг вертикали; матрицы актуальны к этому кадру
+    parent.updateWorldMatrix(true, false);
+    parent.getWorldQuaternion(parentQuaternion);
+    parentEuler.setFromQuaternion(parentQuaternion, 'YXZ');
+    group.rotation.y = SHIELD_YAW - parentEuler.y;
+  });
+
   return (
-    <group rotation={[-SHIELD_LEAN, 0, 0]}>
-      <mesh geometry={rim} material={materials.rim} castShadow />
-      <mesh geometry={face} material={materials.face} castShadow />
+    // Лицом к камере (yaw пресета) с компенсацией поворота тайла, затем откинут назад
+    <group ref={facing} rotation={[0, SHIELD_YAW, 0]}>
+      <group rotation={[-SHIELD_LEAN, 0, 0]}>
+        <mesh geometry={rim} material={materials.rim} castShadow />
+        <mesh geometry={face} material={materials.face} castShadow />
+      </group>
     </group>
   );
 });
-ShieldFigure.displayName = 'ShieldFigure';
+ShieldFigure.displayName = 'ShieldFigure';

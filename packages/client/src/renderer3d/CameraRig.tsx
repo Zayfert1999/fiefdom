@@ -11,6 +11,7 @@
 //   • хоткеи: + / = / − (зум), 0 (сброс), стрелки (панорама);
 //   • границы мира (WORLD_BOUNDS).
 //
+// Углы обзора (pitch/yaw), жёсткая или свободная камера — в cameraPreset.json.
 // Плавность — экспоненциальное сглаживание цели (target) и смещения камеры
 // относительно цели (offset): так камера сохраняет угол обзора, который
 // игрок выставил вращением. Любое ручное действие отменяет анимацию.
@@ -24,16 +25,18 @@ import type { CompletedRegion } from '@fiefdom/shared/core/scoring';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { useGameStore } from '@/state/useGameStore';
 import { parseFeatureKey } from './boardMath';
+import { CAMERA_PRESET, DEFAULT_OFFSET } from './cameraPreset';
 
-/** Смещение камеры от цели по умолчанию: ~36° от вертикали, расстояние ≈ 525 */
-export const DEFAULT_CAMERA_OFFSET = new THREE.Vector3(0, 430, 300);
+// Углы, расстояния и скорость камеры задаёт пресет (cameraPreset.json)
+/** Смещение камеры от цели по умолчанию: старт и сброс по хоткею */
+export const DEFAULT_CAMERA_OFFSET = new THREE.Vector3(DEFAULT_OFFSET.x, DEFAULT_OFFSET.y, DEFAULT_OFFSET.z);
 /** Расстояние до цели при выборе мипла (аналог zoom ×2) */
-const MEEPLE_DISTANCE = 250;
-/** Скорость сглаживания, 1/с (≈ ANIMATION_DURATION камеры) */
-const SMOOTHING = 7;
+const MEEPLE_DISTANCE = CAMERA_PRESET.meepleDistance;
+/** Скорость сглаживания, 1/с */
+const SMOOTHING = CAMERA_PRESET.smoothing;
 
-export const CAMERA_MIN_DISTANCE = 110;
-export const CAMERA_MAX_DISTANCE = 2600;
+export const CAMERA_MIN_DISTANCE = CAMERA_PRESET.minDistance;
+export const CAMERA_MAX_DISTANCE = CAMERA_PRESET.maxDistance;
 
 /** Минимальный интерфейс OrbitControls/MapControls, который нужен ригу */
 interface ControlsLike {
@@ -268,5 +271,4 @@ export const CameraRig = () => {
   });
 
   return null;
-};
-
+};

@@ -12,7 +12,8 @@
 // Режимы (приоритет, как в SVG): temporary → completing → dropping → idle.
 //   • idle        — мипл «дышит» (масштаб и покачивание, 3 с);
 //   • dropping    — падает сверху после тайла (анимация чужого хода);
-//   • temporary   — белое пульсирующее свечение; клик убирает мипла, наведение ×1.3;
+//   • temporary   — материал как у призрака-спота выбора (полупрозрачный, лёгкая белая
+//                   эмиссия), но в цвете мипла игрока; клик убирает мипла, наведение ×1.3;
 //   • completing  — вырастает до ×1.3 с золотым свечением, затем уменьшается и
 //                   растворяется; над ним всплывает «+N».
 //
@@ -45,6 +46,10 @@ const HOVER_SCALE = 1.3;
 
 const WHITE = new THREE.Color('#ffffff');
 const GOLD = new THREE.Color('#ffd700');
+
+// Временный мипл: материал как у призрака-спота (MeepleSelectionLayer3D в покое), цвет — игрока
+const TEMP_OPACITY = 0.8;
+const TEMP_EMISSIVE_INTENSITY = 0.05;
 
 type MeepleMode = 'idle' | 'temporary' | 'dropping' | 'completing';
 
@@ -129,7 +134,8 @@ const MeepleActor3D = memo(({ item, terrain, onRemove }: MeepleActor3DProps) => 
     if (isTemporary) {
       hoverScale.current = THREE.MathUtils.damp(hoverScale.current, hovered ? HOVER_SCALE : 1, 12, delta);
       scale = hoverScale.current;
-      glow = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin((t / 1.5) * Math.PI * 2));
+      opacity = TEMP_OPACITY;
+      glow = TEMP_EMISSIVE_INTENSITY;
     } else if (isCompleting) {
       const p = clamp01((t - (completeStart.current ?? t)) / COMPLETION_DURATION);
       if (p < 0.3) {

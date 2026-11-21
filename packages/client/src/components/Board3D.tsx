@@ -29,6 +29,7 @@ import {
   type FieldRegionTile,
 } from '@/core/geometry/fieldRegions';
 import { CityWallCache, buildCityWallModels } from '@/core/geometry/cityWalls';
+import { geometryTileId } from '@/core/geometry/bundleToken';
 import { getCityRefs, type CityRegionTile } from '@/core/geometry/cityRegions';
 import type { WallParams } from '@/core/geometry/wallParams';
 import { CityWallMeshObject } from './CityWallMeshObject';
@@ -155,7 +156,8 @@ export const Board3D = memo(({
         col: placement.col,
         row: placement.row,
         rotation: placement.rotation,
-        tileId: placement.tileId,
+        // Токен геометрии в id тайла: после смены шума и т. п. бандл новый, и кэш регионов не отдаст старый меш
+        tileId: geometryTileId(placement.tileId, bundle),
         fields: bundle.fieldPolygons,
       });
     }
@@ -183,7 +185,7 @@ export const Board3D = memo(({
         col: placement.col,
         row: placement.row,
         rotation: placement.rotation,
-        tileId: placement.tileId,
+        tileId: geometryTileId(placement.tileId, bundle),
         cities: refs.cities,
         roadEnds: refs.roadEnds,
       });

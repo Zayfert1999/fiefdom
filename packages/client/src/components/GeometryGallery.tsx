@@ -89,7 +89,11 @@ export const GeometryGallery = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {isPending && <div style={{ color: '#9ca3af', fontSize: 12 }}>⏳ Пересчёт…</div>}
+      {/* Место под индикатор занято всегда: иначе строка то появляется, то исчезает, и всё, что ниже
+          (в том числе 3D-окно), прыгает на её высоту при каждом пересчёте */}
+      <div style={{ color: '#9ca3af', fontSize: 12, height: 18, lineHeight: '18px', visibility: isPending ? 'visible' : 'hidden' }}>
+        ⏳ Пересчёт…
+      </div>
       {mode === 'gallery' ? (
         <GalleryGrid
           audits={audits}

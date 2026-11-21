@@ -7,7 +7,7 @@
 // у renderer/Board: onGridClick(x, y) и validCells.
 //
 // Слои (аналоги SVG-слоёв, снизу вверх):
-//   пол и сетка → тайлы → щиты → клетки → подсветка регионов → завершение →
+//   пол и сетка → тайлы → городские стены → щиты → клетки → подсветка регионов → завершение →
 //   последние тайлы → debug → превью → падение тайла → мипл-споты → мипли
 //
 // Клики: ЛКМ — клетка (перетаскивание камеры отличается по event.delta),
@@ -26,6 +26,7 @@ import { useShieldMaterials } from './models/ShieldModel';
 import { worldToCell } from './boardMath';
 import { prewarmBundles } from './tileBundles';
 import { CellsLayer3D } from './layers/CellsLayer3D';
+import { CityWallsLayer3D } from './layers/CityWallsLayer3D';
 import { DebugLayer3D, LastPlacedLayer3D } from './layers/MarkerLayers3D';
 import { MeepleLayer3D } from './layers/MeepleLayer3D';
 import { MeepleSelectionLayer3D } from './layers/MeepleSelectionLayer3D';
@@ -137,6 +138,7 @@ const Scene = ({ onGridClick, validCells }: BoardProps) => {
       <BoardFloor />
 
       <TilesLayer3D onTileClick={handleCell} />
+      <CityWallsLayer3D />
       <ShieldsLayer3D materials={shieldMaterials} />
       <CellsLayer3D validCells={validCells} hoverCell={hoverCell} />
       <RegionOverlayLayer3D />
@@ -212,4 +214,4 @@ export const GameBoard3D = ({ onGridClick, validCells }: BoardProps) => {
       </Canvas>
     </div>
   );
-};
+};

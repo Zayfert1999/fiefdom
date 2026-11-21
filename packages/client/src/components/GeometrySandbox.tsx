@@ -53,6 +53,7 @@ import {
   SpotControls,
   TessellationControls,
   TileOverrideControls,
+  WallControls,
   ParamCheckbox,
 } from './SandboxParamControls';
 import { TerrainControls } from '@/components/TerrainControls';
@@ -81,6 +82,7 @@ import type {
 } from '@/core/geometry';
 import { auditGeometry, type AuditPipelineOptions } from '@/core/geometry/geometryAudit';
 import { resolveMeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
+import { mergeWallParams, resolveWallParams, type WallParamsInput } from '@/core/geometry/wallParams';
 import {
   DEFAULT_GEOMETRY_PARAMS,
   cloneGeometryParams,
@@ -898,6 +900,11 @@ export const GeometrySandbox = () => {
     []
   );
   const resetMesh = useCallback(() => setParams((prev) => ({ ...prev, mesh: resolveMeshParams() })), []);
+  const patchWalls = useCallback(
+    (patch: WallParamsInput) => setParams((prev) => ({ ...prev, walls: mergeWallParams(prev.walls, patch) })),
+    []
+  );
+  const resetWalls = useCallback(() => setParams((prev) => ({ ...prev, walls: resolveWallParams() })), []);
 
   // Файл параметров: сохранение, загрузка, откат
   const handleSaved = useCallback((saved: GeometryParams) => setSavedParams(cloneGeometryParams(saved)), []);
@@ -905,10 +912,19 @@ export const GeometrySandbox = () => {
   const handleRevert = useCallback(() => setParams(cloneGeometryParams(savedParams)), [savedParams]);
   const handleResetDefaults = useCallback(() => setParams(cloneGeometryParams(DEFAULT_GEOMETRY_PARAMS)), []);
 
+  // Геометрию тайлов пересчитываем только когда правится то, что на неё влияет: городские стены
+  // строятся поверх готовых бандлов, и ползунок стены не должен гонять аудит всех тайлов
+  const tileParamsKey = useMemo(
+    () => hashGeometryParams(deferredParams, undefined, { includeWalls: false }),
+    [deferredParams]
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- осознанно: идентичность держится по хэшу без стен
+  const tileParams = useMemo(() => deferredParams, [tileParamsKey]);
+
   // Галерея и доска швов считаются теми же настройками, что и одиночный тайл
   const pipeline = useMemo<AuditPipelineOptions>(
-    () => ({ geometryParams: deferredParams, noiseEnabled, seedOverride }),
-    [deferredParams, noiseEnabled, seedOverride]
+    () => ({ geometryParams: tileParams, noiseEnabled, seedOverride }),
+    [tileParams, noiseEnabled, seedOverride]
   );
 
   // ============================================
@@ -1165,6 +1181,19 @@ export const GeometrySandbox = () => {
             </div>
 
             {/* ======================================== */}
+            {/* 🏰 ГОРОДСКИЕ СТЕНЫ */}
+            {/* ======================================== */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+                🏰 Городские стены
+              </div>
+              <div style={{ fontSize: 10.5, color: '#888', lineHeight: 1.3 }}>
+                Смотреть: вкладка «3D доска». Кнопка «🏰 Найти доску с городом» подберёт доску с замкнутым городом.
+              </div>
+              <WallControls params={params.walls} onChange={patchWalls} onReset={resetWalls} />
+            </div>
+
+            {/* ======================================== */}
             {/* 🌊 ШУМ ПЕРЛИНА */}
             {/* ======================================== */}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1260,7 +1289,8 @@ export const GeometrySandbox = () => {
                 tiles={tiles}
                 pipeline={pipeline}
                 isPending={isPending}
-                meshParams={deferredParams.mesh}
+                meshParams={tileParams.mesh}
+                wallParams={deferredParams.walls}
                 onOpenTile={handleOpenFromGallery}
               />
             ) : selectedTile ? (
@@ -1277,7 +1307,7 @@ export const GeometrySandbox = () => {
                     showGeometry={showGeometry}
                     seedOverride={seedOverride}
                     noiseEnabled={noiseEnabled}
-                    params={deferredParams}
+                    params={tileParams}
                     showVertices={showVertices}
                   />
                 </div>

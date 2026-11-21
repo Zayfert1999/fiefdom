@@ -7,12 +7,13 @@
 //   • seams   — случайная доска из совпадающих по портам тайлов;
 //               места, где тип поверхности на стыке не сходится,
 //               подсвечены красным
-//   • board3d — та же доска в 3D (Board3D): инстансинг, тени, пикинг клеток
+//   • board3d — та же доска в 3D (Board3D): инстансинг, тени, пикинг клеток;
+//               здесь же городские стены: рост из земли, поиск доски с замкнутым городом
 //
 // Любое движение ползунка в левой панели пересчитывает всё сразу —
 // видно, как параметр влияет на ВСЕ тайлы, а не на один.
 // ============================================
-import { memo, useMemo, useState, type CSSProperties } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   auditSeams,
   auditTiles,
@@ -26,7 +27,10 @@ import {
 } from '@/core/geometry/geometryAudit';
 import { buildTileBundle, type MeshParamsInput, type TileBundle } from '@/core/geometry/tileMesh';
 import { DEFAULT_SPOT_PARAMS } from '@/core/geometry/spots';
-import { Board3D, type Board3DHover, type BoardPlacement } from './Board3D';
+import { ANIMATION_TIMING } from '@fiefdom/shared/core/animationTiming';
+import { buildCityRegions, getCityRefs, type CityRegionTile } from '@/core/geometry/cityRegions';
+import { wallGrowthAt, type WallParams } from '@/core/geometry/wallParams';
+import { Board3D, type Board3DHover, type BoardPlacement, type BoardWallsInfo } from './Board3D';
 import { TileGeometryLayers } from './TileGeometryLayers';
 
 // ============================================
@@ -67,6 +71,8 @@ interface GeometryGalleryProps {
   isPending?: boolean;
   /** Параметры меша для 3D (высоты, цвета, стены) */
   meshParams?: MeshParamsInput;
+  /** Параметры городских стен для 3D-доски */
+  wallParams?: WallParams;
   onOpenTile: (tileId: string) => void;
 }
 
@@ -76,6 +82,7 @@ export const GeometryGallery = ({
   pipeline,
   isPending = false,
   meshParams,
+  wallParams,
   onOpenTile,
 }: GeometryGalleryProps) => {
   const audits = useMemo(() => auditTiles(tiles, pipeline), [tiles, pipeline]);
@@ -95,6 +102,7 @@ export const GeometryGallery = ({
           audits={audits}
           view3d={mode === 'board3d'}
           meshParams={meshParams}
+          wallParams={wallParams}
           onOpenTile={onOpenTile}
         />
       )}
@@ -250,10 +258,14 @@ interface SeamBoardProps {
   /** Рисовать доску в 3D вместо SVG */
   view3d: boolean;
   meshParams?: MeshParamsInput;
+  wallParams?: WallParams;
   onOpenTile: (tileId: string) => void;
 }
 
-const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardProps) => {
+/** Сколько доск перебирается в поисках замкнутого города */
+const CITY_SEARCH_LIMIT = 400;
+
+const SeamBoard = ({ tiles, audits, view3d, meshParams, wallParams, onOpenTile }: SeamBoardProps) => {
   const [cols, setCols] = useState(6);
   const [rows, setRows] = useState(4);
   const [boardSeed, setBoardSeed] = useState('seam-board');
@@ -263,6 +275,14 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardP
   const [shadows, setShadows] = useState(true);
   const [wireframe, setWireframe] = useState(false);
   const [hover, setHover] = useState<Board3DHover | null>(null);
+  const [showWalls, setShowWalls] = useState(true);
+  const [wallGrowth, setWallGrowth] = useState(1);
+  const [wallsInfo, setWallsInfo] = useState<BoardWallsInfo | null>(null);
+  const [searchNote, setSearchNote] = useState('');
+  const growthFrame = useRef(0);
+
+  // Остановка анимации роста при уходе со вкладки
+  useEffect(() => () => cancelAnimationFrame(growthFrame.current), []);
 
   const board = useMemo(
     () => generateSeamBoard(tiles, cols, rows, `${boardSeed}#${reroll}`),
@@ -302,6 +322,66 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardP
       })),
     [board]
   );
+
+  // Объект стен стабилен, пока не меняются параметры и рост (Board3D мемоизирован)
+  const wallsProp = useMemo(
+    () => (showWalls && wallParams ? { params: wallParams, growth: wallGrowth } : undefined),
+    [showWalls, wallParams, wallGrowth]
+  );
+
+  /** Проигрывает рост стен из земли ровно так, как он идёт в игре */
+  const playGrowth = useCallback(() => {
+    cancelAnimationFrame(growthFrame.current);
+    const duration = ANIMATION_TIMING.regionMs * (wallParams?.riseFraction ?? 0.7);
+    const start = performance.now();
+    const tick = (now: number): void => {
+      const elapsed = now - start;
+      setWallGrowth(wallGrowthAt(elapsed, duration));
+      if (elapsed < duration) growthFrame.current = requestAnimationFrame(tick);
+    };
+    setWallGrowth(0);
+    growthFrame.current = requestAnimationFrame(tick);
+  }, [wallParams?.riseFraction]);
+
+  /**
+   * Случайная доска почти никогда не замыкает город. Перебираем seed'ы, пока не найдём доску
+   * с замкнутым городом (лучше — с воротами), и переключаемся на неё.
+   */
+  const findCityBoard = useCallback(() => {
+    const refsByTile = new Map(audits.map((audit) => [audit.tileId, getCityRefs(audit)]));
+    let fallback = -1;
+    for (let k = 1; k <= CITY_SEARCH_LIMIT; k++) {
+      const candidate = generateSeamBoard(tiles, cols, rows, `${boardSeed}#${reroll + k}`);
+      if (!candidate) continue;
+      const regionTiles: CityRegionTile[] = candidate.flatMap((placed) => {
+        const refs = refsByTile.get(placed.tile.id);
+        if (!refs || refs.cities.length === 0) return [];
+        return [{
+          key: `${placed.col},${placed.row}`,
+          col: placed.col,
+          row: placed.row,
+          rotation: placed.rotation,
+          tileId: placed.tile.id,
+          cities: refs.cities,
+          roadEnds: refs.roadEnds,
+        }];
+      });
+      const closed = buildCityRegions(regionTiles).filter((region) => region.closed);
+      if (closed.length === 0) continue;
+      if (closed.some((region) => region.gates.length > 0)) {
+        setReroll(reroll + k);
+        setSearchNote(`найдена доска с воротами (попытка ${k})`);
+        return;
+      }
+      if (fallback < 0) fallback = k;
+    }
+    if (fallback >= 0) {
+      setReroll(reroll + fallback);
+      setSearchNote('замкнутый город есть, но без ворот');
+    } else {
+      setSearchNote(`за ${CITY_SEARCH_LIMIT} попыток замкнутых городов нет — попробуйте другой seed или размер`);
+    }
+  }, [audits, tiles, cols, rows, boardSeed, reroll]);
 
   const meshTotals = useMemo(() => {
     let triangles = 0;
@@ -362,6 +442,24 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardP
               <input type="checkbox" checked={wireframe} onChange={(e) => setWireframe(e.target.checked)} />
               Каркас
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showWalls} onChange={(e) => setShowWalls(e.target.checked)} />
+              🏰 Стены
+            </label>
+            {showWalls && (
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Рост
+                  <input
+                    type="range" min={0} max={1} step={0.01} value={wallGrowth} style={{ width: 110 }}
+                    onChange={(e) => { cancelAnimationFrame(growthFrame.current); setWallGrowth(Number(e.target.value)); }}
+                  />
+                  <span style={{ width: 34, fontFamily: 'monospace' }}>{Math.round(wallGrowth * 100)}%</span>
+                </label>
+                <button type="button" style={buttonStyle} onClick={playGrowth}>▶ Проиграть появление</button>
+                <button type="button" style={buttonStyle} onClick={findCityBoard}>🏰 Найти доску с городом</button>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -412,6 +510,8 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardP
                 shadows={shadows}
                 wireframe={wireframe}
                 onHover={setHover}
+                walls={wallsProp}
+                onWallsBuilt={setWallsInfo}
               />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12, color: '#ccc', fontFamily: 'monospace' }}>
                 <span>
@@ -424,6 +524,17 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, onOpenTile }: SeamBoardP
                     : 'Наведите курсор на доску'}
                 </span>
                 <span>треугольников на сцене: {meshTotals}</span>
+                <span style={{ color: showWalls && wallsInfo ? COLOR_OK : '#9ca3af' }}>
+                  {!showWalls
+                    ? 'стены выключены'
+                    : wallsInfo
+                      ? `стены: городов ${wallsInfo.cities} · башен ${wallsInfo.towers} · ворот ${wallsInfo.gates} · зубцов ${wallsInfo.merlons}`
+                      : 'стен нет: на доске нет замкнутого города'}
+                </span>
+                {searchNote && <span>{searchNote}</span>}
+                {wallsInfo?.warnings.map((warning) => (
+                  <span key={warning} style={{ color: COLOR_WARN }}>⚠ {warning}</span>
+                ))}
                 <span>ЛКМ — панорама · ПКМ — вращение · колесо — зум</span>
               </div>
             </>

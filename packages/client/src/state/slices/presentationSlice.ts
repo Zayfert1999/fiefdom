@@ -7,7 +7,9 @@
 //  • ghostMeeples  — миплы завершённых регионов, которые уже сняты с доски в состоянии,
 //                    но ещё рисуются (waiting — стоят на месте, active — исчезают с «+N»);
 //  • pendingScore  — очки, уже начисленные в состоянии, но ещё не «показанные» в счётчике;
-//  • completionAnimations (из gameSlice) — обводка активного региона и камера.
+//  • queuedRegionKeys — регионы, чья анимация стоит в очереди и ещё не началась
+//                    (городские стены такого города ещё не растут);
+//  • completionAnimations (из gameSlice) — обводка активного региона, камера, рост стен.
 //
 // Отображаемые очки = player.score − pendingScore[player.id], поэтому не важно,
 // в каком порядке придут событие и state-update: итог всегда сходится к серверному score.
@@ -31,6 +33,12 @@ export interface GhostMeeple extends RegionMeeple {
 export interface PresentationSlice {
   ghostMeeples: GhostMeeple[];
   pendingScore: Record<string, number>;
+  /**
+   * Корни регионов, чьи анимации поставлены в очередь, но ещё не начались.
+   * Регион завершён уже в состоянии (isComplete), а показ идёт по очереди: пока ключ здесь,
+   * его городские стены не показываются, а после активации растут «из земли».
+   */
+  queuedRegionKeys: string[];
 
   /** Поставить анимации регионов в очередь. Состояние (очки, миплы) к этому моменту уже применено. */
   enqueueScoreAnimations: (regions: CompletedRegion[]) => void;
@@ -80,7 +88,7 @@ export const createPresentationSlice: StateCreator<GameStore, [], [], Presentati
     queue.length = 0;
     running = false;
     cancelSleep?.();
-    set({ ghostMeeples: [], pendingScore: {}, completionAnimations: [] });
+    set({ ghostMeeples: [], pendingScore: {}, queuedRegionKeys: [], completionAnimations: [] });
     settleWaiters(completed);
   };
 
@@ -107,6 +115,7 @@ export const createPresentationSlice: StateCreator<GameStore, [], [], Presentati
       // Регион становится активным: обводка + миплы начинают исчезать
       set(state => ({
         completionAnimations: [...state.completionAnimations, { region, startTime: Date.now() }],
+        queuedRegionKeys: state.queuedRegionKeys.filter(k => k !== key),
         ghostMeeples: state.ghostMeeples.map(g => (g.regionKey === key ? { ...g, status: 'active' as const } : g)),
       }));
 
@@ -140,6 +149,7 @@ export const createPresentationSlice: StateCreator<GameStore, [], [], Presentati
   return {
     ghostMeeples: [],
     pendingScore: {},
+    queuedRegionKeys: [],
 
     enqueueScoreAnimations: (regions) => {
       if (regions.length === 0) return;
@@ -178,7 +188,11 @@ export const createPresentationSlice: StateCreator<GameStore, [], [], Presentati
         for (const [playerId, add] of Object.entries(pendingAdd)) {
           pendingScore[playerId] = (pendingScore[playerId] ?? 0) + add;
         }
-        return { pendingScore, ghostMeeples: [...state.ghostMeeples, ...ghosts] };
+        return {
+          pendingScore,
+          ghostMeeples: [...state.ghostMeeples, ...ghosts],
+          queuedRegionKeys: [...state.queuedRegionKeys, ...items.map(item => item.region.rootKey)],
+        };
       });
 
       queue.push(...items);

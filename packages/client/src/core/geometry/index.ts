@@ -96,6 +96,15 @@ export type {
     CityShapeParams, MonasteryShapeParams, RoadShapeParams, ShapeParams, ShapeParamsInput,
 } from './generators';
 
+// 🏰 Городские стены
+export {
+    DEFAULT_WALL_PARAMS, WALL_PARAM_LIMITS, resolveWallParams, mergeWallParams, wallParamsKey,
+    easeOutBack, wallGrowthAt,
+} from './wallParams';
+export type {
+    WallParams, WallParamsInput, WallBodyParams, TowerParams, GateParams, MerlonParams, WallColors,
+} from './wallParams';
+
 // Типы из shared
 export type {
     Point, Ring, Polygon, MultiPolygon,

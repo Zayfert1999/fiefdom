@@ -13,9 +13,12 @@
 //   • подсветка клетки под курсором (в том числе пустой — для будущей
 //     постановки тайлов)
 //
+// 🏰 Городские стены (walls): для каждого ЗАМКНУТОГО города строится один меш стен с башнями,
+//    воротами и зубцами (core/geometry/cityWalls.ts). Рост из земли управляется walls.growth.
+//
 // Мипплы, оверлеи регионов и превью тайла — следующие шаги.
 // ============================================
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { Line, MapControls } from '@react-three/drei';
 import type { MeshGroup, MeshSurface, TileBundle } from '@/core/geometry/tileMesh';
@@ -25,6 +28,10 @@ import {
   locateFieldFeature,
   type FieldRegionTile,
 } from '@/core/geometry/fieldRegions';
+import { CityWallCache, buildCityWallModels } from '@/core/geometry/cityWalls';
+import { getCityRefs, type CityRegionTile } from '@/core/geometry/cityRegions';
+import type { WallParams } from '@/core/geometry/wallParams';
+import { CityWallMeshObject } from './CityWallMeshObject';
 import { RegionMeshObject, TILE_SIZE, TileInstances, type RegionHit, type TilePlacement } from './TileMeshObjects';
 
 /** Тайл на доске: ссылка на бандл + позиция */
@@ -45,6 +52,15 @@ export interface Board3DHover {
   readonly regionId?: string;
 }
 
+/** Сводка по стенам для панели песочницы */
+export interface BoardWallsInfo {
+  readonly cities: number;
+  readonly towers: number;
+  readonly gates: number;
+  readonly merlons: number;
+  readonly warnings: readonly string[];
+}
+
 interface Board3DProps {
   placements: readonly BoardPlacement[];
   bundles: ReadonlyMap<string, TileBundle>;
@@ -56,6 +72,10 @@ interface Board3DProps {
   highlightHeight?: number;
   height?: number | string;
   onHover?: (hover: Board3DHover | null) => void;
+  /** Городские стены: параметры и степень роста (0 — под землёй, 1 — полная высота). Без параметров стен нет */
+  walls?: { readonly params: WallParams; readonly growth?: number };
+  /** Сводка по построенным стенам (null — стен нет) */
+  onWallsBuilt?: (info: BoardWallsInfo | null) => void;
 }
 
 // ============================================
@@ -99,10 +119,13 @@ export const Board3D = memo(({
   highlightHeight = 12,
   height = '68vh',
   onHover,
+  walls,
+  onWallsBuilt,
 }: Board3DProps) => {
   const [hoverCell, setHoverCell] = useState<{ col: number; row: number } | null>(null);
   const lastKey = useRef<string>('');
   const regionCache = useRef(new FieldRegionMeshCache());
+  const wallCache = useRef(new CityWallCache());
 
   // Центр доски: сдвигаем всю сцену, чтобы он оказался в мировом (0, 0, 0)
   const centerX = ((cols - 1) * TILE_SIZE) / 2;
@@ -144,6 +167,50 @@ export const Board3D = memo(({
     const first = bundles.get(placements[0].tileId);
     return buildFieldRegionMeshes(regionTiles, first?.meshParams, regionCache.current);
   }, [regionTiles, bundles, placements]);
+
+  // Стены замкнутых городов: меши кэшируются по составу города и параметрам стен
+  const wallParams = walls?.params;
+  const wallModels = useMemo(() => {
+    if (!wallParams || placements.length === 0) return [];
+    const tiles: CityRegionTile[] = [];
+    for (const placement of placements) {
+      const bundle = bundles.get(placement.tileId);
+      if (!bundle) continue;
+      const refs = getCityRefs(bundle);
+      if (refs.cities.length === 0) continue;
+      tiles.push({
+        key: placement.key,
+        col: placement.col,
+        row: placement.row,
+        rotation: placement.rotation,
+        tileId: placement.tileId,
+        cities: refs.cities,
+        roadEnds: refs.roadEnds,
+      });
+    }
+    return buildCityWallModels(tiles, wallParams, { cache: wallCache.current });
+  }, [placements, bundles, wallParams]);
+
+  // Поверхность города берём у первого бандла (параметры меша у всех одинаковые)
+  const wallBaseY = useMemo(() => {
+    const mesh = bundles.get(placements[0]?.tileId ?? '')?.meshParams;
+    return mesh ? mesh.baseHeight + mesh.heights.city : 0;
+  }, [bundles, placements]);
+
+  useEffect(() => {
+    if (!onWallsBuilt) return;
+    if (wallModels.length === 0) {
+      onWallsBuilt(null);
+      return;
+    }
+    onWallsBuilt({
+      cities: wallModels.length,
+      towers: wallModels.reduce((n, m) => n + m.stats.towers, 0),
+      gates: wallModels.reduce((n, m) => n + m.stats.gates, 0),
+      merlons: wallModels.reduce((n, m) => n + m.stats.merlons, 0),
+      warnings: wallModels.flatMap((m) => m.warnings),
+    });
+  }, [wallModels, onWallsBuilt]);
 
   /** Сообщаем наружу только об изменениях, а не о каждом движении мыши */
   const emit = useCallback(
@@ -256,6 +323,17 @@ export const Board3D = memo(({
               region={region}
               wireframe={wireframe}
               onHover={handleRegionHover}
+            />
+          ))}
+
+          {/* Стены замкнутых городов (мировые координаты доски, в рейкасте не участвуют) */}
+          {wallModels.map((model) => (
+            <CityWallMeshObject
+              key={model.signature}
+              model={model}
+              baseY={wallBaseY}
+              growth={walls?.growth ?? 1}
+              wireframe={wireframe}
             />
           ))}
 

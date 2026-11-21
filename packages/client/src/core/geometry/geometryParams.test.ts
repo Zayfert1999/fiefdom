@@ -22,6 +22,7 @@ import {
 } from './geometryParams';
 import { auditTile, type AuditTile } from './geometryAudit';
 import { clearTileBundleCache, getTileBundle, tileBundleCacheStats } from './geometryBundleCache';
+import { mergeWallParams } from './wallParams';
 
 const tiles = (baseData as unknown as { tiles: AuditTile[] }).tiles;
 const tileById = (id: string): AuditTile => tiles.find((t) => t.id === id)!;
@@ -47,6 +48,7 @@ const withChanges = (changes: Parameters<typeof resolveGeometryParams>[0] = {}):
             heights: { ...GEOMETRY_PARAMS.mesh.heights, ...changes.mesh?.heights },
             colors: { ...GEOMETRY_PARAMS.mesh.colors, ...changes.mesh?.colors },
         },
+        walls: mergeWallParams(GEOMETRY_PARAMS.walls, changes.walls ?? {}),
         noiseByType: changes.noiseByType ?? GEOMETRY_PARAMS.noiseByType,
         tiles: changes.tiles ?? GEOMETRY_PARAMS.tiles,
     });
@@ -114,6 +116,18 @@ describe('parseGeometryParams', () => {
         expect(params.mesh.colors.road).toBe(DEFAULT_GEOMETRY_PARAMS.mesh.colors.road);
     });
 
+    it('секция walls: значения вне диапазона обрезаются с замечанием, неверный цвет отбрасывается', () => {
+        const { params, warnings } = parseGeometryParams({
+            version: 1,
+            walls: { wall: { height: 9999 }, colors: { tower: 'синий' }, unknownKey: 1 },
+        });
+        expect(warnings.some((w) => w.includes('walls.wall.height'))).toBe(true);
+        expect(warnings.some((w) => w.includes('walls.colors.tower'))).toBe(true);
+        expect(warnings.some((w) => w.includes('walls.unknownKey'))).toBe(true);
+        expect(params.walls.wall.height).toBe(80);
+        expect(params.walls.colors.tower).toBe(DEFAULT_GEOMETRY_PARAMS.walls.colors.tower);
+    });
+
     it('секция spots: значения вне диапазона обрезаются, лишние ключи игнорируются', () => {
         const { params, warnings } = parseGeometryParams({
             version: 1,
@@ -169,6 +183,20 @@ describe('hashGeometryParams', () => {
         expect(hashGeometryParams(withChanges({ plaza: { depth: 31 } }))).not.toBe(base);
         expect(hashGeometryParams(withChanges({ mesh: { baseHeight: 5 } }))).not.toBe(base);
         expect(hashGeometryParams(withChanges({ spots: { meepleRadius: 9 } }))).not.toBe(base);
+    });
+
+    it('стены меняют общий хэш, но не хэш тайла и не хэш геометрии без стен', () => {
+        const base = withChanges();
+        const taller = withChanges({ walls: { wall: { height: 30 } } });
+        expect(hashGeometryParams(taller)).not.toBe(hashGeometryParams(base));
+        expect(hashGeometryParams(taller, 'tile_CCFC')).toBe(hashGeometryParams(base, 'tile_CCFC'));
+        expect(hashGeometryParams(taller, undefined, { includeWalls: false })).toBe(
+            hashGeometryParams(base, undefined, { includeWalls: false })
+        );
+        // правка чего-то другого по-прежнему меняет хэш и без стен
+        expect(hashGeometryParams(withChanges({ plaza: { depth: 31 } }), undefined, { includeWalls: false })).not.toBe(
+            hashGeometryParams(base, undefined, { includeWalls: false })
+        );
     });
 
     it('хэш тайла не зависит от настроек других тайлов', () => {
@@ -302,6 +330,14 @@ describe('кэш бандлов', () => {
         const first = getTileBundle(tile, GEOMETRY_PARAMS);
         const afterOtherEdit = getTileBundle(tile, withChanges({ tiles: { tile_CFCF: { seed: 'other' } } }));
         expect(afterOtherEdit).toBe(first);
+    });
+
+    it('правка параметров стен не сбрасывает кэш бандлов тайлов', () => {
+        clearTileBundleCache();
+        const tile = tileById('tile_CCFC');
+        const first = getTileBundle(tile, GEOMETRY_PARAMS);
+        const afterWalls = getTileBundle(tile, withChanges({ walls: { wall: { height: 30 }, tower: { radius: 9 } } }));
+        expect(afterWalls).toBe(first);
     });
 
     it('правка параметров меша даёт новый бандл', () => {

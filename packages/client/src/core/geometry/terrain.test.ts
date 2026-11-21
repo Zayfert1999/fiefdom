@@ -573,7 +573,7 @@ describe('рельеф через швы между тайлами', () => {
 describe('бандл тайла', () => {
     const geometry = {
         tessellation: { areas: new Map([['city1', [[[[-30, -50], [30, -50], [30, -10], [-30, -10]]]]]]), lines: new Map() },
-        decorations: { plazas: [], plazaGeometries: [] },
+        decorations: { plazas: [], plazaGeometries: [], plazaCuts: new Map() },
         clipping: { clippedLines: new Map() },
         fields: { fieldPolygons: [NOTCH] }, // та же ссылка, что в fieldGeometries: по ней определяется владелец
         assignments: { fieldGeometries: new Map([['field1', [NOTCH]]]) },

@@ -78,7 +78,9 @@ export const SHAPE_PARAM_LIMITS: Readonly<{
 }> = {
     city: { capDepth: [5, 45], roadArcDepth: [5, 45], diagBulge: [0, 45] },
     monastery: { halfExtent: [5, 40], cornerRadius: [0, 20] },
-    road: { width: [2, 40], cornerRadius: [5, 45], cornerTension: [0.45, 0.65], endOverlap: [0, 30] },
+    // Ширина ограничена шумом оси: при lineAmplitude ~30 полоса шире ~28 на части сидов складывается сама
+    // в себя (внутренний край самопересекается), до 24 — не наблюдалось ни разу.
+    road: { width: [2, 24], cornerRadius: [5, 45], cornerTension: [0.45, 0.65], endOverlap: [0, 30] },
 };
 
 /**

@@ -17,7 +17,8 @@ import {
     type TessellationParams,
 } from './tessellate';
 import { subtractPolygons } from './booleanOps';
-import { generatePlazas, type PlazaParams } from './generators/plaza';
+import { ringsOverlap, ringBounds, boundsOverlap } from './ringOverlap';
+import { generateJunctions, type PlazaParams } from './generators/plaza';
 import { computeFieldPolygons, assignFieldFeaturesDetailed } from './generators/field';
 import { applyGeometryNoise, type NoiseOptions } from './geometryPostProcessor';
 // 🌟 Типы из нового файла
@@ -28,7 +29,11 @@ import type {
     FieldComputationResult,
     AssignmentResult,
     TileGeometryResult,
+    PlazaRoadCut,
 } from './types';
+
+/** Порог дробления прямых, который ничего не дробит (юниты) */
+const NO_SUBDIVIDE = 1e9;
 
 // Реэкспортируем типы для совместимости
 export type {
@@ -55,9 +60,19 @@ export interface ProcessOptions {
 // ============================================
 // 🛠️ ХЕЛПЕРЫ
 // ============================================
-function buildRoadPolygon(tessellated: TessellatedLine): Ring {
-    const reversedRight = [...tessellated.right].reverse();
-    return [...tessellated.left, ...reversedRight];
+function buildRoadPolygon(tessellated: TessellatedLine, cuts: readonly PlazaRoadCut[] = []): Ring | null {
+    // Дорога обрывается там, где её срезает площадь: полигон начинается на ребре среза
+    let from = 0;
+    let to = tessellated.center.length - 1;
+    for (const cut of cuts) {
+        if (cut.atStart) from = Math.max(from, cut.index);
+        else to = Math.min(to, cut.index);
+    }
+    if (to - from < 1) return null; // дорога целиком под площадью
+
+    const left = tessellated.left.slice(from, to + 1);
+    const reversedRight = tessellated.right.slice(from, to + 1).reverse();
+    return [...left, ...reversedRight];
 }
 
 // ============================================
@@ -147,10 +162,30 @@ function generateDecorations(
     params?: Partial<TessellationParams>,
     plazaParams?: Partial<PlazaParams>
 ): DecorationResult {
-    const plazaGeometries = generatePlazas(tessellation.lines, plazaParams);
-    const plazas = plazaGeometries.map(geo => tessellateArea(geo, params));
+    const junctions = generateJunctions(tessellation.lines, plazaParams);
+    const plazaGeometries = junctions.map(junction => junction.geometry);
+
+    // Прямые рёбра контура площади не дробим: часть из них общая с дорогами (срезы),
+    // а добавленные посередине вершины лежали бы вне линии края после округления
+    // координат в булевых операциях и давали осколки.
+    const ringParams: Partial<TessellationParams> = {
+        ...params,
+        lineSubdivideThreshold: NO_SUBDIVIDE,
+        minRingPoints: 3,
+    };
+    const plazas = plazaGeometries.map(geo => tessellateArea(geo, ringParams));
+
+    const plazaCuts = new Map<string, PlazaRoadCut[]>();
+    junctions.forEach((junction, plazaIndex) => {
+        for (const cut of junction.cuts) {
+            const list = plazaCuts.get(cut.roadId) ?? [];
+            list.push({ plazaIndex, atStart: cut.atStart, index: cut.index });
+            plazaCuts.set(cut.roadId, list);
+        }
+    });
+
     console.log(`🏛️ [Decorations] Сгенерировано ${plazas.length} площадей`);
-    return { plazaGeometries, plazas };
+    return { plazaGeometries, plazas, plazaCuts };
 }
 
 // ============================================
@@ -161,31 +196,44 @@ function clipLines(
     decorations: DecorationResult
 ): ClippingResult {
     const clippedLines = new Map<string, MultiPolygon>();
-    const obstacles: Polygon[] = [];
+    const areaObstacles: Polygon[] = [];
 
     for (const mp of tessellation.areas.values()) {
-        for (const polygon of mp) obstacles.push(polygon);
-    }
-    for (const plaza of decorations.plazas) {
-        obstacles.push([plaza]);
+        for (const polygon of mp) areaObstacles.push(polygon);
     }
 
-    console.log(`✂️ [Clip] Препятствий: ${obstacles.length}`);
-
-    if (obstacles.length === 0) {
-        for (const [id, tess] of tessellation.lines) {
-            clippedLines.set(id, [[buildRoadPolygon(tess)]]);
-        }
-        return { clippedLines };
-    }
+    console.log(`✂️ [Clip] Препятствий: ${areaObstacles.length + decorations.plazas.length}`);
 
     for (const [id, tess] of tessellation.lines) {
-        const ring = buildRoadPolygon(tess);
+        const cuts = decorations.plazaCuts.get(id) ?? [];
+        // Площади, которые уже срезали эту дорогу, булевой операцией не вычитаем
+        const ring = buildRoadPolygon(tess, cuts);
+        if (!ring) {
+            console.warn(`⚠️ [Clip] Дорога "${id}" полностью вырезана`);
+            continue;
+        }
+
         let clipped: MultiPolygon = [[ring]];
 
-        for (const obstacle of obstacles) {
+        // Вычитание у Clipper округляет координаты, поэтому его вызываем, только когда
+        // препятствие может задеть дорогу: иначе дорога вернулась бы чуть сдвинутой
+        const bounds = ringBounds(ring);
+        const mayTouch = (obstacle: Ring): boolean => boundsOverlap(bounds, ringBounds(obstacle));
+
+        for (const obstacle of areaObstacles) {
+            if (!mayTouch(obstacle[0])) continue;
             clipped = subtractPolygons(clipped, [obstacle]);
             if (clipped.length === 0) break;
+        }
+
+        const owners = new Set(cuts.map(cut => cut.plazaIndex));
+        for (let i = 0; i < decorations.plazas.length && clipped.length > 0; i++) {
+            const plaza = decorations.plazas[i];
+            if (!mayTouch(plaza)) continue;
+            // Своя площадь стыкуется с дорогой по ребру среза: вычитать нечего.
+            // Если же изогнутая дорога заходит на свою площадь, режем булевой операцией.
+            if (owners.has(i) && !ringsOverlap(ring, plaza)) continue;
+            clipped = subtractPolygons(clipped, [[plaza]]);
         }
 
         if (clipped.length > 0) {

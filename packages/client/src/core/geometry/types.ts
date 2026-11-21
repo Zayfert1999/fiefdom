@@ -14,10 +14,20 @@ export interface TessellationResult {
     readonly lines: ReadonlyMap<string, TessellatedLine>;
 }
 
+/** Срез дороги площадью: дорога дальше идёт от вершины `index` (см. PlazaCut) */
+export interface PlazaRoadCut {
+    /** Индекс площади в `plazas` */
+    readonly plazaIndex: number;
+    readonly atStart: boolean;
+    readonly index: number;
+}
+
 /** Результат генерации декораций (площади) */
 export interface DecorationResult {
     readonly plazaGeometries: readonly import('@fiefdom/shared/core/geometry.types').AreaGeometry[];
     readonly plazas: readonly Ring[];
+    /** id дороги → срезы площадями (дороги без перекрёстков здесь нет) */
+    readonly plazaCuts: ReadonlyMap<string, readonly PlazaRoadCut[]>;
 }
 
 /** Результат обрезки дорог */

@@ -73,8 +73,9 @@ describe('ограничения значений', () => {
 
     it('радиус поворота дороги подтягивается под ширину', () => {
         expect(roadCornerRadiusFloor(20)).toBe(25);
-        expect(resolveShapeParams({ road: { width: 40, cornerRadius: 10 } }).road.cornerRadius).toBe(
-            roadCornerRadiusFloor(40)
+        const widest = SHAPE_PARAM_LIMITS.road.width[1];
+        expect(resolveShapeParams({ road: { width: widest, cornerRadius: 10 } }).road.cornerRadius).toBe(
+            roadCornerRadiusFloor(widest)
         );
         // а у тонкой дороги порог ниже
         expect(resolveShapeParams({ road: { width: 4, cornerRadius: 10 } }).road.cornerRadius).toBe(17);
@@ -85,7 +86,7 @@ describe('ограничения значений', () => {
             version: 1,
             shapes: { road: { width: 99, cornerStub: 5 }, monastery: { halfExtent: 'большой' } },
         });
-        expect(params.shapes.road.width).toBe(40);
+        expect(params.shapes.road.width).toBe(SHAPE_PARAM_LIMITS.road.width[1]);
         expect(warnings.some((w) => w.includes('shapes.road.width'))).toBe(true);
         expect(warnings.some((w) => w.includes('shapes.road.cornerStub'))).toBe(true);
         expect(warnings.some((w) => w.includes('shapes.monastery.halfExtent'))).toBe(true);

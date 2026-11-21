@@ -101,13 +101,14 @@ describe('запасной вариант, если генератор не сп
             id: 'tile_odd',
             features: [unsupported],
         };
-        const audit = auditTile(tile, OPTIONS);
+        // Без шума: амплитуда шума в geometryParams.json может быть любой, а проверяется форма
+        const audit = auditTile(tile, { ...OPTIONS, noiseEnabled: false });
         const ring = audit.geometry.tessellation.areas.get('city_odd');
         expect(ring).toBeDefined();
-        // Нарисованный квадрат ±30 (с поправкой на шум), а не форма генератора
+        // Нарисованный квадрат ±30, а не форма генератора
         const xs = ring![0][0].map((p) => p[0]);
-        expect(Math.max(...xs)).toBeGreaterThan(27);
-        expect(Math.max(...xs)).toBeLessThan(33);
+        expect(Math.max(...xs)).toBeCloseTo(30, 3);
+        expect(Math.min(...xs)).toBeCloseTo(-30, 3);
         expect(audit.issues.some((i) => i.code === 'generation')).toBe(true);
     });
 });

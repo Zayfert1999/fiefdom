@@ -18,6 +18,13 @@
 //       скругляется по касательным в торцах дорог;
 //     • поперёк дороги на глубине `depth` идёт «срез» — он лежит
 //       внутри дорожной полосы и после обрезки дорог не виден.
+//       Глубина растёт вместе с шириной дорог (см. requiredEdgeLengths);
+//     • площадь отдаёт и «срезы» дорог (PlazaCut): дальше среза дорога идёт
+//       отдельным полигоном, начинающимся ровно на ребре среза. Вычитать
+//       площадь из дорог булевой операцией не нужно — там и рождались осколки;
+//     • «сквозной» край (противоположные дороги) определяется по общей
+//       точке торцов, а не только по углу между осями: шум изгибает дороги;
+//     • готовый контур проверяется на самопересечения (buildValidPlaza).
 //
 // АРХИТЕКТУРА:
 //   Принимает УЖЕ ТЕССЕЛИРОВАННЫЕ (и зашумлённые) дороги из пайплайна.
@@ -31,7 +38,10 @@ import type { TessellatedLine } from '../tessellate';
 // ⚙️ ПАРАМЕТРЫ
 // ============================================
 export interface PlazaParams {
-    /** Глубина площади вдоль дороги: расстояние по оси от центра перекрёстка до среза (юниты) */
+    /**
+     * Минимальная глубина площади вдоль дороги: расстояние по оси от центра перекрёстка до среза (юниты).
+     * У широких дорог срез уходит глубже сам: он обязан лежать за внутренним углом и его скруглением.
+     */
     depth: number;
     /** Радиус скругления внутренних углов: сколько юнитов вдоль каждого края съедает скругление */
     cornerRadius: number;
@@ -65,6 +75,20 @@ export function resolvePlazaParams(partial?: Partial<PlazaParams>): PlazaParams 
 
 /** dot(dirA, dirB) ниже порога = дороги почти противоположны (~180°) */
 const OPPOSITE_DOT = -0.97;
+
+/**
+ * Торцы противоположных дорог делят одну точку: плюс-край одной и минус-край другой
+ * начинаются в одном месте. Это надёжнее угла между осями: шум изгибает дороги,
+ * и угол легко выходит за порог, хотя край по-прежнему сквозной.
+ */
+const SHARED_END_RATIO = 0.15;
+
+function areOpposite(A: Arm, B: Arm): boolean {
+    if (A.dir[0] * B.dir[0] + A.dir[1] * B.dir[1] < OPPOSITE_DOT) return true;
+    const width = dist(A.plus[0], A.minus[0]);
+    return width > EPS && dist(A.plus[0], B.minus[0]) < width * SHARED_END_RATIO;
+}
+
 /** Скругление короче этого не строим (юниты) */
 const MIN_FILLET = 0.25;
 /** Максимальный вылет касательных при поиске внешнего угла (юниты) */
@@ -135,7 +159,7 @@ interface Arm {
  * `left` = ось + нормаль (поворот касательной на +90°), поэтому у начала
  * оси левая сторона — «плюс», а у конца порядок и стороны меняются местами.
  */
-function buildArm(line: TessellatedLine, atStart: boolean, depth: number): Arm | null {
+function buildArm(line: TessellatedLine, atStart: boolean, depth: number, minEdgeS = 0): Arm | null {
     const n = line.center.length;
     if (n < 2) return null;
 
@@ -144,9 +168,13 @@ function buildArm(line: TessellatedLine, atStart: boolean, depth: number): Arm |
     const minus = atStart ? line.right : [...line.left].reverse();
 
     const centerS = cumulative(center);
+    const plusS = cumulative(plus);
+    const minusS = cumulative(minus);
+    // Срез ставим там, где и ось, и оба края прошли нужную глубину:
+    // на изгибе внешний край длиннее оси, внутренний короче
     let cap = n - 1;
     for (let i = 1; i < n; i++) {
-        if (centerS[i] >= depth) {
+        if (centerS[i] >= depth && plusS[i] >= minEdgeS && minusS[i] >= minEdgeS) {
             cap = i;
             break;
         }
@@ -158,7 +186,7 @@ function buildArm(line: TessellatedLine, atStart: boolean, depth: number): Arm |
     const dir = unit(center[0], center[k]);
     if (dir[0] === 0 && dir[1] === 0) return null;
 
-    return { dir, plus, minus, plusS: cumulative(plus), minusS: cumulative(minus), cap };
+    return { dir, plus, minus, plusS, minusS, cap };
 }
 
 // ============================================
@@ -255,7 +283,7 @@ function buildConnector(A: Arm, B: Arm, p: PlazaParams): OutlineSegment[] {
     };
 
     // --- Противоположные дороги: идём по общему краю ---
-    if (A.dir[0] * B.dir[0] + A.dir[1] * B.dir[1] < OPPOSITE_DOT) {
+    if (areOpposite(A, B)) {
         descendA(-1);
         const a0 = A.plus[0];
         const b0 = B.minus[0];
@@ -339,6 +367,125 @@ function generatePlazaGeometry(arms: readonly Arm[], p: PlazaParams): AreaGeomet
 }
 
 // ============================================
+// 📏 ГЛУБИНА СРЕЗА ПО ШИРИНЕ ДОРОГИ
+// ============================================
+/** Запас за скруглением, чтобы срез не попадал в саму точку касания (юниты) */
+const CAP_SLACK = 1;
+
+/**
+ * Для каждой дороги: на какую длину по краю надо уйти от перекрёстка, чтобы
+ * срез оказался ЗА внутренним углом и его скруглением. Зависит от ширины дорог
+ * и от изгиба, поэтому фиксированный `depth` для широких дорог не годится:
+ * пересечение краёв остаётся за срезом, и контур собирается неверно.
+ */
+function requiredEdgeLengths(probes: readonly (Arm | null)[], p: PlazaParams): number[] {
+    const need = probes.map(() => 0);
+    const order = probes
+        .map((arm, i) => ({ arm, i }))
+        .filter((e): e is { arm: Arm; i: number } => e.arm !== null)
+        .sort((a, b) => Math.atan2(a.arm.dir[1], a.arm.dir[0]) - Math.atan2(b.arm.dir[1], b.arm.dir[0]));
+
+    for (let k = 0; k < order.length; k++) {
+        const A = order[k];
+        const B = order[(k + 1) % order.length];
+        if (A === B || areOpposite(A.arm, B.arm)) continue;
+        const crossing = findCrossing(A.arm, B.arm);
+        if (!crossing) continue;
+        need[A.i] = Math.max(need[A.i], crossing.sA + p.cornerRadius + CAP_SLACK);
+        need[B.i] = Math.max(need[B.i], crossing.sB + p.cornerRadius + CAP_SLACK);
+    }
+    return need;
+}
+
+// ============================================
+// ✂️ СРЕЗЫ ДОРОГ
+// ============================================
+/**
+ * Где площадь обрывает дорогу. Дорога дальше идёт полигоном, который начинается
+ * на ребре среза (левая и правая вершины с индексом `index`) — то же ребро
+ * есть в контуре площади, поэтому полигоны стыкуются вершина в вершину.
+ */
+export interface PlazaCut {
+    readonly roadId: string;
+    /** Площадь у начала оси дороги (true) или у её конца (false) */
+    readonly atStart: boolean;
+    /**
+     * Индекс вершины дороги, на которой проходит срез. Площадь забирает всё от
+     * перекрёстка до неё: при `atStart` — вершины [0..index], иначе [index..конец].
+     */
+    readonly index: number;
+}
+
+/** Площадь вместе со срезами дорог, которые в неё входят */
+export interface Junction {
+    readonly geometry: AreaGeometry;
+    readonly cuts: readonly PlazaCut[];
+}
+
+// ============================================
+// 🛡️ ПРОВЕРКА КОНТУРА
+// ============================================
+/** Контур площади в точках (кривые берём грубо — для проверки хватает) */
+function sampleOutline(geometry: AreaGeometry): Point[] {
+    const points: Point[] = [geometry.start];
+    let current = geometry.start;
+    for (const seg of geometry.outline) {
+        if (seg.type === 'line') {
+            points.push(seg.to);
+            current = seg.to;
+        } else if (seg.type === 'quadratic') {
+            for (let i = 1; i <= 8; i++) {
+                const t = i / 8;
+                const mt = 1 - t;
+                points.push([
+                    mt * mt * current[0] + 2 * mt * t * seg.cp[0] + t * t * seg.to[0],
+                    mt * mt * current[1] + 2 * mt * t * seg.cp[1] + t * t * seg.to[1],
+                ]);
+            }
+            current = seg.to;
+        } else if ('to' in seg) {
+            points.push(seg.to as Point);
+            current = seg.to as Point;
+        }
+    }
+    return points;
+}
+
+const orient2 = (a: Point, b: Point, c: Point): number => {
+    const v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    return Math.abs(v) < 1e-9 ? 0 : v;
+};
+
+function ringSelfIntersects(ring: readonly Point[]): boolean {
+    const n = ring.length;
+    for (let i = 0; i < n; i++) {
+        const a = ring[i];
+        const b = ring[(i + 1) % n];
+        for (let j = i + 2; j < n; j++) {
+            if (i === 0 && j === n - 1) continue;
+            const c = ring[j];
+            const d = ring[(j + 1) % n];
+            if (orient2(a, b, c) * orient2(a, b, d) < 0 && orient2(c, d, a) * orient2(c, d, b) < 0) return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Строит контур и проверяет его. Если со скруглением он самопересекается,
+ * пробуем без скруглений (острые углы по пересечению краёв).
+ * Если и так не вышло — лучше не строить площадь, чем отдать битый контур.
+ */
+function buildValidPlaza(arms: readonly Arm[], p: PlazaParams): AreaGeometry | null {
+    const attempts: PlazaParams[] = [p, { ...p, cornerRadius: 0 }];
+    for (const attempt of attempts) {
+        const geometry = generatePlazaGeometry(arms, attempt);
+        if (!ringSelfIntersects(sampleOutline(geometry))) return geometry;
+    }
+    return null;
+}
+
+// ============================================
 // 📍 КЛАСТЕРИЗАЦИЯ
 // ============================================
 interface RoadEnd {
@@ -380,9 +527,21 @@ export function generatePlazas(
     tessellatedLines: ReadonlyMap<string, TessellatedLine>,
     params?: Partial<PlazaParams>
 ): AreaGeometry[] {
+    return generateJunctions(tessellatedLines, params).map((junction) => junction.geometry);
+}
+
+/**
+ * То же, что `generatePlazas`, но вместе со срезами дорог (см. PlazaCut):
+ * по ним дороги обрезаются без булевых операций.
+ */
+export function generateJunctions(
+    tessellatedLines: ReadonlyMap<string, TessellatedLine>,
+    params?: Partial<PlazaParams>
+): Junction[] {
     if (tessellatedLines.size < 2) return [];
 
     const p = resolvePlazaParams(params);
+    const roadIds = [...tessellatedLines.keys()];
     const roads = [...tessellatedLines.values()];
 
     const ends: RoadEnd[] = [];
@@ -392,20 +551,36 @@ export function generatePlazas(
         ends.push({ road, atStart: false, point: line.center[line.center.length - 1] });
     });
 
-    const plazas: AreaGeometry[] = [];
+    const junctions: Junction[] = [];
 
     for (const cluster of clusterEnds(ends, p.clusterTolerance)) {
         if (cluster.length < 2) continue;
 
         // Дорога, оба конца которой в кластере (петля), перекрёстка не образует
         const roadsInCluster = cluster.map((i) => ends[i].road);
+        const entries = cluster
+            .map((index) => ends[index])
+            .filter((end) => roadsInCluster.filter((r) => r === end.road).length === 1);
+
+        // Пробные лучи на всю длину: нужны, чтобы узнать, где реально сходятся края
+        const probes = entries.map((end) => buildArm(roads[end.road], end.atStart, Infinity));
+        const needS = requiredEdgeLengths(probes, p);
+
         const arms: Arm[] = [];
-        for (const index of cluster) {
-            const end = ends[index];
-            if (roadsInCluster.filter((r) => r === end.road).length > 1) continue;
-            const arm = buildArm(roads[end.road], end.atStart, p.depth);
-            if (arm) arms.push(arm);
-        }
+        const cuts: PlazaCut[] = [];
+        entries.forEach((end, i) => {
+            if (!probes[i]) return;
+            const arm = buildArm(roads[end.road], end.atStart, p.depth, needS[i]);
+            if (!arm) return;
+            arms.push(arm);
+            // Рёбра луча идут от перекрёстка наружу; у конца оси порядок вершин дороги обратный
+            const last = roads[end.road].center.length - 1;
+            cuts.push({
+                roadId: roadIds[end.road],
+                atStart: end.atStart,
+                index: end.atStart ? arm.cap : last - arm.cap,
+            });
+        });
         if (arms.length < 2) continue;
 
         // Все дороги вдоль одной прямой — это просто длинная дорога, не перекрёсток
@@ -414,7 +589,12 @@ export function generatePlazas(
         );
         if (axes.size < 2) continue;
 
-        plazas.push(generatePlazaGeometry(arms, p));
+        const plaza = buildValidPlaza(arms, p);
+        if (!plaza) {
+            console.warn('🏛️ [PlazaGenerator] Контур площади самопересекается даже без скругления — площадь пропущена');
+            continue;
+        }
+        junctions.push({ geometry: plaza, cuts });
 
         console.log(
             `🏛️ [PlazaGenerator] Площадь: ${arms.length} дорог, ` +
@@ -422,5 +602,5 @@ export function generatePlazas(
         );
     }
 
-    return plazas;
+    return junctions;
 }

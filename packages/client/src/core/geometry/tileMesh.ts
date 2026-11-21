@@ -142,6 +142,8 @@ export interface TileMeshStats {
     readonly wallQuads: number;
     /** Макс. относительное расхождение площади триангуляции и площади полигона */
     readonly maxTopDeviation: number;
+    /** Какой полигон дал это расхождение: `поверхность:фича` (для отчётов тестов) */
+    readonly worstTopPolygon?: string;
     /** Стены, пропущенные на границе тайла */
     readonly skippedBoundaryEdges: number;
     /** Треугольников верха полей после измельчения под рельеф (0 — рельеф выключен) */
@@ -260,6 +262,9 @@ class MeshBuilder {
     topTriangles = 0;
     wallQuads = 0;
     maxDeviation = 0;
+    worstPolygon = '';
+    /** Полигон, который сейчас строится (для диагностики расхождения площади) */
+    private currentLabel = '';
     skippedBoundary = 0;
     terrainTriangles = 0;
     terrainFallbacks = 0;
@@ -274,10 +279,18 @@ class MeshBuilder {
         return index;
     }
 
+    private trackDeviation(deviation: number): void {
+        if (deviation > this.maxDeviation) {
+            this.maxDeviation = deviation;
+            this.worstPolygon = this.currentLabel;
+        }
+    }
+
     /** Один полигон: крышка + стены. Записывается как одна группа. */
     addPolygon(featureId: string, surface: MeshSurface, polygon: Polygon, top: number, bottom: number): void {
         const rings = polygon.map(cleanRing).filter((r) => r.length >= 3);
         if (rings.length === 0 || signedArea(rings[0]) === 0) return;
+        this.currentLabel = `${surface}:${featureId}`;
 
         const color = hexToLinear(this.params.colors[surface]);
         const start = this.idx.length;
@@ -341,7 +354,7 @@ class MeshBuilder {
             0
         );
         if (polygonArea > 1e-9) {
-            this.maxDeviation = Math.max(this.maxDeviation, Math.abs(trianglesArea - polygonArea) / polygonArea);
+            this.trackDeviation(Math.abs(trianglesArea - polygonArea) / polygonArea);
         }
 
         return { flat, offsets, triangles };
@@ -368,6 +381,7 @@ class MeshBuilder {
     addFieldPolygon(featureId: string, polygon: Polygon, top: number, bottom: number, terrain: TerrainContext): void {
         const rings = polygon.map(cleanRing).filter((r) => r.length >= 3);
         if (rings.length === 0 || signedArea(rings[0]) === 0 || !(top > bottom)) return;
+        this.currentLabel = `field:${featureId}`;
 
         const tp = terrain.params;
         const baseColor = hexToLinear(this.params.colors.field);
@@ -381,7 +395,7 @@ class MeshBuilder {
         const grid = triangulateFieldUniform(rings, tp.gridStep, budget);
         if (grid) {
             surface = grid;
-            this.maxDeviation = Math.max(this.maxDeviation, grid.areaDeviation);
+            this.trackDeviation(grid.areaDeviation);
         } else {
             this.terrainFallbacks++;
             const tri = this.triangulate(rings);
@@ -579,6 +593,7 @@ class MeshBuilder {
                 topTriangles: this.topTriangles,
                 wallQuads: this.wallQuads,
                 maxTopDeviation: this.maxDeviation,
+                worstTopPolygon: this.worstPolygon,
                 skippedBoundaryEdges: this.skippedBoundary,
                 terrainTriangles: this.terrainTriangles,
                 terrainFallbacks: this.terrainFallbacks,

@@ -46,7 +46,8 @@ export type {
     ShapeParams,
     ShapeParamsInput,
 } from './shapeParams';
-export { generatePlazas, DEFAULT_PLAZA_PARAMS, resolvePlazaParams } from './plaza';
+export { generatePlazas, generateJunctions, DEFAULT_PLAZA_PARAMS, resolvePlazaParams } from './plaza';
+export type { PlazaCut, Junction } from './plaza';
 export type { PlazaParams } from './plaza';
 export { computeFieldPolygons, assignFieldFeatures } from './field';
 

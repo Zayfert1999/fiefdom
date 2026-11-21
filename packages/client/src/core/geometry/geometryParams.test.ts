@@ -269,8 +269,10 @@ describe('параметры доходят до геометрии', () => {
     });
 
     it('ширина дороги из shapes.road.width доходит до геометрии', () => {
-        const narrow = withChanges({ shapes: { road: { width: 12 } } });
-        expect(signature('tile_CRRC', narrow)).not.toBe(signature('tile_CRRC', GEOMETRY_PARAMS));
+        // Берём значение, отличное от текущего в geometryParams.json: иначе подписи совпадут сами собой
+        const current = GEOMETRY_PARAMS.shapes.road.width;
+        const other = withChanges({ shapes: { road: { width: current > 14 ? current - 4 : current + 4 } } });
+        expect(signature('tile_CRRC', other)).not.toBe(signature('tile_CRRC', GEOMETRY_PARAMS));
     });
 });
 

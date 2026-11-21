@@ -95,7 +95,9 @@ function findInverted(mesh: TileMeshData): InvertedTriangle[] {
 
 describe('меш тайла', () => {
     it.each(ids)('%s: площадь триангуляции совпадает с площадью полигонов', (id) => {
-        expect(meshOf(id).stats.maxTopDeviation).toBeLessThan(1e-6);
+        const { stats } = meshOf(id);
+        // Если упало, сообщение называет полигон с худшим расхождением (поверхность:фича)
+        expect(stats.maxTopDeviation, `худший полигон: ${stats.worstTopPolygon ?? '?'}`).toBeLessThan(1e-6);
     });
 
     it.each(ids)('%s: нет вывернутых треугольников', (id) => {
@@ -116,7 +118,9 @@ describe('меш тайла', () => {
         }
         expect(Math.min(minX, minZ)).toBeGreaterThan(-50 - 1e-6);
         expect(Math.max(maxX, maxZ)).toBeLessThan(50 + 1e-6);
-        expect(minY).toBeGreaterThan(MESH.baseHeight - 1e-6);
+        // Подложка (стены по периметру) идёт от самого низа, y = 0; без неё нижняя точка — верх подложки
+        const lowest = MESH.boundaryWalls && MESH.baseHeight > 0 ? 0 : MESH.baseHeight;
+        expect(minY).toBeGreaterThan(lowest - 1e-6);
         expect(maxY).toBeLessThan(MAX_Y + 1e-6);
     });
 

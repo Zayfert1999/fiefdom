@@ -3,7 +3,7 @@
 // 💾 ПАНЕЛЬ ФАЙЛА ПАРАМЕТРОВ
 // ============================================
 // Показывает, совпадают ли параметры песочницы с geometryParams.json,
-// и умеет:
+// и умеет (рамку и заголовок рисует ParamGroup в GeometrySandbox):
 //   • сохранить в файл на диске (dev-сервер Vite, эндпоинт /__geometry-params)
 //   • скачать / скопировать JSON (если запись на диск недоступна)
 //   • загрузить JSON из файла (с проверкой и списком замечаний)
@@ -140,17 +140,9 @@ export const SandboxParamsBar = memo(({
   };
 
   return (
-    <div
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', marginBottom: 12,
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
-        <span style={{ color: '#fff', fontWeight: 700 }}>💾 Файл параметров</span>
-        <span style={{ color: dirty ? '#fcd34d' : '#86efac' }}>
-          {dirty ? '● есть несохранённые изменения' : '✓ совпадает с файлом'}
-        </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11.5, color: dirty ? '#fcd34d' : '#86efac' }}>
+        {dirty ? '● есть несохранённые изменения' : '✓ совпадает с файлом'}
       </div>
 
       <div style={{ fontSize: 10.5, color: '#9ca3af', wordBreak: 'break-all' }}>{GEOMETRY_PARAMS_FILE}</div>

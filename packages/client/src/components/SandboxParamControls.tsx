@@ -6,11 +6,13 @@
 // • NoiseControls        — амплитуды, частоты, октавы, края тайла,
 //                          сглаживание, вариация ширины дороги
 // • WallControls         — городские стены: стена, башни, ворота, зубцы, цвета
+// • ParamSection (реэкспорт из ParamGroup.tsx) — сворачиваемая подсекция
 //
 // Компоненты «глупые»: состояние живёт в GeometrySandbox,
 // сюда приходят значения и колбэк `onChange(patch)`.
 // ============================================
-import { memo, type ChangeEvent, type ReactNode } from 'react';
+import { memo, type ChangeEvent } from 'react';
+import { ParamSection } from './ParamGroup';
 import type {
   EdgeFadeCurve,
   NoiseByType,
@@ -49,26 +51,8 @@ const numberInputStyle = {
 // 🧱 БАЗОВЫЕ КОНТРОЛЫ
 // ============================================
 
-interface ParamSectionProps {
-  title: string;
-  children: ReactNode;
-  defaultOpen?: boolean;
-}
-
-/** Сворачиваемая группа параметров */
-export const ParamSection = ({ title, children, defaultOpen = true }: ParamSectionProps) => (
-  <details
-    open={defaultOpen}
-    style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6 }}
-  >
-    <summary style={{ cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-      {title}
-    </summary>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 6 }}>
-      {children}
-    </div>
-  </details>
-);
+// ParamSection живёт в ParamGroup.tsx; реэкспорт сохраняет прежние импорты
+export { ParamSection };
 
 interface ParamSliderProps {
   label: string;
@@ -670,7 +654,7 @@ export const TileOverrideControls = memo(({
   onPin,
   onClear,
 }: TileOverrideControlsProps) => (
-  <ParamSection title={`Настройки тайла ${artId}`}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div style={{ fontSize: 11.5, color: TEXT, lineHeight: 1.4 }}>
       Закреплённый seed:{' '}
       <b style={{ color: override?.seed ? '#86efac' : MUTED }}>{override?.seed ?? `нет (используется ${artId})`}</b>
@@ -678,7 +662,7 @@ export const TileOverrideControls = memo(({
       Тайлов с настройками в файле: {overriddenCount}
     </div>
     <div style={{ fontSize: 10.5, color: MUTED, lineHeight: 1.3 }}>
-      Подберите вариант кнопкой «Подобрать» (или введите seed в поле «Seed шума» выше), затем закрепите.
+      Подберите вариант кнопкой «Подобрать» (или введите seed в поле «Seed шума» в блоке «Шум Перлина»), затем закрепите.
       Закрепление действует на все тайлы с этим artId и записывается в файл при сохранении.
     </div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -706,7 +690,7 @@ export const TileOverrideControls = memo(({
         onChange={(v) => onShieldAnchor(v === 'auto' ? undefined : v)}
       />
     )}
-  </ParamSection>
+  </div>
 ));
 TileOverrideControls.displayName = 'TileOverrideControls';
 
@@ -859,7 +843,7 @@ export const WallControls = memo(({ params, onChange, onReset }: WallControlsPro
   const L = WALL_PARAM_LIMITS;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <ParamSection title="Общее">
+      <ParamSection title="Общее" defaultOpen>
         <ParamCheckbox
           label="Строить стены" checked={params.enabled}
           hint="Стены получают только завершённые (замкнутые) города. Результат — во вкладке «3D доска»."

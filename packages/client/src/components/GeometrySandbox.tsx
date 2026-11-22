@@ -18,13 +18,14 @@
 //   → SVG / 3D visualization
 //
 // 🌟 Все параметры тесселяции и шума настраиваются в левой панели
-//    (см. SandboxParamControls.tsx). Показывается число вершин
+//    (см. SandboxParamControls.tsx). Панель разбита на сворачиваемые блоки
+//    (ParamGroup.tsx): Геометрия тайла · Шум · 3D; состояние блоков запоминается. Показывается число вершин
 //    и максимальный выход геометрии за границу тайла.
 //
-// 🩺 Три режима правой части:
-//    • «Тайл»    — один тайл (2D + 3D) и список найденных проблем
+// 🩺 Четыре режима правой части:
+//    • «Тайл»    — один тайл (2D + 3D), выбор тайла, слои и легенда, список проблем
 //    • «Галерея» — все тайлы сеткой с метриками (GeometryGallery.tsx)
-//    • «Швы»     — случайная доска, подсветка несовпадений на стыках
+//    • «2D доска» — случайная доска, подсветка несовпадений на стыках
 //    • «3D доска» — та же доска в 3D (инстансинг, тени, пикинг клеток)
 //
 // 📍 Споты мипла и щита вычисляются из геометрии (core/geometry/spots.ts).
@@ -58,6 +59,7 @@ import {
 } from './SandboxParamControls';
 import { TerrainControls } from '@/components/TerrainControls';
 import { SandboxParamsBar } from './SandboxParamsBar';
+import { ParamCategory, ParamGroup, collapseAllParamGroups, paramsDiffer } from './ParamGroup';
 import { GeometryGallery } from './GeometryGallery';
 import {
   processTileGeometry,
@@ -317,22 +319,7 @@ CompassLabels.displayName = 'CompassLabels';
 // ============================================
 
 const Legend = memo(() => (
-  <div
-    style={{
-      marginTop: 12,
-      paddingTop: 12,
-      borderTop: '1px solid rgba(255,255,255,0.12)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 8,
-      fontSize: 12,
-      color: '#ccc',
-    }}
-  >
-    <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-      📚 Легенда
-    </div>
-
+  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: 11, color: '#ccc', marginTop: 4 }}>
     {[
       { label: 'Поле', color: COLORS.field },
       { label: 'Дорога', color: COLORS.road },
@@ -342,21 +329,10 @@ const Legend = memo(() => (
       { label: 'Щит', color: COLORS.shield },
       { label: 'Мипл', color: COLORS.meeple },
     ].map((item) => (
-      <div
-        key={item.label}
-        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-      >
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            background: item.color,
-            border: '1px solid #fff',
-            flexShrink: 0,
-          }}
-        />
-        <span>{item.label}</span>
-      </div>
+      <span key={item.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ width: 9, height: 9, background: item.color, border: '1px solid #fff', flexShrink: 0 }} />
+        {item.label}
+      </span>
     ))}
   </div>
 ));
@@ -689,7 +665,7 @@ const SandboxTileView = memo(({
         {/* 🎮 3D ВИД */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ marginBottom: 8, color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>3D</div>
-          <Tile3DView result={result} size={size} features={generation.features} meshParams={params.mesh} seed={seed} />
+          <Tile3DView result={result} size={size} features={generation.features} meshParams={params.mesh} />
         </div>
       </div>
 
@@ -829,6 +805,22 @@ export const GeometrySandbox = () => {
     () => hashGeometryParams(params) !== hashGeometryParams(savedParams),
     [params, savedParams]
   );
+
+  // Какие блоки отличаются от файла (жёлтая точка в заголовке свёрнутого блока)
+  const changed = useMemo(() => {
+    const meshWithoutTerrain = (m: GeometryParams['mesh']) => ({ ...m, terrain: undefined });
+    return {
+      shapes: paramsDiffer(params.shapes, savedParams.shapes),
+      tessellation: paramsDiffer(params.tessellation, savedParams.tessellation),
+      plaza: paramsDiffer(params.plaza, savedParams.plaza),
+      spots: paramsDiffer(params.spots, savedParams.spots),
+      noise: paramsDiffer([params.noise, params.noiseByType], [savedParams.noise, savedParams.noiseByType]),
+      tiles: paramsDiffer(params.tiles, savedParams.tiles),
+      mesh: paramsDiffer(meshWithoutTerrain(params.mesh), meshWithoutTerrain(savedParams.mesh)),
+      terrain: paramsDiffer(params.mesh.terrain, savedParams.mesh.terrain),
+      walls: paramsDiffer(params.walls, savedParams.walls),
+    };
+  }, [params, savedParams]);
 
   // Короткие псевдонимы для панелей
   const noiseParams = params.noise;
@@ -1087,171 +1079,162 @@ export const GeometrySandbox = () => {
 
         {/* Тело */}
         <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-          {/* 🎛 ЛЕВАЯ ПАНЕЛЬ */}
-          <div style={{ width: 330, flexShrink: 0, overflowY: 'auto', paddingRight: 8, borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+          {/* 🎛 ЛЕВАЯ ПАНЕЛЬ: параметры сгруппированы в сворачиваемые блоки */}
+          <div style={{ width: 350, flexShrink: 0, overflowY: 'auto', paddingRight: 8, borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Шапка панели */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>🎛 Параметры</span>
+              <button
+                type="button"
+                onClick={collapseAllParamGroups}
+                title="Свернуть все блоки параметров"
+                style={{ background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
+              >
+                ⊟ Свернуть всё
+              </button>
+            </div>
+
             {/* 💾 Файл параметров */}
-            <SandboxParamsBar
-              params={params}
-              dirty={dirty}
-              fileWarnings={GEOMETRY_PARAMS_WARNINGS}
-              onSaved={handleSaved}
-              onLoad={handleLoaded}
-              onRevert={handleRevert}
-              onResetDefaults={handleResetDefaults}
-            />
-
-            <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 10, letterSpacing: 0.5 }}>
-              🎛 Управление
-            </div>
-
-            {/* Выбор тайла */}
-            <label style={{ display: 'block', color: '#ccc', fontSize: 13, marginBottom: 6 }}>Тайл</label>
-            <select
-              value={selectedTileId}
-              onChange={(e) => handleTileClick(e.target.value)}
-              style={{ width: '100%', background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 6, padding: '8px 10px', fontSize: 13, marginBottom: 12 }}
+            <ParamGroup
+              id="file"
+              title="💾 Файл параметров"
+              meta={dirty ? 'не сохранено' : 'сохранено'}
+              changed={dirty}
             >
-              {tiles.map((tile) => (
-                <option key={tile.id} value={tile.id}>{tile.id} (×{tile.quantity})</option>
-              ))}
-            </select>
-
-            {/* Слои */}
-            <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, marginBottom: 8, letterSpacing: 0.5 }}>👁 Слои</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {layerToggles.map(({ label, value, set }) => (
-                <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ccc', fontSize: 13, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <Legend />
-
-            {/* ======================================== */}
-            {/* 🏗 ФОРМЫ (ГОРОД, МОНАСТЫРЬ, ДОРОГА) */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                🏗 Формы
-              </div>
-              <ShapeControls params={params.shapes} onChange={patchShapes} onReset={resetShapes} />
-            </div>
-
-            {/* ======================================== */}
-            {/* 📐 ТЕССЕЛЯЦИЯ */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                📐 Тесселяция
-              </div>
-              <TessellationControls params={tessParams} onChange={patchTess} onReset={resetTess} />
-            </div>
-
-            {/* ======================================== */}
-            {/* 🏛 ПЛОЩАДИ НА ПЕРЕКРЁСТКАХ */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                🏛 Площади
-              </div>
-              <PlazaControls params={plazaParams} onChange={patchPlaza} onReset={resetPlaza} />
-            </div>
-
-            {/* ======================================== */}
-            {/* 📍 СПОТЫ МИПЛА И ЩИТА */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                📍 Споты
-              </div>
-              <SpotControls params={params.spots} onChange={patchSpots} onReset={resetSpots} />
-            </div>
-
-            {/* ======================================== */}
-            {/* 🧱 МЕШ (3D) */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                🧱 Меш (3D)
-              </div>
-              <MeshControls params={meshParams} onChange={patchMesh} onReset={resetMesh} />
-              <TerrainControls params={meshParams.terrain} onChange={(terrain) => patchMesh({ terrain })} />
-            </div>
-
-            {/* ======================================== */}
-            {/* 🏰 ГОРОДСКИЕ СТЕНЫ */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                🏰 Городские стены
-              </div>
-              <div style={{ fontSize: 10.5, color: '#888', lineHeight: 1.3 }}>
-                Смотреть: вкладка «3D доска». Кнопка «🏰 Найти доску с городом» подберёт доску с замкнутым городом.
-              </div>
-              <WallControls params={params.walls} onChange={patchWalls} onReset={resetWalls} />
-            </div>
-
-            {/* ======================================== */}
-            {/* 🌊 ШУМ ПЕРЛИНА */}
-            {/* ======================================== */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
-                🌊 Шум Перлина
-              </div>
-
-              <ParamCheckbox
-                label="Включить шум (органическая неровность)"
-                checked={noiseEnabled}
-                onChange={setNoiseEnabled}
+              <SandboxParamsBar
+                params={params}
+                dirty={dirty}
+                fileWarnings={GEOMETRY_PARAMS_WARNINGS}
+                onSaved={handleSaved}
+                onLoad={handleLoaded}
+                onRevert={handleRevert}
+                onResetDefaults={handleResetDefaults}
               />
+            </ParamGroup>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13, opacity: noiseEnabled ? 1 : 0.4 }}>
-                <span style={{ minWidth: 90 }}>🔑 Seed шума</span>
-                <input
-                  type="text" value={seedOverride} onChange={(e) => setSeedOverride(e.target.value)}
-                  placeholder="по умолчанию artId" disabled={!noiseEnabled}
-                  style={{ flex: 1, minWidth: 0, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
+            {/* ======================================== */}
+            {/* ГЕОМЕТРИЯ ТАЙЛА: до шума */}
+            {/* ======================================== */}
+            <ParamCategory title="Геометрия тайла">
+              <ParamGroup id="shapes" title="🏗 Формы" changed={changed.shapes}>
+                <ShapeControls params={params.shapes} onChange={patchShapes} onReset={resetShapes} />
+              </ParamGroup>
+
+              <ParamGroup id="tessellation" title="📐 Тесселяция" changed={changed.tessellation}>
+                <TessellationControls params={tessParams} onChange={patchTess} onReset={resetTess} />
+              </ParamGroup>
+
+              <ParamGroup id="plaza" title="🏛 Площади" changed={changed.plaza}>
+                <PlazaControls params={plazaParams} onChange={patchPlaza} onReset={resetPlaza} />
+              </ParamGroup>
+
+              <ParamGroup id="spots" title="📍 Споты мипла и щита" changed={changed.spots}>
+                <SpotControls params={params.spots} onChange={patchSpots} onReset={resetSpots} />
+              </ParamGroup>
+            </ParamCategory>
+
+            {/* ======================================== */}
+            {/* ШУМ */}
+            {/* ======================================== */}
+            <ParamCategory title="Шум">
+              <ParamGroup
+                id="noise"
+                title="🌊 Шум Перлина"
+                meta={noiseEnabled ? 'вкл' : 'выкл'}
+                changed={changed.noise}
+              >
+                <ParamCheckbox
+                  label="Включить шум (органическая неровность)"
+                  checked={noiseEnabled}
+                  onChange={setNoiseEnabled}
                 />
-              </label>
 
-              <NoiseControls
-                params={noiseParams}
-                onChange={patchNoise}
-                onReset={resetNoise}
-                disabled={!noiseEnabled}
-              />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ccc', fontSize: 13, opacity: noiseEnabled ? 1 : 0.4 }}>
+                  <span style={{ minWidth: 90 }}>🔑 Seed шума</span>
+                  <input
+                    type="text" value={seedOverride} onChange={(e) => setSeedOverride(e.target.value)}
+                    placeholder="по умолчанию artId" disabled={!noiseEnabled}
+                    style={{ flex: 1, minWidth: 0, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
+                  />
+                </label>
 
-              <NoiseByTypeControls
-                byType={params.noiseByType}
-                base={params.noise}
-                onChange={setNoiseByType}
-                disabled={!noiseEnabled}
-              />
+                <NoiseControls
+                  params={noiseParams}
+                  onChange={patchNoise}
+                  onReset={resetNoise}
+                  disabled={!noiseEnabled}
+                />
+
+                <NoiseByTypeControls
+                  byType={params.noiseByType}
+                  base={params.noise}
+                  onChange={setNoiseByType}
+                  disabled={!noiseEnabled}
+                />
+              </ParamGroup>
 
               {selectedArtId && (
-                <TileOverrideControls
-                  artId={selectedArtId}
-                  override={params.tiles[selectedArtId]}
-                  hasShield={selectedHasShield}
-                  onShieldAnchor={handleShieldAnchor}
-                  previewSeed={seedOverride}
-                  overriddenCount={Object.keys(params.tiles).length}
-                  onRandomize={handleRandomSeed}
-                  onPin={handlePinSeed}
-                  onClear={handleClearPin}
-                />
+                <ParamGroup
+                  id="tile-override"
+                  title={`📌 Тайл ${selectedArtId}`}
+                  meta={params.tiles[selectedArtId]?.seed ? 'seed закреплён' : undefined}
+                  changed={changed.tiles}
+                >
+                  <TileOverrideControls
+                    artId={selectedArtId}
+                    override={params.tiles[selectedArtId]}
+                    hasShield={selectedHasShield}
+                    onShieldAnchor={handleShieldAnchor}
+                    previewSeed={seedOverride}
+                    overriddenCount={Object.keys(params.tiles).length}
+                    onRandomize={handleRandomSeed}
+                    onPin={handlePinSeed}
+                    onClear={handleClearPin}
+                  />
+                </ParamGroup>
               )}
-            </div>
+            </ParamCategory>
+
+            {/* ======================================== */}
+            {/* 3D */}
+            {/* ======================================== */}
+            <ParamCategory title="3D">
+              <ParamGroup id="mesh" title="🧱 Меш" changed={changed.mesh}>
+                <MeshControls params={meshParams} onChange={patchMesh} onReset={resetMesh} />
+              </ParamGroup>
+
+              <ParamGroup
+                id="terrain"
+                title="⛰️ Рельеф полей"
+                meta={meshParams.terrain.enabled ? 'вкл' : 'выкл'}
+                changed={changed.terrain}
+              >
+                <TerrainControls params={meshParams.terrain} onChange={(terrain) => patchMesh({ terrain })} />
+              </ParamGroup>
+
+              <ParamGroup
+                id="walls"
+                title="🏰 Городские стены"
+                meta={params.walls.enabled ? 'вкл' : 'выкл'}
+                changed={changed.walls}
+              >
+                <div style={{ fontSize: 10.5, color: '#888', lineHeight: 1.3 }}>
+                  Смотреть: вкладка «3D доска». Кнопка «🏰 Найти доску с городом» подберёт доску с замкнутым городом.
+                </div>
+                <WallControls params={params.walls} onChange={patchWalls} onReset={resetWalls} />
+              </ParamGroup>
+            </ParamCategory>
 
             {/* 📊 СТАТИСТИКА */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: 12, color: '#888' }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>📊 Статистика</div>
-              <p style={{ margin: '4px 0' }} title="Не используется: геометрия строится из портов">🗄 Ручная геометрия в данных (устарела): {geometryStats.legacyManual}</p>
-              <p style={{ margin: '4px 0' }}>🌾 Derived (поля): {geometryStats.derived}</p>
-              <p style={{ margin: '4px 0' }}>⬜ Без геометрии: {geometryStats.withoutGeometry}</p>
-            </div>
+            <ParamCategory title="Данные">
+              <ParamGroup id="stats" title="📊 Статистика">
+                <div style={{ fontSize: 12, color: '#888' }}>
+                  <p style={{ margin: '4px 0' }} title="Не используется: геометрия строится из портов">🗄 Ручная геометрия в данных (устарела): {geometryStats.legacyManual}</p>
+                  <p style={{ margin: '4px 0' }}>🌾 Derived (поля): {geometryStats.derived}</p>
+                  <p style={{ margin: '4px 0' }}>⬜ Без геометрии: {geometryStats.withoutGeometry}</p>
+                </div>
+              </ParamGroup>
+            </ParamCategory>
           </div>
 
           {/* 🖼 ПРАВАЯ ЧАСТЬ */}
@@ -1261,7 +1244,7 @@ export const GeometrySandbox = () => {
               {([
                 ['tile', '🔍 Тайл'],
                 ['gallery', '🖼 Галерея'],
-                ['seams', '🧵 Швы'],
+                ['seams', '🗺 2D доска'],
                 ['board3d', '🧱 3D доска'],
               ] as const).map(([mode, label]) => (
                 <button
@@ -1282,6 +1265,36 @@ export const GeometrySandbox = () => {
                 </button>
               ))}
             </div>
+
+            {/* 🔍 Инструменты вкладки «Тайл»: выбор тайла, слои, легенда */}
+            {viewMode === 'tile' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', marginBottom: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ color: '#fff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>🎛 Тайл</label>
+                  <select
+                    value={selectedTileId}
+                    onChange={(e) => handleTileClick(e.target.value)}
+                    style={{ flex: 1, minWidth: 0, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 6, padding: '6px 10px', fontSize: 13 }}
+                  >
+                    {tiles.map((tile) => (
+                      <option key={tile.id} value={tile.id}>{tile.id} (×{tile.quantity})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 14px' }}>
+                  <span style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>👁 Слои</span>
+                  {layerToggles.map(({ label, value, set }) => (
+                    <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#ccc', fontSize: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+
+                <Legend />
+              </div>
+            )}
 
             {viewMode !== 'tile' ? (
               <GeometryGallery

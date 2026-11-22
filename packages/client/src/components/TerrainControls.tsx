@@ -6,8 +6,9 @@
 // ПОЛНЫЙ обновлённый объект. Поэтому patchMesh песочницы (он подмешивает
 // только heights и colors) править не нужно.
 //
-// Подключение в GeometrySandbox — сразу после <MeshControls … />:
+// Подключение в GeometrySandbox — отдельным блоком <ParamGroup title="⛰️ Рельеф полей">:
 //   <TerrainControls params={meshParams.terrain} onChange={(terrain) => patchMesh({ terrain })} />
+// Заголовок и рамку рисует ParamGroup.
 // ============================================
 import { memo } from 'react';
 import { DEFAULT_TERRAIN_PARAMS, type TerrainParams } from '@/core/geometry/terrain';
@@ -24,9 +25,7 @@ export const TerrainControls = memo(({ params, onChange }: TerrainControlsProps)
   const off = !params.enabled;
 
   return (
-    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>⛰️ Рельеф полей (3D)</div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <ParamCheckbox
         label="Объёмные поля"
         checked={params.enabled}

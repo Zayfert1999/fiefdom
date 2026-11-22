@@ -1,4 +1,4 @@
-// packages/client/src/components/Tile3DView.tsx
+// packages/client/src/sandbox/view/Tile3DView.tsx
 // ============================================
 // 🎮 3D ВЬЮПОРТ ОДНОГО ТАЙЛА
 // ============================================
@@ -9,7 +9,6 @@
 //   • Исправлено зеркало: раньше rotateX(-π/2) отправлял y формы в −z,
 //     и тайл был перевёрнут по оси север-юг относительно 2D.
 //     Теперь (x, y) → (x, высота, y): юг = низ экрана, как в SVG.
-//   • Убран циклический импорт PLAZA_COLOR из GeometrySandbox
 //     (цвета теперь в MeshParams).
 //   • Рельеф полей (mesh.terrain): поля тайла строятся тем же путём, что и на доске —
 //     общим мешем региона (здесь регион из одного тайла в клетке 0,0). Шум мировой,
@@ -27,7 +26,7 @@ import {
   type MeshParamsInput,
 } from '@/core/geometry/tileMesh';
 import { buildFieldRegionMeshes } from '@/core/geometry/fieldRegions';
-import { TileMeshObject } from './TileMeshObjects';
+import { TileMeshObject } from '@/components/TileMeshObjects';
 
 interface Tile3DViewProps {
   result: TileGeometryResult;
@@ -122,4 +121,3 @@ export const Tile3DView = memo(({ result, size, features, meshParams, wireframe 
 });
 
 Tile3DView.displayName = 'Tile3DView';
-

@@ -1,4 +1,4 @@
-// packages/client/src/components/TerrainControls.tsx
+// packages/client/src/sandbox/params/controls/TerrainControls.tsx
 // ============================================
 // ⛰️ ПАНЕЛЬ РЕЛЬЕФА ПОЛЕЙ (песочница геометрии)
 // ============================================
@@ -6,13 +6,13 @@
 // ПОЛНЫЙ обновлённый объект. Поэтому patchMesh песочницы (он подмешивает
 // только heights и colors) править не нужно.
 //
-// Подключение в GeometrySandbox — отдельным блоком <ParamGroup title="⛰️ Рельеф полей">:
-//   <TerrainControls params={meshParams.terrain} onChange={(terrain) => patchMesh({ terrain })} />
-// Заголовок и рамку рисует ParamGroup.
+// Подключается в ParamsPanel отдельным блоком <ParamGroup title="⛰️ Рельеф полей">;
+// заголовок и рамку рисует ParamGroup.
 // ============================================
 import { memo } from 'react';
 import { DEFAULT_TERRAIN_PARAMS, type TerrainParams } from '@/core/geometry/terrain';
-import { ParamCheckbox, ParamSection, ParamSlider } from './SandboxParamControls';
+import { ParamCheckbox, ParamSlider } from './base';
+import { ParamSection } from '../ParamGroup';
 
 interface TerrainControlsProps {
   params: TerrainParams;

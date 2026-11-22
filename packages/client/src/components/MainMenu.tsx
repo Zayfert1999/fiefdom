@@ -159,7 +159,7 @@ export const MainMenu = () => {
         {
             ...HOTKEY_DEFINITIONS.SHOW_GEOMETRY_SANDBOX,
             action: handleOpenGeometrySandbox,
-            enabled: true,
+            enabled: import.meta.env.DEV, // песочница только в dev
         },
     ]);
 

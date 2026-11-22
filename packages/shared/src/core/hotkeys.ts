@@ -13,6 +13,8 @@ export interface HotkeyDefinition {
   ctrl?: boolean;
   shift?: boolean;
   alt?: boolean;
+  /** Только для dev-сборки: в подсказке по хоткеям в проде не показывается */
+  devOnly?: boolean;
 }
 
 // ============================================
@@ -99,6 +101,7 @@ export const HOTKEY_DEFINITIONS = {
     key: 'F2',
     description: 'Песочница геометрии тайлов (dev)',
     category: 'system',
+    devOnly: true,
   },
 } as const satisfies Record<string, HotkeyDefinition>;
 

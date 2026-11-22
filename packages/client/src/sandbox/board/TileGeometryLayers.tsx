@@ -1,4 +1,4 @@
-// packages/client/src/components/TileGeometryLayers.tsx
+// packages/client/src/sandbox/board/TileGeometryLayers.tsx
 // ============================================
 // 🎨 SVG-СЛОИ ГЕОМЕТРИИ ТАЙЛА
 // ============================================

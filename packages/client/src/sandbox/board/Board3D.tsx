@@ -1,4 +1,4 @@
-// packages/client/src/components/Board3D.tsx
+// packages/client/src/sandbox/board/Board3D.tsx
 // ============================================
 // 🧱 3D-ДОСКА: СКЕЛЕТ
 // ============================================
@@ -32,8 +32,8 @@ import { CityWallCache, buildCityWallModels } from '@/core/geometry/cityWalls';
 import { geometryTileId } from '@/core/geometry/bundleToken';
 import { getCityRefs, type CityRegionTile } from '@/core/geometry/cityRegions';
 import type { WallParams } from '@/core/geometry/wallParams';
-import { CityWallMeshObject } from './CityWallMeshObject';
-import { RegionMeshObject, TILE_SIZE, TileInstances, type RegionHit, type TilePlacement } from './TileMeshObjects';
+import { CityWallMeshObject } from '@/components/CityWallMeshObject';
+import { RegionMeshObject, TILE_SIZE, TileInstances, type RegionHit, type TilePlacement } from '@/components/TileMeshObjects';
 
 /** Тайл на доске: ссылка на бандл + позиция */
 export interface BoardPlacement extends TilePlacement {

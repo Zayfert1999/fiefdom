@@ -1,4 +1,4 @@
-// packages/client/src/components/SandboxParamsBar.tsx
+// packages/client/src/sandbox/params/SandboxParamsBar.tsx
 // ============================================
 // 💾 ПАНЕЛЬ ФАЙЛА ПАРАМЕТРОВ
 // ============================================

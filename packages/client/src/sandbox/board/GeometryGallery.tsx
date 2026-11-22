@@ -1,4 +1,4 @@
-// packages/client/src/components/GeometryGallery.tsx
+// packages/client/src/sandbox/board/GeometryGallery.tsx
 // ============================================
 // 🖼 ГАЛЕРЕЯ ТАЙЛОВ И ДОСКА ШВОВ
 // ============================================

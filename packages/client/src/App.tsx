@@ -20,7 +20,11 @@ const LocalLobby = lazy(() => import('@/components/LocalLobby').then(m => ({ def
 const GameOverScreen = lazy(() => import('@/components/GameOverScreen').then(m => ({ default: m.GameOverScreen })));
 const DebugPanel = lazy(() => import('@/components/DebugPanel').then(m => ({ default: m.DebugPanel })));
 const NetworkLobby = lazy(() => import('@/components/NetworkLobby').then(m => ({ default: m.NetworkLobby })));
-const GeometrySandbox = lazy(() => import('@/components/GeometrySandbox').then(m => ({ default: m.GeometrySandbox })));
+// 🧪 Песочница геометрии — только dev. В прод-сборке import.meta.env.DEV === false,
+// ветка вырезается целиком, и чанк песочницы в dist не попадает.
+const GeometrySandbox = import.meta.env.DEV
+  ? lazy(() => import('@/sandbox').then(m => ({ default: m.GeometrySandbox })))
+  : null;
 // 🧊 3D-доска (three.js — отдельный чанк, грузится только при входе в игру)
 const GameBoard3D = lazy(() => import('@/renderer3d/GameBoard3D').then(m => ({ default: m.GameBoard3D })));
 
@@ -219,7 +223,7 @@ function AppScreens() {
         </Suspense>
       );
     }
-    if (lobbyScreen === 'geometrySandbox') {
+    if (GeometrySandbox && lobbyScreen === 'geometrySandbox') {
       return (
         <Suspense fallback={null}>
           <ErrorBoundary name="GeometrySandbox">
@@ -273,4 +277,4 @@ function AppScreens() {
         )}
       </div>
     );
-  }
+  }

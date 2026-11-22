@@ -86,7 +86,10 @@ export const HotkeysModal = ({ isOpen, onClose }: HotkeysModalProps) => {
         {/* Список категорий */}
         <div className={styles.hotkeysContent}>
           {CATEGORY_ORDER.map(cat =>
-            renderCategory(cat, HOTKEYS_BY_CATEGORY[cat])
+            renderCategory(
+              cat,
+              HOTKEYS_BY_CATEGORY[cat].filter((def) => import.meta.env.DEV || !def.devOnly)
+            )
           )}
 
           {/* Подсказка внизу */}

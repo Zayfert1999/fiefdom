@@ -25,6 +25,7 @@ import type {
 } from '@/core/geometry';
 import { resolveMeshParams, type MeshParamsInput } from '@/core/geometry/tileMesh';
 import { mergeWallParams, resolveWallParams, type WallParamsInput } from '@/core/geometry/wallParams';
+import { mergeTownParams, resolveTownParams, type TownParamsInput } from '@/core/geometry/townParams';
 import {
   DEFAULT_GEOMETRY_PARAMS,
   cloneGeometryParams,
@@ -117,6 +118,11 @@ export const useSandboxParams = () => {
     []
   );
   const resetWalls = useCallback(() => setParams((prev) => ({ ...prev, walls: resolveWallParams() })), []);
+  const patchTown = useCallback(
+    (patch: TownParamsInput) => setParams((prev) => ({ ...prev, town: mergeTownParams(prev.town, patch) })),
+    []
+  );
+  const resetTown = useCallback(() => setParams((prev) => ({ ...prev, town: resolveTownParams() })), []);
 
   // Файл параметров: сохранение, загрузка, откат
   const handleSaved = useCallback((saved: GeometryParams) => setSavedParams(cloneGeometryParams(saved)), []);
@@ -192,6 +198,8 @@ export const useSandboxParams = () => {
       resetMesh,
       patchWalls,
       resetWalls,
+      patchTown,
+      resetTown,
       handleSaved,
       handleLoaded,
       handleRevert,
@@ -216,6 +224,8 @@ export const useSandboxParams = () => {
       resetMesh,
       patchWalls,
       resetWalls,
+      patchTown,
+      resetTown,
       handleSaved,
       handleLoaded,
       handleRevert,

@@ -205,6 +205,7 @@ export const GeometrySandbox = () => {
                 isPending={isPending}
                 meshParams={tileParams.mesh}
                 wallParams={deferredParams.walls}
+                townParams={deferredParams.town}
                 onOpenTile={handleOpenFromGallery}
               />
             ) : selectedTile ? (

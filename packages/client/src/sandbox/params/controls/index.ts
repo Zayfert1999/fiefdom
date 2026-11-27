@@ -10,4 +10,5 @@ export { SpotControls } from './SpotControls';
 export { TerrainControls } from './TerrainControls';
 export { TessellationControls } from './TessellationControls';
 export { TileOverrideControls } from './TileOverrideControls';
+export { TownControls } from './TownControls';
 export { WallControls } from './WallControls';

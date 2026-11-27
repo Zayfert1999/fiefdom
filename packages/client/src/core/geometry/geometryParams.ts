@@ -10,6 +10,7 @@
 //     noiseByType: { city?, monastery?, road? },   ← свои настройки шума для типа фичи
 //     plaza, spots, mesh,
 //     walls,                                        ← городские стены (не влияют на геометрию тайлов)
+//     town,                                         ← застройка городов: площадь, улицы, дома (тоже не влияет)
 //     tiles: { "<artId>": { seed?, noise? } }      ← настройки конкретного тайла
 //   }
 //
@@ -65,6 +66,12 @@ import {
     type WallParams,
     type WallParamsInput,
 } from './wallParams';
+import {
+    DEFAULT_TOWN_PARAMS,
+    resolveTownParams,
+    type TownParams,
+    type TownParamsInput,
+} from './townParams';
 
 export const GEOMETRY_PARAMS_VERSION = 1;
 
@@ -94,6 +101,8 @@ export interface GeometryParams {
     mesh: MeshParams;
     /** Городские стены: башни, ворота, зубцы. В хэш бандлов тайлов не входят */
     walls: WallParams;
+    /** Застройка городов: площадь, улицы, дома. В хэш бандлов тайлов не входит */
+    town: TownParams;
     tiles: Record<string, TileParamOverride>;
 }
 
@@ -108,6 +117,7 @@ export interface GeometryParamsInput {
     spots?: Partial<SpotParams>;
     mesh?: MeshParamsInput;
     walls?: WallParamsInput;
+    town?: TownParamsInput;
     tiles?: Record<string, TileParamOverride>;
 }
 
@@ -176,6 +186,7 @@ export function resolveGeometryParams(input: GeometryParamsInput = {}): Geometry
         spots: resolveSpotParams(input.spots),
         mesh: resolveMeshParams(input.mesh),
         walls: resolveWallParams(input.walls),
+        town: resolveTownParams(input.town),
         tiles,
     };
 }
@@ -262,7 +273,7 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     }
 
     const topLevel = new Set([
-        'version', 'shapes', 'generation', 'tessellation', 'noise', 'noiseByType', 'plaza', 'spots', 'mesh', 'walls', 'tiles',
+        'version', 'shapes', 'generation', 'tessellation', 'noise', 'noiseByType', 'plaza', 'spots', 'mesh', 'walls', 'town', 'tiles',
     ]);
     for (const key of Object.keys(raw)) {
         if (!topLevel.has(key)) warnings.push(`${key}: неизвестная секция, проигнорирована`);
@@ -277,6 +288,7 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
         spots: sanitizeSection('spots', raw.spots, DEFAULT_SPOT_PARAMS, warnings) as GeometryParamsInput['spots'],
         mesh: sanitizeSection('mesh', raw.mesh, DEFAULT_MESH_PARAMS, warnings) as GeometryParamsInput['mesh'],
         walls: sanitizeSection('walls', raw.walls, DEFAULT_WALL_PARAMS, warnings) as GeometryParamsInput['walls'],
+        town: sanitizeSection('town', raw.town, DEFAULT_TOWN_PARAMS, warnings) as GeometryParamsInput['town'],
     };
 
     // Старая секция generation: roadWidth и roadEndOverlap переехали в shapes.road, overwrite удалён
@@ -321,6 +333,17 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
             if (typeof value !== 'string' || !HEX_COLOR.test(value)) {
                 warnings.push(`walls.colors.${part}: ожидался цвет #rrggbb, получено ${JSON.stringify(value)}`);
                 delete wallColors[part];
+            }
+        }
+    }
+
+    // Цвета застройки тоже #rrggbb
+    const townColors = input.town?.colors as Record<string, unknown> | undefined;
+    if (townColors) {
+        for (const [part, value] of Object.entries(townColors)) {
+            if (typeof value !== 'string' || !HEX_COLOR.test(value)) {
+                warnings.push(`town.colors.${part}: ожидался цвет #rrggbb, получено ${JSON.stringify(value)}`);
+                delete townColors[part];
             }
         }
     }
@@ -388,6 +411,7 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     reportClamped('spots', input.spots, params.spots, warnings);
     reportClamped('mesh', input.mesh, params.mesh, warnings);
     reportClamped('walls', input.walls, params.walls, warnings);
+    reportClamped('town', input.town, params.town, warnings);
     for (const type of NOISE_FEATURE_TYPES) {
         reportClamped(`noiseByType.${type}`, input.noiseByType?.[type], params.noiseByType[type], warnings);
     }
@@ -443,9 +467,9 @@ function canonicalObject(
         plaza: params.plaza,
         spots: params.spots,
         mesh: params.mesh,
-        // Стены не влияют на геометрию тайлов: в хэш одного тайла они не попадают,
-        // иначе ползунок стены сбрасывал бы кэш бандлов
-        ...(includeWalls ? { walls: params.walls } : {}),
+        // Стены и застройка не влияют на геометрию тайлов: в хэш одного тайла они не попадают,
+        // иначе ползунок стены или дома сбрасывал бы кэш бандлов
+        ...(includeWalls ? { walls: params.walls, town: params.town } : {}),
         tiles,
     };
 }
@@ -470,7 +494,7 @@ function fnv1a(text: string): string {
 
 export interface HashGeometryParamsOptions {
     /**
-     * Учитывать ли городские стены. По умолчанию — только для общего хэша (без artId):
+     * Учитывать ли городские стены и застройку. По умолчанию — только для общего хэша (без artId):
      * хэш одного тайла от стен не зависит, потому что стены не влияют на его геометрию.
      * `false` нужен, чтобы пересчитывать геометрию тайлов только при правке того, что её меняет.
      */

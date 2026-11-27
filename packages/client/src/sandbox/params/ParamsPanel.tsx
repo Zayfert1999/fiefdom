@@ -25,6 +25,7 @@ import {
   TerrainControls,
   TessellationControls,
   TileOverrideControls,
+  TownControls,
   WallControls,
 } from './controls';
 
@@ -56,8 +57,8 @@ export const ParamsPanel = ({
   onSeedOverrideChange: setSeedOverride,
 }: ParamsPanelProps) => {
   const {
-    patchShapes, patchNoise, patchTess, patchPlaza, patchSpots, patchMesh, patchWalls, setNoiseByType,
-    resetNoise, resetTess, resetPlaza, resetShapes, resetSpots, resetMesh, resetWalls,
+    patchShapes, patchNoise, patchTess, patchPlaza, patchSpots, patchMesh, patchWalls, patchTown, setNoiseByType,
+    resetNoise, resetTess, resetPlaza, resetShapes, resetSpots, resetMesh, resetWalls, resetTown,
     handleSaved, handleLoaded, handleRevert, handleResetDefaults,
   } = actions;
 
@@ -80,6 +81,7 @@ export const ParamsPanel = ({
       mesh: paramsDiffer(meshWithoutTerrain(params.mesh), meshWithoutTerrain(savedParams.mesh)),
       terrain: paramsDiffer(params.mesh.terrain, savedParams.mesh.terrain),
       walls: paramsDiffer(params.walls, savedParams.walls),
+      town: paramsDiffer(params.town, savedParams.town),
     };
   }, [params, savedParams]);
 
@@ -277,6 +279,18 @@ export const ParamsPanel = ({
             Смотреть: вкладка «3D доска». Кнопка «🏰 Найти доску с городом» подберёт доску с замкнутым городом.
           </div>
           <WallControls params={params.walls} onChange={patchWalls} onReset={resetWalls} />
+        </ParamGroup>
+
+        <ParamGroup
+          id="town"
+          title="🏘 Застройка городов"
+          meta={params.town.enabled ? 'вкл' : 'выкл'}
+          changed={changed.town}
+        >
+          <div style={{ fontSize: 10.5, color: '#888', lineHeight: 1.3 }}>
+            Площадь, улицы и дома внутри замкнутых городов. Смотреть: вкладка «3D доска».
+          </div>
+          <TownControls params={params.town} onChange={patchTown} onReset={resetTown} />
         </ParamGroup>
       </ParamCategory>
 

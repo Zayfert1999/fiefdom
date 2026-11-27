@@ -141,5 +141,73 @@
       "merlon": "#c2b69c"
     }
   },
+  "town": {
+    "enabled": true,
+    "seed": "1",
+    "edgeInset": 8,
+    "square": {
+      "minCityArea": 2,
+      "fullSizeArea": 4,
+      "minRadius": 6,
+      "maxRadius": 20,
+      "gap": 2,
+      "approachRatio": 0.6,
+      "approachMin": 5,
+      "approachMax": 14,
+      "passWidth": 12,
+      "segments": 32
+    },
+    "streets": {
+      "blockSize": 32,
+      "keepFraction": 0.1,
+      "mainSmoothing": 15,
+      "sideSmoothing": 5,
+      "archRun": 10,
+      "entranceMinSep": 40,
+      "maxRays": 3,
+      "raySep": 45,
+      "farRoads": 3,
+      "farCover": 100,
+      "wobble": 1.5,
+      "mainWidth": 8,
+      "sideWidth": 4,
+      "minLength": 16
+    },
+    "houses": {
+      "fill": 0.8,
+      "scale": 1.5,
+      "widthMin": 6,
+      "widthMax": 9,
+      "depthMin": 5,
+      "depthMax": 8,
+      "wallHeightMin": 3.4,
+      "wallHeightMax": 5.6,
+      "roofHeightMin": 2.8,
+      "roofHeightMax": 5.2,
+      "setback": 1.2,
+      "gapMin": 1,
+      "gapMax": 2.6,
+      "yawJitter": 4,
+      "apexJitter": 0.18,
+      "roofOverhang": 0.12,
+      "sink": 0.5,
+      "squareRing": true
+    },
+    "colors": {
+      "square": "#d9c79c",
+      "mainStreet": "#cdb892",
+      "sideStreet": "#c2aa80",
+      "wall": "#e4d6b5",
+      "roofA": "#b5523b",
+      "roofB": "#9c4a35",
+      "roofC": "#c4683f"
+    },
+    "animation": {
+      "riseFraction": 0.7,
+      "startDelay": 0.15,
+      "stagger": 0.35,
+      "buckets": 8
+    }
+  },
   "tiles": {}
 }

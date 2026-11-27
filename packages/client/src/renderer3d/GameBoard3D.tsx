@@ -27,6 +27,7 @@ import { worldToCell } from './boardMath';
 import { prewarmBundles } from './tileBundles';
 import { CellsLayer3D } from './layers/CellsLayer3D';
 import { CityWallsLayer3D } from './layers/CityWallsLayer3D';
+import { CityTownLayer3D } from './layers/CityTownLayer3D';
 import { DebugLayer3D, LastPlacedLayer3D } from './layers/MarkerLayers3D';
 import { MeepleLayer3D } from './layers/MeepleLayer3D';
 import { MeepleSelectionLayer3D } from './layers/MeepleSelectionLayer3D';
@@ -139,6 +140,7 @@ const Scene = ({ onGridClick, validCells }: BoardProps) => {
 
       <TilesLayer3D onTileClick={handleCell} />
       <CityWallsLayer3D />
+      <CityTownLayer3D />
       <ShieldsLayer3D materials={shieldMaterials} />
       <CellsLayer3D validCells={validCells} hoverCell={hoverCell} />
       <RegionOverlayLayer3D />

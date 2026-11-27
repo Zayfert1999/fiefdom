@@ -21,6 +21,12 @@ import { TileTransform } from '../TileTransform';
 const SHIMMER_PERIOD = 3;
 const SHIMMER_MAX = 0.45;
 
+/**
+ * Насколько щит приподнят над поверхностью города. Щит парит над застройкой: дома (до ~11)
+ * не заслоняют его. Стена выше — 14. Поставьте 0, чтобы вернуть щит на землю.
+ */
+export const SHIELD_LIFT = 16;
+
 /** Щиты тайла в его локальных координатах (без поворота) */
 export function getTileShields(templateId: string, bundle: TileBundle): LocalPoint[] {
   const definition = getTileDefinition(templateId);
@@ -47,7 +53,7 @@ export function useShieldShimmer(materials: ShieldMaterials): void {
 export const TileShields = memo(
   ({ templateId, bundle, materials }: { templateId: string; bundle: TileBundle; materials: ShieldMaterials }) => {
     const shields = useMemo(() => getTileShields(templateId, bundle), [templateId, bundle]);
-    const y = surfaceTopY(BOARD_MESH_PARAMS, 'city');
+    const y = surfaceTopY(BOARD_MESH_PARAMS, 'city') + SHIELD_LIFT;
 
     return (
       <>

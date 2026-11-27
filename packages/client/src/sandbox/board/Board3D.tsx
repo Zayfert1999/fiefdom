@@ -16,6 +16,9 @@
 // 🏰 Городские стены (walls): для каждого ЗАМКНУТОГО города строится один меш стен с башнями,
 //    воротами и зубцами (core/geometry/cityWalls.ts). Рост из земли управляется walls.growth.
 //
+// 🏘 Застройка (town): внутри каждого ЗАМКНУТОГО города — главная площадь, улицы и домики
+//    (core/geometry/cityTown.ts). Рост домов управляется town.progress.
+//
 // Мипплы, оверлеи регионов и превью тайла — следующие шаги.
 // ============================================
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,10 +32,13 @@ import {
   type FieldRegionTile,
 } from '@/core/geometry/fieldRegions';
 import { CityWallCache, buildCityWallModels } from '@/core/geometry/cityWalls';
+import { CityTownCache, buildCityTownModels } from '@/core/geometry/cityTown';
 import { geometryTileId } from '@/core/geometry/bundleToken';
 import { getCityRefs, type CityRegionTile } from '@/core/geometry/cityRegions';
 import type { WallParams } from '@/core/geometry/wallParams';
+import type { TownParams } from '@/core/geometry/townParams';
 import { CityWallMeshObject } from '@/components/CityWallMeshObject';
+import { CityTownMeshObject } from '@/components/CityTownMeshObject';
 import { RegionMeshObject, TILE_SIZE, TileInstances, type RegionHit, type TilePlacement } from '@/components/TileMeshObjects';
 
 /** Тайл на доске: ссылка на бандл + позиция */
@@ -62,6 +68,15 @@ export interface BoardWallsInfo {
   readonly warnings: readonly string[];
 }
 
+/** Сводка по застройке для панели песочницы */
+export interface BoardTownInfo {
+  readonly cities: number;
+  readonly squares: number;
+  readonly streets: number;
+  readonly houses: number;
+  readonly warnings: readonly string[];
+}
+
 interface Board3DProps {
   placements: readonly BoardPlacement[];
   bundles: ReadonlyMap<string, TileBundle>;
@@ -77,6 +92,10 @@ interface Board3DProps {
   walls?: { readonly params: WallParams; readonly growth?: number };
   /** Сводка по построенным стенам (null — стен нет) */
   onWallsBuilt?: (info: BoardWallsInfo | null) => void;
+  /** Застройка городов: параметры и линейный прогресс роста (0 — нет, 1 — готово). Без параметров застройки нет */
+  town?: { readonly params: TownParams; readonly progress?: number };
+  /** Сводка по построенной застройке (null — застройки нет) */
+  onTownBuilt?: (info: BoardTownInfo | null) => void;
 }
 
 // ============================================
@@ -122,11 +141,14 @@ export const Board3D = memo(({
   onHover,
   walls,
   onWallsBuilt,
+  town,
+  onTownBuilt,
 }: Board3DProps) => {
   const [hoverCell, setHoverCell] = useState<{ col: number; row: number } | null>(null);
   const lastKey = useRef<string>('');
   const regionCache = useRef(new FieldRegionMeshCache());
   const wallCache = useRef(new CityWallCache());
+  const townCache = useRef(new CityTownCache());
 
   // Центр доски: сдвигаем всю сцену, чтобы он оказался в мировом (0, 0, 0)
   const centerX = ((cols - 1) * TILE_SIZE) / 2;
@@ -170,10 +192,8 @@ export const Board3D = memo(({
     return buildFieldRegionMeshes(regionTiles, first?.meshParams, regionCache.current);
   }, [regionTiles, bundles, placements]);
 
-  // Стены замкнутых городов: меши кэшируются по составу города и параметрам стен
-  const wallParams = walls?.params;
-  const wallModels = useMemo(() => {
-    if (!wallParams || placements.length === 0) return [];
+  // Тайлы с городами: общий вход для стен и застройки
+  const cityTiles = useMemo(() => {
     const tiles: CityRegionTile[] = [];
     for (const placement of placements) {
       const bundle = bundles.get(placement.tileId);
@@ -190,8 +210,22 @@ export const Board3D = memo(({
         roadEnds: refs.roadEnds,
       });
     }
-    return buildCityWallModels(tiles, wallParams, { cache: wallCache.current });
-  }, [placements, bundles, wallParams]);
+    return tiles;
+  }, [placements, bundles]);
+
+  // Стены замкнутых городов: меши кэшируются по составу города и параметрам стен
+  const wallParams = walls?.params;
+  const wallModels = useMemo(() => {
+    if (!wallParams || cityTiles.length === 0) return [];
+    return buildCityWallModels(cityTiles, wallParams, { cache: wallCache.current });
+  }, [cityTiles, wallParams]);
+
+  // Застройка замкнутых городов: площадь, улицы, дома (так же кэшируется)
+  const townParams = town?.params;
+  const townModels = useMemo(() => {
+    if (!townParams || cityTiles.length === 0) return [];
+    return buildCityTownModels(cityTiles, townParams, { cache: townCache.current });
+  }, [cityTiles, townParams]);
 
   // Поверхность города берём у первого бандла (параметры меша у всех одинаковые)
   const wallBaseY = useMemo(() => {
@@ -213,6 +247,21 @@ export const Board3D = memo(({
       warnings: wallModels.flatMap((m) => m.warnings),
     });
   }, [wallModels, onWallsBuilt]);
+
+  useEffect(() => {
+    if (!onTownBuilt) return;
+    if (townModels.length === 0) {
+      onTownBuilt(null);
+      return;
+    }
+    onTownBuilt({
+      cities: townModels.length,
+      squares: townModels.reduce((n, m) => n + m.stats.squares, 0),
+      streets: townModels.reduce((n, m) => n + m.stats.streets, 0),
+      houses: townModels.reduce((n, m) => n + m.stats.houses, 0),
+      warnings: townModels.flatMap((m) => m.warnings),
+    });
+  }, [townModels, onTownBuilt]);
 
   /** Сообщаем наружу только об изменениях, а не о каждом движении мыши */
   const emit = useCallback(
@@ -335,6 +384,18 @@ export const Board3D = memo(({
               model={model}
               baseY={wallBaseY}
               growth={walls?.growth ?? 1}
+              wireframe={wireframe}
+            />
+          ))}
+
+          {/* Застройка замкнутых городов (мировые координаты доски, в рейкасте не участвуют) */}
+          {townModels.map((model) => (
+            <CityTownMeshObject
+              key={model.signature}
+              model={model}
+              baseY={wallBaseY}
+              progress={town?.progress ?? 1}
+              stagger={townParams?.animation.stagger ?? 0}
               wireframe={wireframe}
             />
           ))}

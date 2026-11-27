@@ -248,7 +248,7 @@ describe('споты на тайлах', () => {
     it('shieldAnchor тайла выполняется: угол NE у города на весь тайл', () => {
         const tile = tiles.find((t) => t.id === 'tile_CCCC-S')!;
         const audit = auditTile(tile, GENERATED);
-        const params = { ...GEOMETRY_PARAMS, tiles: { tile_CCCC: { shieldAnchor: 'NE' as const } } };
+        const params = { ...GEOMETRY_PARAMS, tiles: { 'tile_CCCC-S': { shieldAnchor: 'NE' as const } } };
         const forced = auditTile(tile, { geometryParams: params });
 
         const feature = tile.features.find((f) => f.type === 'city')!;
@@ -264,7 +264,7 @@ describe('споты на тайлах', () => {
             ...GEOMETRY_PARAMS,
             // 30 + 20 + зазор = 52 > 48 (расстояние от центра до угла): щиту в угол не поместиться без перекрытия
             spots: { ...GEOMETRY_PARAMS.spots, meepleRadius: 30, shieldRadius: 20 },
-            tiles: { tile_CCCC: { shieldAnchor: 'NW' as const } },
+            tiles: { 'tile_CCCC-S': { shieldAnchor: 'NW' as const } },
         };
         const audit = auditTile(tile, { geometryParams: params });
         const feature = tile.features.find((f) => f.type === 'city')!;

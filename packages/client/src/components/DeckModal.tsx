@@ -6,7 +6,7 @@
 import { useEffect, useMemo } from 'react';
 import { useGameStore } from '@/state/useGameStore';
 import { TILE_DEFINITIONS } from '@fiefdom/shared/core/tileData';
-import { Tile } from '@/renderer/Tile';
+import { ProceduralTile } from '@/components/ProceduralTile';
 import styles from '@/components/styles/modal.module.css';
 
 interface DeckModalProps {
@@ -131,14 +131,7 @@ export const DeckModal = ({ isOpen, onClose }: DeckModalProps) => {
               >
                 {/* Миниатюра тайла */}
                 <div className={styles.deckTilePreview}>
-                  <svg width={100} height={100} style={{ display: 'block' }}>
-                    <Tile
-                      id={tile.id as any}
-                      size={100}
-                      features={TILE_DEFINITIONS.find(d => d.id === tile.id)?.features}
-                      rotation={0}
-                    />
-                  </svg>
+                  <ProceduralTile id={tile.id} size={100} />
                 </div>
 
                 {/* Счётчик остатка */}

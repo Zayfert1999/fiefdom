@@ -23,7 +23,7 @@ const SHIELD_ANCHOR_OPTIONS: ReadonlyArray<{ value: ShieldAnchor | 'auto'; label
 ];
 
 interface TileOverrideControlsProps {
-  artId: string;
+  tileId: string;
   override?: TileParamOverride;
   /** У тайла есть город со щитом */
   hasShield: boolean;
@@ -39,7 +39,7 @@ interface TileOverrideControlsProps {
 
 /** Закрепление seed за тайлом: «этот тайл вышел некрасивым — берём другой seed» */
 export const TileOverrideControls = memo(({
-  artId,
+  tileId,
   override,
   hasShield,
   onShieldAnchor,
@@ -52,13 +52,13 @@ export const TileOverrideControls = memo(({
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div style={{ fontSize: 11.5, color: TEXT, lineHeight: 1.4 }}>
       Закреплённый seed:{' '}
-      <b style={{ color: override?.seed ? '#86efac' : MUTED }}>{override?.seed ?? `нет (используется ${artId})`}</b>
+      <b style={{ color: override?.seed ? '#86efac' : MUTED }}>{override?.seed ?? `нет (используется ${tileId})`}</b>
       <br />
       Тайлов с настройками в файле: {overriddenCount}
     </div>
     <div style={{ fontSize: 10.5, color: MUTED, lineHeight: 1.3 }}>
       Подберите вариант кнопкой «Подобрать» (или введите seed в поле «Seed шума» в блоке «Шум Перлина»), затем закрепите.
-      Закрепление действует на все тайлы с этим artId и записывается в файл при сохранении.
+      Закрепление действует на этот тайл и записывается в файл при сохранении.
     </div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       <ResetButton onClick={onRandomize} label="🎲 Подобрать" />

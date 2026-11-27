@@ -11,16 +11,16 @@
 //     plaza, spots, mesh,
 //     walls,                                        ← городские стены (не влияют на геометрию тайлов)
 //     town,                                         ← застройка городов: площадь, улицы, дома (тоже не влияет)
-//     tiles: { "<artId>": { seed?, noise? } }      ← настройки конкретного тайла
+//     tiles: { "<tileId>": { seed?, noise? } }      ← настройки конкретного тайла
 //   }
 //
-// Порядок применения шума для фичи: noise → tiles[artId].noise → noiseByType[тип].
+// Порядок применения шума для фичи: noise → tiles[tileId].noise → noiseByType[тип].
 //
 // Модуль чистый: без React и без three. Умеет:
 //   • parseGeometryParams — толерантный разбор с понятными предупреждениями
 //   • serializeGeometryParams — канонический текст (стабильный порядок ключей)
 //   • hashGeometryParams — хэш для ключей кэша (можно по одному тайлу)
-//   • resolveTileParams — что реально применяется к тайлу с данным artId
+//   • resolveTileParams — что реально применяется к тайлу с данным id
 //
 // 🏗 `shapes` — параметры форм городов, монастырей и дорог (раньше константы
 //    CITY_PARAMS / MONASTERY_PARAMS / ROAD_PARAMS в генераторах). Старая секция
@@ -79,9 +79,9 @@ export const GEOMETRY_PARAMS_VERSION = 1;
 // 📦 ТИПЫ
 // ============================================
 
-/** Настройки конкретного тайла (ключ — artId) */
+/** Настройки конкретного тайла (ключ — id тайла) */
 export interface TileParamOverride {
-    /** Seed шума вместо artId: «этот тайл вышел некрасивым — берём другой seed» */
+    /** Seed шума вместо id тайла: «этот тайл вышел некрасивым — берём другой seed» */
     seed?: string;
     /** Куда поставить щит: угол тайла (NW, NE, SE, SW) или середина стороны (N, E, S, W). Без этого — автоматически */
     shieldAnchor?: ShieldAnchor;
@@ -161,15 +161,15 @@ export function resolveGeometryParams(input: GeometryParamsInput = {}): Geometry
     }
 
     const tiles: Record<string, TileParamOverride> = {};
-    for (const artId of Object.keys(input.tiles ?? {}).sort()) {
-        const raw = input.tiles![artId];
+    for (const tileId of Object.keys(input.tiles ?? {}).sort()) {
+        const raw = input.tiles![tileId];
         const seed = typeof raw?.seed === 'string' && raw.seed.trim() ? raw.seed.trim() : undefined;
         const tileNoise = normalizeNoisePartial(raw?.noise, noise);
         const shieldAnchor = SHIELD_ANCHORS.includes(raw?.shieldAnchor as ShieldAnchor)
             ? (raw!.shieldAnchor as ShieldAnchor)
             : undefined;
         if (seed === undefined && tileNoise === undefined && shieldAnchor === undefined) continue;
-        tiles[artId] = {
+        tiles[tileId] = {
             ...(seed !== undefined ? { seed } : {}),
             ...(shieldAnchor !== undefined ? { shieldAnchor } : {}),
             ...(tileNoise ? { noise: tileNoise } : {}),
@@ -372,28 +372,28 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
             warnings.push('tiles: ожидался объект, секция пропущена');
         } else {
             const tiles: Record<string, TileParamOverride> = {};
-            for (const [artId, value] of Object.entries(raw.tiles)) {
+            for (const [tileId, value] of Object.entries(raw.tiles)) {
                 if (!isRecord(value)) {
-                    warnings.push(`tiles.${artId}: ожидался объект, пропущено`);
+                    warnings.push(`tiles.${tileId}: ожидался объект, пропущено`);
                     continue;
                 }
                 for (const key of Object.keys(value)) {
                     if (key !== 'seed' && key !== 'noise' && key !== 'shieldAnchor') {
-                        warnings.push(`tiles.${artId}.${key}: неизвестный параметр, проигнорирован`);
+                        warnings.push(`tiles.${tileId}.${key}: неизвестный параметр, проигнорирован`);
                     }
                 }
                 if (value.shieldAnchor !== undefined && !SHIELD_ANCHORS.includes(value.shieldAnchor as ShieldAnchor)) {
                     warnings.push(
-                        `tiles.${artId}.shieldAnchor: допустимо ${SHIELD_ANCHORS.join(' | ')}, получено ${JSON.stringify(value.shieldAnchor)}`
+                        `tiles.${tileId}.shieldAnchor: допустимо ${SHIELD_ANCHORS.join(' | ')}, получено ${JSON.stringify(value.shieldAnchor)}`
                     );
                 }
                 if (value.seed !== undefined && typeof value.seed !== 'string') {
-                    warnings.push(`tiles.${artId}.seed: ожидалась строка`);
+                    warnings.push(`tiles.${tileId}.seed: ожидалась строка`);
                 }
-                tiles[artId] = {
+                tiles[tileId] = {
                     seed: typeof value.seed === 'string' ? value.seed : undefined,
                     shieldAnchor: value.shieldAnchor as ShieldAnchor | undefined,
-                    noise: sanitizeSection(`tiles.${artId}.noise`, value.noise, NOISE_PARAMS, warnings) as
+                    noise: sanitizeSection(`tiles.${tileId}.noise`, value.noise, NOISE_PARAMS, warnings) as
                         Partial<NoiseSettings> | undefined,
                 };
             }
@@ -415,8 +415,8 @@ export function parseGeometryParams(raw: unknown): ParseGeometryParamsResult {
     for (const type of NOISE_FEATURE_TYPES) {
         reportClamped(`noiseByType.${type}`, input.noiseByType?.[type], params.noiseByType[type], warnings);
     }
-    for (const [artId, override] of Object.entries(input.tiles ?? {})) {
-        reportClamped(`tiles.${artId}.noise`, override.noise, params.tiles[artId]?.noise, warnings);
+    for (const [tileId, override] of Object.entries(input.tiles ?? {})) {
+        reportClamped(`tiles.${tileId}.noise`, override.noise, params.tiles[tileId]?.noise, warnings);
     }
 
     return { params, warnings };
@@ -448,10 +448,10 @@ function canonicalObject(
     }
 
     const tiles: Record<string, unknown> = {};
-    for (const artId of Object.keys(params.tiles).sort()) {
-        if (onlyTile !== undefined && artId !== onlyTile) continue;
-        const override = params.tiles[artId];
-        tiles[artId] = {
+    for (const tileId of Object.keys(params.tiles).sort()) {
+        if (onlyTile !== undefined && tileId !== onlyTile) continue;
+        const override = params.tiles[tileId];
+        tiles[tileId] = {
             ...(override.seed !== undefined ? { seed: override.seed } : {}),
             ...(override.shieldAnchor !== undefined ? { shieldAnchor: override.shieldAnchor } : {}),
             ...(override.noise ? { noise: orderNoise(override.noise) } : {}),
@@ -494,7 +494,7 @@ function fnv1a(text: string): string {
 
 export interface HashGeometryParamsOptions {
     /**
-     * Учитывать ли городские стены и застройку. По умолчанию — только для общего хэша (без artId):
+     * Учитывать ли городские стены и застройку. По умолчанию — только для общего хэша (без id тайла):
      * хэш одного тайла от стен не зависит, потому что стены не влияют на его геометрию.
      * `false` нужен, чтобы пересчитывать геометрию тайлов только при правке того, что её меняет.
      */
@@ -503,15 +503,15 @@ export interface HashGeometryParamsOptions {
 
 /**
  * Хэш параметров для ключей кэша.
- * С `artId` учитываются только настройки этого тайла: правка seed
+ * С `tileId` учитываются только настройки этого тайла: правка seed
  * одного тайла не сбрасывает кэш остальных.
  */
 export function hashGeometryParams(
     params: GeometryParams,
-    artId?: string,
+    tileId?: string,
     options: HashGeometryParamsOptions = {}
 ): string {
-    return fnv1a(JSON.stringify(canonicalObject(params, artId ?? undefined, options.includeWalls)));
+    return fnv1a(JSON.stringify(canonicalObject(params, tileId ?? undefined, options.includeWalls)));
 }
 
 // ============================================
@@ -523,14 +523,14 @@ export interface ResolvedTileParams {
     readonly seed?: string;
     /** Заданная привязка щита (если задана) */
     readonly shieldAnchor?: ShieldAnchor;
-    /** Общие настройки шума с учётом tiles[artId].noise */
+    /** Общие настройки шума с учётом tiles[tileId].noise */
     readonly noise: NoiseSettings;
     /** Переопределения по типу фичи (применяются поверх noise) */
     readonly noiseByType: NoiseByType;
 }
 
-export function resolveTileParams(params: GeometryParams, artId: string): ResolvedTileParams {
-    const override = params.tiles[artId];
+export function resolveTileParams(params: GeometryParams, tileId: string): ResolvedTileParams {
+    const override = params.tiles[tileId];
     return {
         seed: override?.seed,
         shieldAnchor: override?.shieldAnchor,

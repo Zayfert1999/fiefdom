@@ -20,12 +20,15 @@ export interface TileFeature {
   ports: Port[];
   meepleSpot: Spot;
   adjacentCities?: string[];
+  /**
+   * Только в рантайме: форму фичи строит генератор из портов и подставляет сюда.
+   * В base.json геометрии нет.
+   */
   geometry?: FeatureGeometry;
 }
 
 export interface Tile {
   id: string;
-  artId: string;
   quantity: number;
   features: TileFeature[];
 }

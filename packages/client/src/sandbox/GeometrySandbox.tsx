@@ -222,19 +222,13 @@ export const GeometrySandbox = () => {
                 </div>
                 <div style={{ marginTop: 12, fontSize: 12, color: '#aaa' }}>
                   <p style={{ margin: '4px 0', color: '#fff', fontWeight: 600 }}>
-                    {selectedTile.id}
-                    {selectedTile.artId && selectedTile.artId !== selectedTile.id
-                      ? ` (art: ${selectedTile.artId})`
-                      : ''}{' '}
-                    (×{selectedTile.quantity})
+                    {selectedTile.id} (×{selectedTile.quantity})
                   </p>
                   {selectedTile.features.map((feat) => {
-                    const kind = feat.geometry?.kind ?? 'none';
-                    const statusIcon = kind === 'derived' ? '🌾' : kind === 'none' ? '⬜' : '✅';
                     return (
                       <p key={feat.id} style={{ margin: '2px 0' }}>
-                        <span style={{ color: getFeatureFill(feat) }}>{statusIcon} {feat.id}</span>
-                        {' · '}{feat.type}{' · '}{kind}
+                        <span style={{ color: getFeatureFill(feat) }}>● {feat.id}</span>
+                        {' · '}{feat.type}
                         {feat.ports.length > 0 && (
                           <>{' · ports: ['}{feat.ports.join(', ')}{']'}</>
                         )}

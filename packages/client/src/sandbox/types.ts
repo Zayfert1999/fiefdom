@@ -8,7 +8,6 @@ import type { TileFeature } from '@fiefdom/shared/core/types';
  */
 export interface SandboxTile {
   id: string;
-  artId?: string;
   quantity: number;
   features: readonly TileFeature[];
 }

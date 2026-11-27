@@ -313,7 +313,6 @@ const SeamBoard = ({ tiles, audits, view3d, meshParams, wallParams, townParams, 
         buildTileBundle(
           {
             tileId: audit.tileId,
-            artId: audit.artId,
             features: audit.features,
             geometry: audit.geometry,
             spots: audit.spots,

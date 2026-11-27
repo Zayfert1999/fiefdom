@@ -6,7 +6,6 @@
   "tiles": [
     {
       "id": "tile_CCCC-S",
-      "artId": "tile_CCCC",
       "quantity": 1,
       "features": [
         {
@@ -14,23 +13,12 @@
           "type": "city",
           "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 4, 7, 10],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "line", "to": [-50, 50] },
-              { "type": "line", "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         }
       ]
     },
     {
       "id": "tile_CCFC-S",
-      "artId": "tile_CCFC",
       "quantity": 1,
       "features": [
         {
@@ -38,62 +26,38 @@
           "type": "city",
           "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 4, 10],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "line", "to": [-50, 50] },
-              { "type": "quadratic", "cp": [0, 10], "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
           "meepleSpot": { "x": 0, "y": 40 },
-          "adjacentCities": ["city_new"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_new"]
         }
       ]
     },
     {
       "id": "tile_CCFC",
-      "artId": "tile_CCFC",
       "quantity": 3,
       "features": [
         {
           "id": "city_new",
           "type": "city",
           "ports": [1, 4, 10],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "line", "to": [-50, 50] },
-              { "type": "quadratic", "cp": [0, 10], "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
           "meepleSpot": { "x": 0, "y": 40 },
-          "adjacentCities": ["city_new"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_new"]
         }
       ]
     },
     {
       "id": "tile_CCFF-S",
-      "artId": "tile_CCFF",
       "quantity": 2,
       "features": [
         {
@@ -101,60 +65,38 @@
           "type": "city",
           "shieldSpot": { "x": 34, "y": -34 },
           "ports": [1, 4],
-          "meepleSpot": { "x": 15, "y": -15 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [-20, 20], "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 15, "y": -15 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [7, 10],
           "meepleSpot": { "x": -25, "y": 25 },
-          "adjacentCities": ["city_ne"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_ne"]
         }
       ]
     },
     {
       "id": "tile_CCFF",
-      "artId": "tile_CCFF",
       "quantity": 3,
       "features": [
         {
           "id": "city_ne",
           "type": "city",
           "ports": [1, 4],
-          "meepleSpot": { "x": 15, "y": -15 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [-20, 20], "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 15, "y": -15 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [7, 10],
           "meepleSpot": { "x": -25, "y": 25 },
-          "adjacentCities": ["city_ne"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_ne"]
         }
       ]
     },
     {
       "id": "tile_CCRC-S",
-      "artId": "tile_CCRC",
       "quantity": 2,
       "features": [
         {
@@ -162,323 +104,195 @@
           "type": "city",
           "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 4, 10],
-          "meepleSpot": { "x": 0, "y": -10 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "line", "to": [-50, 50] },
-              { "type": "quadratic", "cp": [0, -10], "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -10 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 35 },
-          "geometry": {
-            "kind": "line",
-            "start": [0, 50],
-            "lineWidth": 20,
-            "path": [
-              { "type": "line", "to": [0, 20] }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [6],
           "meepleSpot": { "x": 25, "y": 40 },
-          "adjacentCities": ["city_new"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_new"]
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8],
           "meepleSpot": { "x": -25, "y": 40 },
-          "adjacentCities": ["city_new"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_new"]
         }
       ]
     },
     {
       "id": "tile_CCRC",
-      "artId": "tile_CCRC",
       "quantity": 1,
       "features": [
         {
           "id": "city_new",
           "type": "city",
           "ports": [1, 4, 10],
-          "meepleSpot": { "x": 0, "y": -10 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "line", "to": [-50, 50] },
-              { "type": "quadratic", "cp": [0, -10], "to": [50, 50] },
-              { "type": "line", "to": [50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -10 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 35 },
-          "geometry": {
-            "kind": "line",
-            "start": [0, 50],
-            "lineWidth": 20,
-            "path": [
-              { "type": "line", "to": [0, 20] }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [6],
           "meepleSpot": { "x": 25, "y": 40 },
-          "adjacentCities": ["city_new"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_new"]
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8],
           "meepleSpot": { "x": -25, "y": 40 },
-          "adjacentCities": ["city_new"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_new"]
         }
       ]
     },
     {
       "id": "tile_CFCF",
-      "artId": "tile_CFCF",
       "quantity": 3,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_ew",
           "type": "field",
           "ports": [4, 10],
           "meepleSpot": { "x": 0, "y": 0 },
-          "adjacentCities": ["city_n", "city_s"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n", "city_s"]
         },
         {
           "id": "city_s",
           "type": "city",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 40 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, 50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, 10], "to": [50, 50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 40 }
         }
       ]
     },
     {
       "id": "tile_CFFC",
-      "artId": "tile_CFFC",
       "quantity": 2,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [4, 7],
           "meepleSpot": { "x": 0, "y": 0 },
-          "adjacentCities": ["city_n", "city_w"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n", "city_w"]
         },
         {
           "id": "city_w",
           "type": "city",
           "ports": [10],
-          "meepleSpot": { "x": -40, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [-10, 0], "to": [-50, 50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": -40, "y": 0 }
         }
       ]
     },
     {
       "id": "tile_CFFF",
-      "artId": "tile_CFFF",
       "quantity": 5,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_esw",
           "type": "field",
           "ports": [4, 7, 10],
           "meepleSpot": { "x": 0, "y": 0 },
-          "adjacentCities": ["city_n"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n"]
         }
       ]
     },
     {
       "id": "tile_CFRR",
-      "artId": "tile_CFRR",
       "quantity": 3,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "road_sw",
           "type": "road",
           "ports": [7, 10],
-          "meepleSpot": { "x": -7, "y": 7 },
-            "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 25] },
-                { "type": "bezier", "cp1": [0, 10], "cp2": [-10, 0], "to": [-25, 0] },
-                { "type": "line", "to": [-50, 0] }
-              ]
-            }
+          "meepleSpot": { "x": -7, "y": 7 }
         },
         {
           "id": "field_e-nw",
           "type": "field",
           "ports": [ 4, 6, 11],
           "meepleSpot": { "x": 30, "y": 0 },
-          "adjacentCities": ["city_n"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n"]
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": { "x": -30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -30, "y": 30 }
         }
       ]
     },
     {
       "id": "tile_CRFR",
-      "artId": "tile_CRFR",
       "quantity": 4,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_ne-nw",
           "type": "field",
           "ports": [3, 11],
           "meepleSpot": { "x": 35, "y": -25 },
-          "adjacentCities": ["city_n"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n"]
         },
         {
           "id": "road_ew",
           "type": "road",
           "ports": [4, 10],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "line",
-            "lineWidth": 20,
-            "start": [-50, 0],
-            "path": [
-              { "type": "line", "to": [50, 0] }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [5, 7, 9],
-          "meepleSpot": { "x": 0, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 0, "y": 30 }
         }
       ]
     },
     {
       "id": "tile_CRRC-S",
-      "artId": "tile_CRRC",
       "quantity": 2,
       "features": [
         {
@@ -486,16 +300,7 @@
           "type": "city",
           "shieldSpot": { "x": -34, "y": -34 },
           "ports": [1, 10],
-          "meepleSpot": { "x": -25, "y": -25 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [-20, -20], "to": [-50, 50] },
-              { "type": "line", "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": -25, "y": -25 }
           
         },
         {
@@ -503,53 +308,31 @@
           "type": "field",
           "ports": [3, 8],
           "meepleSpot": { "x": 35, "y": -25 },
-          "adjacentCities": ["city_nw"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_nw"]
         },
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": { "x": 7, "y": 7 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 25] },
-                { "type": "bezier", "cp1": [0, 10], "cp2": [10, 0], "to": [25, 0] },
-                { "type": "line", "to": [50, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 7, "y": 7 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 35, "y": 35 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 35, "y": 35 }
         }
       ]
     },
     {
       "id": "tile_CRRC",
-      "artId": "tile_CRRC",
       "quantity": 3,
       "features": [
           {
           "id": "city_nw",
           "type": "city",
           "ports": [1, 10],
-          "meepleSpot": { "x": -25, "y": -25 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [-20, -20], "to": [-50, 50] },
-              { "type": "line", "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": -25, "y": -25 }
           
         },
         {
@@ -557,174 +340,104 @@
           "type": "field",
           "ports": [3, 8],
           "meepleSpot": { "x": 35, "y": -25 },
-          "adjacentCities": ["city_nw"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_nw"]
         },
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": { "x": 7, "y": 7 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 25] },
-                { "type": "bezier", "cp1": [0, 10], "cp2": [10, 0], "to": [25, 0] },
-                { "type": "line", "to": [50, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 7, "y": 7 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 35, "y": 35 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 35, "y": 35 }
         }
       ]
     },
     {
       "id": "tile_CRRF",
-      "artId": "tile_CRRF",
       "quantity": 3,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": { "x": 7, "y": 7 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 25] },
-                { "type": "bezier", "cp1": [0, 10], "cp2": [10, 0], "to": [25, 0] },
-                { "type": "line", "to": [50, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 7, "y": 7 }
         },
         {
           "id": "field_ne-w",
           "type": "field",
           "ports": [3, 8, 10],
           "meepleSpot": { "x": -30, "y": 0 },
-          "adjacentCities": ["city_n"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n"]
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": 30 }
         }
       ]
     },
     {
       "id": "tile_CRRR",
-      "artId": "tile_CRRR",
       "quantity": 3,
       "features": [
         {
           "id": "city_n",
           "type": "city",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -40 },
-          "geometry": {
-            "kind": "area",
-            "start": [50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [-50, -50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": -40 }
         },
         {
           "id": "field_ne-nw",
           "type": "field",
           "ports": [3, 11],
           "meepleSpot": { "x": 40, "y": -25 },
-          "adjacentCities": ["city_n"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_n"]
         },
         {
           "id": "road_e",
           "type": "road",
           "ports": [4],
-          "meepleSpot": { "x": 30, "y": 0 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [50, 0],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 30, "y": 0 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": { "x": -30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -30, "y": 30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 30 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 0, "y": 30 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": 30 }
         },
         {
           "id": "road_w",
           "type": "road",
           "ports": [10],
-          "meepleSpot": { "x": -30, "y": 0 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [-50, 0],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": -30, "y": 0 }
         }
       ]
     },
     {
       "id": "tile_FCFC-S",
-      "artId": "tile_FCFC",
       "quantity": 2,
       "features": [
         {
@@ -732,39 +445,26 @@
           "type": "field",
           "ports": [1],
           "meepleSpot": { "x": 0, "y": -40 },
-          "adjacentCities": ["city_ew"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_ew"]
         },
         {
           "id": "city_ew",
           "type": "city",
           "shieldSpot": { "x": 34, "y": 0 },
           "ports": [4, 10],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [50, -50] },
-              { "type": "line", "to": [50, 50] },
-              { "type": "quadratic", "cp": [0, 10], "to": [-50, 50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
           "meepleSpot": { "x": 0, "y": 40 },
-          "adjacentCities": ["city_ew"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_ew"]
         }
       ]
     },
     {
       "id": "tile_FCFC",
-      "artId": "tile_FCFC",
       "quantity": 1,
       "features": [
         {
@@ -772,339 +472,206 @@
           "type": "field",
           "ports": [1],
           "meepleSpot": { "x": 0, "y": -40 },
-          "adjacentCities": ["city_ew"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_ew"]
         },
         {
           "id": "city_ew",
           "type": "city",
           "ports": [4, 10],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-50, -50],
-            "outline": [
-              { "type": "quadratic", "cp": [0, -10], "to": [50, -50] },
-              { "type": "line", "to": [50, 50] },
-              { "type": "quadratic", "cp": [0, 10], "to": [-50, 50] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_s",
           "type": "field",
           "ports": [7],
           "meepleSpot": { "x": 0, "y": 40 },
-          "adjacentCities": ["city_ew"],
-          "geometry": { "kind": "derived" }
+          "adjacentCities": ["city_ew"]
         }
       ]
     },
     {
       "id": "tile_FFFF-M",
-      "artId": "tile_FFFF-M",
       "quantity": 4,
       "features": [
         {
           "id": "monastery",
           "type": "monastery",
           "ports": [],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-20, -20],
-            "outline": [
-              { "type": "line", "to": [20, -20] },
-              { "type": "line", "to": [20, 20] },
-              { "type": "line", "to": [-20, 20] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_nesw",
           "type": "field",
           "ports": [ 1, 4, 7, 10 ],
-          "meepleSpot": { "x": 30, "y": -30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": -30 }
         }
       ]
     },
     {
       "id": "tile_FFRF-M",
-      "artId": "tile_FFRF-M",
       "quantity": 2,
       "features": [
         {
           "id": "monastery",
           "type": "monastery",
           "ports": [],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "area",
-            "start": [-20, -20],
-            "outline": [
-              { "type": "line", "to": [20, -20] },
-              { "type": "line", "to": [20, 20] },
-              { "type": "line", "to": [-20, 20] },
-              { "type": "close" }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_new",
           "type": "field",
           "ports": [ 1, 4, 6, 8, 10],
-          "meepleSpot": { "x": 30, "y": -30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": -30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 30 },
-          "geometry": {
-            "kind": "line",
-            "start": [0, 50],
-            "lineWidth": 20,
-            "path": [
-              { "type": "line", "to": [0, 20] }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 30 }
         }
       ]
     },
     {
       "id": "tile_FRRF",
-      "artId": "tile_FRRF",
       "quantity": 9,
       "features": [
         {
           "id": "road_se",
           "type": "road",
           "ports": [4, 7],
-          "meepleSpot": { "x": 7, "y": 7 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 25] },
-                { "type": "bezier", "cp1": [0, 10], "cp2": [10, 0], "to": [25, 0] },
-                { "type": "line", "to": [50, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 7, "y": 7 }
         },
         {
           "id": "field_nw",
           "type": "field",
           "ports": [1, 3, 8, 10],
-          "meepleSpot": { "x": -20, "y": -20 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -20, "y": -20 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": 30 }
         }
       ]
     },
     {
       "id": "tile_FRRR",
-      "artId": "tile_FRRR",
       "quantity": 4,
       "features": [
         {
           "id": "field_n",
           "type": "field",
           "ports": [1, 3, 11],
-          "meepleSpot": { "x": 0, "y": -30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 0, "y": -30 }
         },
         {
           "id": "road_e",
           "type": "road",
           "ports": [4],
-          "meepleSpot": { "x": 35, "y": 0 },
-           "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [50, 0],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 35, "y": 0 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": { "x": -30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -30, "y": 30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 35 },
-            "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": 30 }
         },
         {
           "id": "road_w",
           "type": "road",
           "ports": [10],
-          "meepleSpot": { "x": -35, "y": 0 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [-50, 0],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": -35, "y": 0 }
         }
       ]
     },
     {
       "id": "tile_RFRF",
-      "artId": "tile_RFRF",
       "quantity": 8,
       "features": [
         {
           "id": "road_ns",
           "type": "road",
           "ports": [1, 7],
-          "meepleSpot": { "x": 0, "y": 0 },
-          "geometry": {
-            "kind": "line",
-            "lineWidth": 20,
-            "start": [0, -50],
-            "path": [
-              { "type": "line", "to": [0, 50] }
-            ]
-          }
+          "meepleSpot": { "x": 0, "y": 0 }
         },
         {
           "id": "field_w",
           "type": "field",
           "ports": [0, 8, 10],
-          "meepleSpot": { "x": -30, "y": 0 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -30, "y": 0 }
         },
         {
           "id": "field_e",
           "type": "field",
           "ports": [2, 4, 6],
-          "meepleSpot": { "x": 30, "y": 0 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": 0 }
         }
       ]
     },
     {
       "id": "tile_RRRR",
-      "artId": "tile_RRRR",
       "quantity": 1,
       "features": [
         {
           "id": "road_n",
           "type": "road",
           "ports": [1],
-          "meepleSpot": { "x": 0, "y": -35 },
-            "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, -50],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 0, "y": -35 }
         },
         {
           "id": "field_ne",
           "type": "field",
           "ports": [2, 3],
-          "meepleSpot": { "x": 30, "y": -30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": -30 }
         },
         {
           "id": "road_e",
           "type": "road",
           "ports": [4],
-          "meepleSpot": { "x": 35, "y": 0 },
-           "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [50, 0],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 35, "y": 0 }
         },
         {
           "id": "field_sw",
           "type": "field",
           "ports": [8, 9],
-          "meepleSpot": { "x": -30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -30, "y": 30 }
         },
         {
           "id": "road_s",
           "type": "road",
           "ports": [7],
-          "meepleSpot": { "x": 0, "y": 35 },
-            "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [0, 50],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": 0, "y": 35 }
         },
         {
           "id": "field_se",
           "type": "field",
           "ports": [5, 6],
-          "meepleSpot": { "x": 30, "y": 30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": 30, "y": 30 }
         },
         {
           "id": "road_w",
           "type": "road",
           "ports": [10],
-          "meepleSpot": { "x": -35, "y": 0 },
-          "geometry": {
-              "kind": "line",
-              "lineWidth": 20,
-              "start": [-50, 0],
-              "path": [
-                { "type": "line", "to": [0, 0] }
-              ]
-            }
+          "meepleSpot": { "x": -35, "y": 0 }
         },
         {
           "id": "field_nw",
           "type": "field",
           "ports": [0, 11],
-          "meepleSpot": { "x": -30, "y": -30 },
-          "geometry": { "kind": "derived" }
+          "meepleSpot": { "x": -30, "y": -30 }
         }
       ]
     }

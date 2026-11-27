@@ -579,7 +579,7 @@ describe('бандл тайла', () => {
         assignments: { fieldGeometries: new Map([['field1', [NOTCH]]]) },
     } as never;
     const features = [{ id: 'field1', type: 'field' }, { id: 'city1', type: 'city' }] as never;
-    const source = { tileId: 't1', artId: 'a1', features, geometry };
+    const source = { tileId: 't1', features, geometry };
 
     it('рельеф включён — тайл без полей, полигоны полей приложены', () => {
         const bundle = buildTileBundle(source, { terrain: { enabled: true, amplitude: 5 } });

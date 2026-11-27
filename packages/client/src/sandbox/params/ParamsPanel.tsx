@@ -88,30 +88,30 @@ export const ParamsPanel = ({
   // ============================================
   // 📌 НАСТРОЙКИ ВЫБРАННОГО ТАЙЛА
   // ============================================
-  const selectedArtId = selectedTile ? (selectedTile.artId ?? selectedTile.id) : null;
+  const selectedTileId = selectedTile ? selectedTile.id : null;
 
   const handleRandomSeed = useCallback(() => {
     setSeedOverride(`s${Math.random().toString(36).slice(2, 8)}`);
   }, [setSeedOverride]);
 
-  /** Закрепляет примеряемый seed за artId выбранного тайла */
+  /** Закрепляет примеряемый seed за выбранным тайлом */
   const handlePinSeed = useCallback(() => {
     const seed = seedOverride.trim();
-    if (!selectedArtId || !seed) return;
-    actions.pinSeed(selectedArtId, seed);
+    if (!selectedTileId || !seed) return;
+    actions.pinSeed(selectedTileId, seed);
     setSeedOverride('');
-    console.log(`📌 [Sandbox] Seed "${seed}" закреплён за ${selectedArtId}`);
-  }, [actions, seedOverride, selectedArtId, setSeedOverride]);
+    console.log(`📌 [Sandbox] Seed "${seed}" закреплён за ${selectedTileId}`);
+  }, [actions, seedOverride, selectedTileId, setSeedOverride]);
 
   const handleClearPin = useCallback(() => {
-    if (selectedArtId) actions.clearPin(selectedArtId);
-  }, [actions, selectedArtId]);
+    if (selectedTileId) actions.clearPin(selectedTileId);
+  }, [actions, selectedTileId]);
 
   const handleShieldAnchor = useCallback(
     (anchor: ShieldAnchor | undefined) => {
-      if (selectedArtId) actions.setShieldAnchor(selectedArtId, anchor);
+      if (selectedTileId) actions.setShieldAnchor(selectedTileId, anchor);
     },
-    [actions, selectedArtId]
+    [actions, selectedTileId]
   );
 
   const selectedHasShield = selectedTile
@@ -122,18 +122,16 @@ export const ParamsPanel = ({
   // 📊 СТАТИСТИКА
   // ============================================
   const geometryStats = useMemo(() => {
-    // Нарисованная вручную геометрия в данных: больше не используется (см. generators/index.ts)
-    let legacyManual = 0;
-    let derived = 0;
-    let withoutGeometry = 0;
+    // Геометрии в данных нет: форма всегда строится из портов (см. generators/index.ts)
+    const byType: Record<string, number> = {};
+    let features = 0;
     for (const tile of tiles) {
       for (const feat of tile.features) {
-        if (feat.geometry?.kind === 'derived') derived++;
-        else if (feat.geometry) legacyManual++;
-        else withoutGeometry++;
+        byType[feat.type] = (byType[feat.type] ?? 0) + 1;
+        features++;
       }
     }
-    return { legacyManual, withoutGeometry, derived };
+    return { tiles: tiles.length, features, byType };
   }, [tiles]);
 
   return (
@@ -210,7 +208,7 @@ export const ParamsPanel = ({
             <span style={{ minWidth: 90 }}>🔑 Seed шума</span>
             <input
               type="text" value={seedOverride} onChange={(e) => setSeedOverride(e.target.value)}
-              placeholder="по умолчанию artId" disabled={!noiseEnabled}
+              placeholder="по умолчанию id тайла" disabled={!noiseEnabled}
               style={{ flex: 1, minWidth: 0, background: '#111827', color: '#e5e7eb', border: '1px solid #374151', borderRadius: 4, padding: '4px 6px' }}
             />
           </label>
@@ -230,16 +228,16 @@ export const ParamsPanel = ({
           />
         </ParamGroup>
 
-        {selectedArtId && (
+        {selectedTileId && (
           <ParamGroup
             id="tile-override"
-            title={`📌 Тайл ${selectedArtId}`}
-            meta={params.tiles[selectedArtId]?.seed ? 'seed закреплён' : undefined}
+            title={`📌 Тайл ${selectedTileId}`}
+            meta={params.tiles[selectedTileId]?.seed ? 'seed закреплён' : undefined}
             changed={changed.tiles}
           >
             <TileOverrideControls
-              artId={selectedArtId}
-              override={params.tiles[selectedArtId]}
+              tileId={selectedTileId}
+              override={params.tiles[selectedTileId]}
               hasShield={selectedHasShield}
               onShieldAnchor={handleShieldAnchor}
               previewSeed={seedOverride}
@@ -298,9 +296,11 @@ export const ParamsPanel = ({
       <ParamCategory title="Данные">
         <ParamGroup id="stats" title="📊 Статистика">
           <div style={{ fontSize: 12, color: '#888' }}>
-            <p style={{ margin: '4px 0' }} title="Не используется: геометрия строится из портов">🗄 Ручная геометрия в данных (устарела): {geometryStats.legacyManual}</p>
-            <p style={{ margin: '4px 0' }}>🌾 Derived (поля): {geometryStats.derived}</p>
-            <p style={{ margin: '4px 0' }}>⬜ Без геометрии: {geometryStats.withoutGeometry}</p>
+            <p style={{ margin: '4px 0' }}>🧩 Тайлов в данных: {geometryStats.tiles}</p>
+            <p style={{ margin: '4px 0' }}>📐 Фич: {geometryStats.features}</p>
+            <p style={{ margin: '4px 0' }}>
+              {Object.entries(geometryStats.byType).map(([type, count]) => `${type}: ${count}`).join(' · ')}
+            </p>
           </div>
         </ParamGroup>
       </ParamCategory>

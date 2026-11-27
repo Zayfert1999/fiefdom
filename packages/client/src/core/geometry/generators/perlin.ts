@@ -81,7 +81,7 @@ export type Noise2D = (x: number, y: number) => number;
 /**
  * Создаёт детерминированную функцию 2D-шума Перлина.
  *
- * @param seed Строка-зерно (обычно `tile.artId`)
+ * @param seed Строка-зерно (обычно `tile.id`)
  * @returns Функция (x, y) → значение в диапазоне [-1, 1]
  *
  * @example

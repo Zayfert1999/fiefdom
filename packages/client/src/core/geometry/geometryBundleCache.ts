@@ -20,7 +20,7 @@ let hits = 0;
 let misses = 0;
 
 export function tileBundleCacheKey(tile: AuditTile, params: GeometryParams): string {
-    return `${tile.id}|${hashGeometryParams(params, tile.artId ?? tile.id)}`;
+    return `${tile.id}|${hashGeometryParams(params, tile.id)}`;
 }
 
 /** Бандл тайла из кэша или построенный заново */
@@ -38,7 +38,6 @@ export function getTileBundle(tile: AuditTile, params: GeometryParams): TileBund
     const bundle = buildTileBundle(
         {
             tileId: audit.tileId,
-            artId: audit.artId,
             features: audit.features,
             geometry: audit.geometry,
             spots: audit.spots,

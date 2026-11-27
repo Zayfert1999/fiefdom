@@ -23,10 +23,6 @@ declare global {
 // ============================================
 export const TILE_DEFINITIONS: Tile[] = tileSetData.tiles as unknown as Tile[];
 
-export const ART_ID_MAP: Record<string, string> = Object.fromEntries(
-    TILE_DEFINITIONS.map(def => [def.id, def.artId])
-);
-
 // ============================================
 // 🔥 HMR: предотвращаем full page reload
 // ============================================

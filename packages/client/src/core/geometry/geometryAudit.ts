@@ -61,7 +61,6 @@ import type { TessellationResult, TileGeometryResult } from './types';
 /** Минимальное описание тайла (структурно совместимо с Tile) */
 export interface AuditTile {
     readonly id: string;
-    readonly artId?: string;
     readonly quantity?: number;
     readonly features: readonly TileFeature[];
 }
@@ -123,7 +122,6 @@ export const DEFAULT_AUDIT_THRESHOLDS: Readonly<AuditThresholds> = {
 
 export interface TileAudit {
     readonly tileId: string;
-    readonly artId: string;
     readonly seed: string;
     readonly features: readonly TileFeature[];
     readonly geometry: TileGeometryResult;
@@ -347,7 +345,6 @@ export function geometrySignature(tessellation: TessellationResult): string {
 
 export interface AuditGeometryInput {
     readonly tileId: string;
-    readonly artId?: string;
     readonly seed: string;
     readonly features: readonly TileFeature[];
     readonly result: TileGeometryResult;
@@ -642,7 +639,6 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
 
     return {
         tileId: input.tileId,
-        artId: input.artId ?? input.tileId,
         seed: input.seed,
         features,
         geometry: result,
@@ -674,7 +670,7 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
  * Те же настройки, что и в песочнице.
  *
  * Приоритет значений: явные поля ниже → `geometryParams` (в нём ещё и настройки
- * конкретного тайла по artId) → значения по умолчанию в коде.
+ * конкретного тайла по его id) → значения по умолчанию в коде.
  */
 export interface AuditPipelineOptions {
     /** Полный набор параметров из geometryParams.json (или из песочницы) */
@@ -683,7 +679,7 @@ export interface AuditPipelineOptions {
     readonly shapes?: ShapeParamsInput;
     /** Включить шум (по умолчанию true) */
     readonly noiseEnabled?: boolean;
-    /** Общий seed вместо artId (для сравнения seed на всех тайлах) */
+    /** Общий seed вместо id тайла (для сравнения seed на всех тайлах) */
     readonly seedOverride?: string;
     readonly noise?: Partial<NoiseSettings>;
     /** Настройки шума по типу фичи (город / монастырь / дорога) */
@@ -701,13 +697,11 @@ export interface AuditPipelineOptions {
 export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): TileAudit {
     const run = (): TileAudit => {
         const started = performance.now();
-        const artKey = tile.artId ?? tile.id;
-
         // Параметры тайла: общие + его собственные (seed, шум) из geometryParams
         const params = options.geometryParams;
-        const forTile = params ? resolveTileParams(params, artKey) : undefined;
+        const forTile = params ? resolveTileParams(params, tile.id) : undefined;
 
-        const seed = options.seedOverride?.trim() || forTile?.seed || artKey;
+        const seed = options.seedOverride?.trim() || forTile?.seed || tile.id;
         const noise = { ...forTile?.noise, ...options.noise };
         const noiseByType = options.noiseByType ?? forTile?.noiseByType;
         const tessellation = { ...params?.tessellation, ...options.tessellation };
@@ -741,7 +735,6 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
 
         return auditGeometry({
             tileId: tile.id,
-            artId: tile.artId,
             seed,
             features,
             result,

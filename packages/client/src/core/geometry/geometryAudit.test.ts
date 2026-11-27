@@ -83,7 +83,7 @@ describe('шум Перлина', () => {
     const WITH_FREE_CONTOURS = ['tile_CCFC', 'tile_CRRC', 'tile_FFFF-M', 'tile_FFRF-M'];
 
     it.each(WITH_FREE_CONTOURS)('%s: шум действительно меняет форму городов/монастырей', (id) => {
-        const tile = tiles.find((t) => t.id === id || t.artId === id)!;
+        const tile = tiles.find((t) => t.id === id)!;
         const noisy = auditTile(tile, { ...GENERATED, noiseEnabled: true });
         const clean = auditTile(tile, { ...GENERATED, noiseEnabled: false });
         // Регрессия бага «нулевая нормаль»: раньше сигнатуры совпадали

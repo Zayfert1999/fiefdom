@@ -92,7 +92,7 @@ describe('computeRegionHighlights', () => {
 
   it('подсвечивает фичи тайла-превью', () => {
     const previewTile = {
-      tile: { id: 't', artId: 't', quantity: 1, features: [feature('city1', 'city')] },
+      tile: { id: 't', quantity: 1, features: [feature('city1', 'city')] },
       x: 2,
       y: 0,
       rotation: 90,

@@ -3,7 +3,7 @@
 // Колода и подсказки убраны — они теперь в GameHUD.
 
 import { useGameStore } from '@/state/useGameStore';
-import { Tile } from '@/renderer/Tile';
+import { ProceduralTile } from '@/components/ProceduralTile';
 import styles from '@/components/styles/game.module.css';
 import CheckIcon from '@/assets/svg/icon/check-icon.svg?react';
 import UndoIcon from '@/assets/svg/icon/undo-icon.svg?react';
@@ -40,15 +40,7 @@ export const ActionPanel: React.FC = () => {
           ============================================ */}
       {phase === 'placeTile' && drawnTile && !previewTile && (
         <div className={styles.tilePreview}>
-          <svg width={TILE_SIZE} height={TILE_SIZE} style={{ display: 'block' }}>
-            {/* 🌟 ОБНОВЛЕНО: передаём features */}
-            <Tile
-              id={drawnTile.id as any}
-              size={TILE_SIZE}
-              features={drawnTile.features}
-              rotation={0}
-            />
-          </svg>
+          <ProceduralTile id={drawnTile.id} size={TILE_SIZE} />
         </div>
       )}
 

@@ -130,15 +130,15 @@ export const useSandboxParams = () => {
   const handleRevert = useCallback(() => setParams(cloneGeometryParams(savedParams)), [savedParams]);
   const handleResetDefaults = useCallback(() => setParams(cloneGeometryParams(DEFAULT_GEOMETRY_PARAMS)), []);
 
-  // 📌 Настройки конкретного тайла (по artId)
+  // 📌 Настройки конкретного тайла (по id)
 
   /** Закрепляет seed за тайлом */
   const pinSeed = useCallback(
-    (artId: string, seed: string) =>
+    (tileId: string, seed: string) =>
       setParams((prev) =>
         resolveGeometryParams({
           ...prev,
-          tiles: { ...prev.tiles, [artId]: { ...prev.tiles[artId], seed } },
+          tiles: { ...prev.tiles, [tileId]: { ...prev.tiles[tileId], seed } },
         })
       ),
     []
@@ -146,12 +146,12 @@ export const useSandboxParams = () => {
 
   /** Снимает закрепление seed, сохраняя остальные настройки тайла */
   const clearPin = useCallback(
-    (artId: string) =>
+    (tileId: string) =>
       setParams((prev) => {
-        const current = prev.tiles[artId];
+        const current = prev.tiles[tileId];
         if (!current) return prev;
         const tiles = { ...prev.tiles };
-        tiles[artId] = {
+        tiles[tileId] = {
           ...(current.shieldAnchor ? { shieldAnchor: current.shieldAnchor } : {}),
           ...(current.noise ? { noise: current.noise } : {}),
         };
@@ -162,11 +162,11 @@ export const useSandboxParams = () => {
 
   /** Задаёт (или снимает) привязку щита */
   const setShieldAnchor = useCallback(
-    (artId: string, anchor: ShieldAnchor | undefined) =>
+    (tileId: string, anchor: ShieldAnchor | undefined) =>
       setParams((prev) =>
         resolveGeometryParams({
           ...prev,
-          tiles: { ...prev.tiles, [artId]: { ...prev.tiles[artId], shieldAnchor: anchor } },
+          tiles: { ...prev.tiles, [tileId]: { ...prev.tiles[tileId], shieldAnchor: anchor } },
         })
       ),
     []

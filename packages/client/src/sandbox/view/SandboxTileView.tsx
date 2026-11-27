@@ -41,14 +41,14 @@ export const SandboxTileView = memo(({
   // ============================================
   // 🔑 SEED (для шума, не для генераторов)
   // ============================================
-  // Параметры именно этого тайла: общие + закреплённый seed + шум по artId
+  // Параметры именно этого тайла: общие + закреплённый seed + шум по id тайла
   const tileParams = useMemo(
-    () => resolveTileParams(params, tile.artId ?? tile.id),
-    [params, tile.artId, tile.id]
+    () => resolveTileParams(params, tile.id),
+    [params, tile.id]
   );
   const seed = useMemo(
-    () => seedOverride?.trim() || tileParams.seed || tile.artId || tile.id,
-    [seedOverride, tileParams.seed, tile.artId, tile.id]
+    () => seedOverride?.trim() || tileParams.seed || tile.id,
+    [seedOverride, tileParams.seed, tile.id]
   );
   const { shapes } = params;
 
@@ -104,7 +104,6 @@ export const SandboxTileView = memo(({
     () =>
       auditGeometry({
         tileId: tile.id,
-        artId: tile.artId,
         seed,
         features: generation.features,
         result,
@@ -112,7 +111,7 @@ export const SandboxTileView = memo(({
         spots: params.spots,
         warnings: generation.warnings,
       }),
-    [tile.id, tile.artId, seed, generation.features, generation.warnings, result, params.tessellation, params.spots]
+    [tile.id, seed, generation.features, generation.warnings, result, params.tessellation, params.spots]
   );
 
   return (

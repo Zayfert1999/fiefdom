@@ -797,7 +797,6 @@ export function sampleMeshHeight(mesh: TileMeshData, x: number, z: number): numb
 /** Всё, что нужно рендереру, интеракции и аудиту для одного тайла */
 export interface TileBundle {
     readonly tileId: string;
-    readonly artId: string;
     readonly features: readonly MeshFeature[];
     readonly geometry: TileGeometryResult;
     readonly mesh: TileMeshData;
@@ -814,7 +813,6 @@ export interface TileBundle {
 export function buildTileBundle(
     source: {
         readonly tileId: string;
-        readonly artId: string;
         readonly features: readonly MeshFeature[];
         readonly geometry: TileGeometryResult;
         readonly spots?: ReadonlyMap<string, FeatureSpot>;
@@ -827,7 +825,6 @@ export function buildTileBundle(
 
     return {
         tileId: source.tileId,
-        artId: source.artId,
         features: source.features,
         geometry: source.geometry,
         mesh: buildTileMesh(source.geometry, source.features, params, { fields: fieldsOmitted ? 'none' : 'flat' }),

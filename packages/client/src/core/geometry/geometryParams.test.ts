@@ -140,13 +140,13 @@ describe('parseGeometryParams', () => {
     });
 
     it('shieldAnchor тайла: принимается допустимое значение, недопустимое отбрасывается с замечанием', () => {
-        const ok = parseGeometryParams({ version: 1, tiles: { tile_CCCC: { shieldAnchor: 'NE' } } });
+        const ok = parseGeometryParams({ version: 1, tiles: { 'tile_CCCC-S': { shieldAnchor: 'NE' } } });
         expect(ok.warnings).toEqual([]);
-        expect(ok.params.tiles.tile_CCCC.shieldAnchor).toBe('NE');
+        expect(ok.params.tiles['tile_CCCC-S'].shieldAnchor).toBe('NE');
 
-        const bad = parseGeometryParams({ version: 1, tiles: { tile_CCCC: { shieldAnchor: 'центр' } } });
+        const bad = parseGeometryParams({ version: 1, tiles: { 'tile_CCCC-S': { shieldAnchor: 'центр' } } });
         expect(bad.warnings.some((w) => w.includes('shieldAnchor'))).toBe(true);
-        expect(bad.params.tiles.tile_CCCC).toBeUndefined();
+        expect(bad.params.tiles['tile_CCCC-S']).toBeUndefined();
     });
 
     it('другая версия формата даёт предупреждение', () => {
@@ -223,9 +223,9 @@ describe('resolveTileParams', () => {
 
     it('привязка щита тайла доходит до resolveTileParams и меняет хэш именно этого тайла', () => {
         const base = withChanges({ tiles: {} });
-        const pinned = withChanges({ tiles: { tile_CCCC: { shieldAnchor: 'SE' } } });
-        expect(resolveTileParams(pinned, 'tile_CCCC').shieldAnchor).toBe('SE');
-        expect(hashGeometryParams(pinned, 'tile_CCCC')).not.toBe(hashGeometryParams(base, 'tile_CCCC'));
+        const pinned = withChanges({ tiles: { 'tile_CCCC-S': { shieldAnchor: 'SE' } } });
+        expect(resolveTileParams(pinned, 'tile_CCCC-S').shieldAnchor).toBe('SE');
+        expect(hashGeometryParams(pinned, 'tile_CCCC-S')).not.toBe(hashGeometryParams(base, 'tile_CCCC-S'));
         expect(hashGeometryParams(pinned, 'tile_CCFC')).toBe(hashGeometryParams(base, 'tile_CCFC'));
     });
 
@@ -243,7 +243,7 @@ describe('параметры доходят до геометрии', () => {
     const CITY = 'tile_CCFC';
     const MONASTERY = 'tile_FFFF-M';
 
-    it('seed тайла из tiles[artId] равен явному seedOverride и отличается от artId', () => {
+    it('seed тайла из tiles[id] равен явному seedOverride и отличается от seed по умолчанию', () => {
         const pinned = withChanges({ tiles: { tile_CCFC: { seed: 'my-seed' } } });
         const viaParams = signature(CITY, pinned);
         const viaOverride = auditTile(tileById(CITY), {

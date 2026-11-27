@@ -1,4 +1,4 @@
-// packages/client/src/renderer/Shield.tsx
+// packages/client/src/components/Shield.tsx
 // 🛡️ Компонент щита. Рендерится поверх тайла.
 // Позиция определяется через shieldSpot фичи.
 // Поворот компенсируется, чтобы щит всегда был "вертикальным".

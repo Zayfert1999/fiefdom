@@ -8,42 +8,25 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "artId", "quantity", "features"],
+        "required": ["id", "quantity", "features"],
         "properties": {
+          "id": { "type": "string" },
+          "quantity": { "type": "integer", "minimum": 1 },
           "features": {
             "type": "array",
             "items": {
               "type": "object",
               "required": ["id", "type", "ports", "meepleSpot"],
               "properties": {
-                "geometry": {
-                  "type": "object",
-                  "required": ["kind"],
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "enum": ["area", "line", "derived"]
-                    },
-                    "start": { "$ref": "#/definitions/point" },
-                    "outline": { "type": "array" },
-                    "lineWidth": { "type": "number", "minimum": 0 },
-                    "path": { "type": "array" }
-                  },
-                  "allOf": [
-                    {
-                      "if": { "properties": { "kind": { "const": "area" } } },
-                      "then": { "required": ["start", "outline"] }
-                    },
-                    {
-                      "if": { "properties": { "kind": { "const": "line" } } },
-                      "then": { "required": ["lineWidth", "start", "path"] }
-                    },
-                    {
-                      "if": { "properties": { "kind": { "const": "derived" } } },
-                      "then": { "not": { "required": ["start", "outline", "path"] } }
-                    }
-                  ]
-                }
+                "id": { "type": "string" },
+                "type": { "enum": ["road", "city", "monastery", "field"] },
+                "ports": {
+                  "type": "array",
+                  "items": { "type": "integer", "minimum": 0, "maximum": 11 }
+                },
+                "meepleSpot": { "$ref": "#/definitions/spot" },
+                "shieldSpot": { "$ref": "#/definitions/spot" },
+                "adjacentCities": { "type": "array", "items": { "type": "string" } }
               }
             }
           }
@@ -52,11 +35,13 @@
     }
   },
   "definitions": {
-    "point": {
-      "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
-      "items": { "type": "number", "minimum": -50, "maximum": 50 }
+    "spot": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": -50, "maximum": 50 },
+        "y": { "type": "number", "minimum": -50, "maximum": 50 }
+      }
     }
   }
 }

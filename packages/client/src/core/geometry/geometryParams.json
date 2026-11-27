@@ -30,9 +30,9 @@
   },
   "noise": {
     "areaAmplitude": 15,
-    "lineAmplitude": 30,
+    "lineAmplitude": 15,
     "areaFrequency": 0.01,
-    "lineFrequency": 0.01,
+    "lineFrequency": 0.02,
     "octaves": 2,
     "lacunarity": 2,
     "gain": 0.5,

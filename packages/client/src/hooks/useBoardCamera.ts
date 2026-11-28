@@ -29,7 +29,7 @@ const getRegionCenter = (region: CompletedRegion): { x: number; y: number } => {
  * - Хоткеи камеры (+, -, 0, стрелки)
  * - Обработчики drag мыши
  */
-export const useBoardCamera = (onGridClick?: (x: number, y: number) => void) => {
+export const useBoardCamera = () => {
   // 🌟 Ref для SVG (нужен и внутри хука для wheel, и снаружи для рендеринга)
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -277,7 +277,7 @@ export const useBoardCamera = (onGridClick?: (x: number, y: number) => void) => 
     if (e.touches.length < 2) {
       touchState.current.lastDistance = 0;
     }
-  }, [endDrag, screenToWorld, onGridClick]);
+  }, [endDrag]);
 
   // ============================================
   // 🛡️ ПРЕДОТВРАЩЕНИЕ ДЕФОЛТНЫХ ЖЕСТОВ БРАУЗЕРА

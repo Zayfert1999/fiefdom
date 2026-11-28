@@ -97,17 +97,6 @@ function unit(p: V2, q: V2): V2 {
     return [(q[0] - p[0]) / l, (q[1] - p[1]) / l];
 }
 
-/** [расстояние, ближайшая точка x, z] до отрезка */
-function nearestOnSegment(x: number, z: number, a: V2, b: V2): [number, number, number] {
-    const dx = b[0] - a[0];
-    const dz = b[1] - a[1];
-    const l2 = dx * dx + dz * dz;
-    const t = l2 > 0 ? clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1) : 0;
-    const px = a[0] + dx * t;
-    const pz = a[1] + dz * t;
-    return [Math.hypot(x - px, z - pz), px, pz];
-}
-
 function ringArea(ring: readonly Point[]): number {
     let s = 0;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) s += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];

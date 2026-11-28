@@ -10,7 +10,7 @@
 // - Объединение регионов: все 12 портов
 // ============================================
 
-import type { FeatureType, Tile, TileFeature, PlacedTile, Dir, Spot } from './types';
+import type { Tile, TileFeature, PlacedTile, Dir, Spot } from './types';
 import { RegionManager, type FeatureKey } from './regionManager';
 import { WORLD_BOUNDS } from './constants';
 import {

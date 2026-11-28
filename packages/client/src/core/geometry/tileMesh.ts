@@ -333,7 +333,7 @@ class MeshBuilder {
         const triangles: number[] = [];
         let trianglesArea = 0;
         for (let t = 0; t < raw.length; t += 3) {
-            let a = raw[t];
+            const a = raw[t];
             let b = raw[t + 1];
             let c = raw[t + 2];
 

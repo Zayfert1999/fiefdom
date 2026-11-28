@@ -474,22 +474,23 @@ export function auditGeometry(input: AuditGeometryInput): TileAudit {
         const geo = feature.geometry;
         if (!geo) continue;
 
-        let clean = 0;
-        let noised = 0;
+        let areas: [number, number] | undefined;
         if (geo.kind === 'area') {
             const multi = tessellation.areas.get(feature.id);
             if (!multi) continue;
-            clean = ringArea(tessellateArea(geo, input.tessellation));
-            noised = multi.reduce((sum, polygon) => sum + ringArea(polygon[0]), 0);
+            areas = [
+                ringArea(tessellateArea(geo, input.tessellation)),
+                multi.reduce((sum, polygon) => sum + ringArea(polygon[0]), 0),
+            ];
         } else if (geo.kind === 'line') {
             const line = tessellation.lines.get(feature.id);
             if (!line) continue;
-            clean = ringArea(roadRing(tessellateLine(geo, input.tessellation)));
-            noised = ringArea(roadRing(line));
+            areas = [ringArea(roadRing(tessellateLine(geo, input.tessellation))), ringArea(roadRing(line))];
         } else {
             continue;
         }
 
+        const [clean, noised] = areas;
         if (clean <= 0) continue;
         const drift = Math.abs(noised - clean) / clean;
         areaDrift[feature.id] = drift;
@@ -708,7 +709,6 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
         const plaza = { ...params?.plaza, ...options.plaza };
         const spotParams = { ...params?.spots, ...options.spots };
 
-        let features: readonly TileFeature[] = tile.features;
         const warnings: string[] = [];
 
         // Геометрия всегда генерируется из портов; нарисованная вручную остаётся
@@ -721,7 +721,7 @@ export function auditTile(tile: AuditTile, options: AuditPipelineOptions = {}): 
             },
         });
         warnings.push(...generated.warnings);
-        features = tile.features.map((feature) => {
+        const features: readonly TileFeature[] = tile.features.map((feature) => {
             const geometry = generated.geometries.get(feature.id);
             return geometry ? { ...feature, geometry } : feature;
         });

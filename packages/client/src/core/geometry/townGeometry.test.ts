@@ -404,7 +404,7 @@ describe('layoutCityTown', () => {
         const first = layout.streets
             .filter((s) => s.kind === 'main')
             .flatMap((s) => s.points)
-            .filter(([x, z]) => z > 110 - 12 + 0.5 && z <= 110 + 0.001);
+            .filter(([, z]) => z > 110 - 12 + 0.5 && z <= 110 + 0.001);
         expect(first.length).toBeGreaterThan(0);
         for (const [x] of first) expect(Math.abs(x - 70)).toBeLessThan(0.5);
     });

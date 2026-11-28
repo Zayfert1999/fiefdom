@@ -135,8 +135,8 @@ export const useCamera = () => {
 
     const { width: vpWidth, height: vpHeight } = viewportRef.current;
 
-    let clampedX = x;
-    let clampedY = y;
+    let clampedX: number;
+    let clampedY: number;
 
     // Ограничение по X
     if (worldWidthPx <= vpWidth) {

@@ -267,28 +267,27 @@ export const createNetworkSlice: StateCreator<GameStore, [], [], NetworkSlice> =
 
     // 🌟 Ход подтверждается ack-ом сервера. Раньше клиент ставил фазу endTurn
     // и просто ждал state-update: при отказе или потере ответа он «зависал».
-    socket.timeout(COMMIT_ACK_TIMEOUT_MS).emit('game:commit-move', { tile, meeple }, (err, result) => {
-      if (err) {
-        // Ответа нет: ход мог дойти, а мог нет — просим сервер прислать актуальное состояние
+    void socket.timeout(COMMIT_ACK_TIMEOUT_MS).emitWithAck('game:commit-move', { tile, meeple })
+      .then((result) => {
+        if (!result.ok) {
+          console.warn(`🚫 [Network] Ход отклонён: [${result.code}] ${result.message}`);
+          toast.error(result.message || getErrorMessage(result.code), { dedupeKey: `error:${result.code}` });
+
+          // Обычные отказы сервер сопровождает ресинком сам. Но при лимите запросов или
+          // внутренней ошибке он состояние не присылает — запрашиваем сами, чтобы не зависнуть.
+          if (result.code === 'RATE_LIMITED' || result.code === 'INTERNAL_ERROR') {
+            window.setTimeout(() => {
+              if (socket.connected) socket.emit('game:request-sync');
+            }, 1500);
+          }
+        }
+      })
+      .catch(() => {
+        // Ответа нет: ход мог дойти, а мог нет — просим сервер прислать актуальное состояние.
         console.warn('⚠️ [Network] Нет ack на commit-move — запрашиваем синхронизацию');
         toast.error('Сервер не ответил на ход. Синхронизируем состояние…', { dedupeKey: 'commit-timeout' });
         socket.emit('game:request-sync');
-        return;
-      }
-
-      if (!result.ok) {
-        console.warn(`🚫 [Network] Ход отклонён: [${result.code}] ${result.message}`);
-        toast.error(result.message || getErrorMessage(result.code), { dedupeKey: `error:${result.code}` });
-
-        // Обычные отказы сервер сопровождает ресинком сам. Но при лимите запросов или
-        // внутренней ошибке он состояние не присылает — запрашиваем сами, чтобы не зависнуть.
-        if (result.code === 'RATE_LIMITED' || result.code === 'INTERNAL_ERROR') {
-          window.setTimeout(() => {
-            if (socket.connected) socket.emit('game:request-sync');
-          }, 1500);
-        }
-      }
-    });
+      });
   },
 
   // ============================================

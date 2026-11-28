@@ -124,7 +124,7 @@ const MeepleActor3D = memo(({ item, terrain, onRemove }: MeepleActor3DProps) => 
     if (!group) return;
     const t = state.clock.elapsedTime;
 
-    let scale = 1;
+    let scale: number;
     let lift = 0;
     let rotZ = 0;
     let opacity = 1;

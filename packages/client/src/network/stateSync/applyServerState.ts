@@ -6,6 +6,7 @@ import { useGameStore } from '@/state/useGameStore';
 import { RegionManager } from '@fiefdom/shared/core/regionManager';
 import type { PlacedTile, PlacedMeeple } from '@fiefdom/shared/core/types';
 import type { SerializedGameState } from '@fiefdom/shared/core/serialization';
+import type { GamePhase } from '@/state/types';
 import { netLog } from '@/network/netLog';
 
 /**
@@ -99,7 +100,7 @@ export function applyServerState(
     regionManager,
     players: gameState.players,
     currentTurn: gameState.currentTurn,
-    phase: gameState.phase as any,
+    phase: gameState.phase as GamePhase,
     drawnTile: gameState.drawnTile,
     totalTiles: gameState.totalTiles,
     deckCount: gameState.deckCount ?? 0,
